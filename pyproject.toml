@@ -41,3 +41,20 @@ markers = ["models: 需要模型（torch、onnxruntime 與模型檔），用 uv 
 # tests/private 放本機資料（匯出的基準版程式碼含它自己的測試）；
 # test_contract_snapshot 要 S28 的 LIANTAI_DATA 和 tests/contract/serve.py，S28 完成前不收集
 addopts = "-m 'not models' --ignore=tests/private --deselect tests/contract/test_contract.py::test_contract_snapshot"
+
+# 靜態檢查與格式化：uvx ruff check . / uvx ruff format .
+[tool.ruff]
+target-version = "py311"
+line-length = 120
+extend-exclude = ["tests/private", "models", "logs"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "SIM", "C4", "S", "C901", "RUF"]
+ignore = [
+    "E501",                         # 行長交給 ruff format
+    "RUF001", "RUF002", "RUF003",   # 中文全形標點（，：（））不是誤植
+    "S603", "S607",                 # subprocess 以 list 呼叫 ffmpeg 等外部程式是預期用法
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101"]   # pytest 用 assert
