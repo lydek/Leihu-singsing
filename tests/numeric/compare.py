@@ -23,6 +23,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import make_inputs as MI  # noqa: E402
 
 SONGS = ("songsing01", "songspeech01")
+AUDIO = (".flac", ".wav", ".mp3", ".m4a", ".ogg")  # run.py --songs、similarity.py 認的音檔
 META_KEYS = ("separation", "vocal_model", "karaoke", "acapella", "language", "lyrics_unreliable", "harmony")
 
 
@@ -68,9 +69,28 @@ def _json(p: Path) -> dict | None:
     return json.loads(p.read_text("utf-8")) if p.exists() else None
 
 
+def songs(a: Path, b: Path) -> list[str]:
+    """合成素材的兩首，加上 run.py --songs 處理的真實歌曲（song01、song02…，任一邊有就列，缺的那邊會報檔案不存在）。"""
+    extra = {x.name for d in (a, b) if d.exists() for x in d.iterdir() if x.is_dir() and re.fullmatch(r"song\d+", x.name)}
+    return [*SONGS, *sorted(extra)]
+
+
+def _lyrics(a: Path, b: Path, sid: str) -> list[dict]:
+    la, lb = (_lrc(d / sid / "lyrics_auto.lrc") for d in (a, b))
+    ta, tb = ("".join(t for _, t in x) for x in (la, lb))
+    v = cer(ta, tb)
+    rows = [row(f"{sid} 歌詞字元錯誤率", f"{v:.3f}（{len(ta)} 字 vs {len(tb)} 字）", "< 0.01", bool(ta) and v < 0.01)]
+    if la and len(la) == len(lb):
+        diff = float(np.median([abs(x[0] - y[0]) for x, y in zip(la, lb, strict=True)]) * 1000)
+        rows.append(row(f"{sid} 歌詞起點差中位數", f"{diff:.0f} ms", "< 80 ms", diff < 80))
+    else:
+        rows.append(row(f"{sid} 歌詞行數", f"{len(la)} vs {len(lb)}", "相同", False))
+    return rows
+
+
 def pair(a: Path, b: Path) -> list[dict]:  # noqa: C901
     rows: list[dict] = []
-    for sid in SONGS:
+    for sid in songs(a, b):
         for stem in ("lead", "back", "inst"):
             pa, pb = a / sid / f"{stem}.flac", b / sid / f"{stem}.flac"
             if not (pa.exists() and pb.exists()):
@@ -106,16 +126,9 @@ def pair(a: Path, b: Path) -> list[dict]:  # noqa: C901
             da, db = ({k: m.get(k) for k in META_KEYS} for m in (ma_, mb_))
             bad = {k: f"{da[k]} vs {db[k]}" for k in META_KEYS if da[k] != db[k]}
             rows.append(row(f"{sid} meta（{'、'.join(META_KEYS)}）", bad or "相同", "相同", not bad))
-    # 歌詞只比有語音的那首：合成旋律那首沒有人聲，Whisper 每次「聽到」的幻覺字句不同，由 meta 的 lyrics_unreliable 比對
-    la, lb = (_lrc(d / "songspeech01" / "lyrics_auto.lrc") for d in (a, b))
-    ta, tb = ("".join(t for _, t in x) for x in (la, lb))
-    v = cer(ta, tb)
-    rows.append(row("songspeech01 歌詞字元錯誤率", f"{v:.3f}（{len(ta)} 字 vs {len(tb)} 字）", "< 0.01", bool(ta) and v < 0.01))
-    if la and len(la) == len(lb):
-        diff = float(np.median([abs(x[0] - y[0]) for x, y in zip(la, lb, strict=True)]) * 1000)
-        rows.append(row("songspeech01 歌詞起點差中位數", f"{diff:.0f} ms", "< 80 ms", diff < 80))
-    else:
-        rows.append(row("songspeech01 歌詞行數", f"{len(la)} vs {len(lb)}", "相同", False))
+        # 合成旋律那首沒有人聲：Whisper 每次「聽到」的幻覺字句不同，不比歌詞，由 meta 的 lyrics_unreliable 比對
+        if sid != "songsing01":
+            rows += _lyrics(a, b, sid)
     ka, kb = (_json(d / "songsing01" / "take_take01.json") for d in (a, b))
     if not (ka and kb):
         rows.append(row("評分", "take_take01.json 不存在", "", False))
@@ -197,7 +210,7 @@ def quality(d: Path) -> list[dict]:
     for sid in SONGS:
         t = _json(d / sid / "timing.json") or {}
         if t:
-            rows.append(row(f"{sid} 處理時間（單執行緒，不是效能基準）", "、".join(f"{k} {v} 秒" for k, v in t.items()), "", None))
+            rows.append(row(f"{sid} 處理時間（不是效能基準；執行緒數見執行條件）", "、".join(f"{k} {v} 秒" for k, v in t.items()), "", None))
     return rows
 
 
