@@ -136,13 +136,13 @@ def keep_corrupt(path: Path, valid) -> None:
     """要覆寫 path 之前呼叫（防止資料遺失）：內容壞掉時改名成 <檔名>.<時間>.bad 保留；
     檔案在但讀不到（例如被其他程式鎖住）時丟 UserError，不覆寫。不存在就什麼都不做。"""
     try:
-        text = path.read_text("utf-8")
+        raw = path.read_bytes()
     except FileNotFoundError:
         return
     except OSError as e:
         raise UserError(f"{path.name} 讀不到，這次沒有存檔（{e}）") from e
     try:
-        ok = valid(json.loads(text))
+        ok = valid(json.loads(raw.decode("utf-8")))   # UnicodeDecodeError、JSONDecodeError 都是 ValueError
     except ValueError:
         ok = False
     if not ok:
@@ -151,7 +151,8 @@ def keep_corrupt(path: Path, valid) -> None:
             path.replace(bad)
         except OSError as e:
             raise UserError(f"{path.name} 內容壞掉、無法改名保留，這次沒有存檔（{e}）") from e
-        log_error(f"{path.name} 內容壞掉，已改名保留成 {bad.name}", ValueError(text[:200]))
+        # 不記內容：config.json 裡有 API 金鑰
+        log_error(f"{path.name} 內容壞掉，已改名保留成 {bad.name}", ValueError("內容不是有效的 JSON 或格式不對"))
 
 
 def save_config(cfg: dict) -> None:
@@ -1506,12 +1507,25 @@ def _files_ready(files: dict) -> bool:
     uvr = MODELS / "uvr"
     for name, (size, sha, _) in files.items():
         p = uvr / name
-        if not p.exists() or (size and p.stat().st_size != size) or p.stat().st_size == 0:
+        try:
+            n = p.stat().st_size   # 只 stat 一次：ensure_model 可能剛好在刪壞掉的 yaml，消失就當成還沒好
+        except OSError:
             return False
-        if sha and size and size < (1 << 20) and _sha256(p) != sha:
-            p.unlink(missing_ok=True)   # O12：小的設定檔也核對內容（舊版沒核對就下載過）；刪掉讓下載重抓
+        if (size and n != size) or n == 0:
             return False
+        if not _small_file_ok(p, size, sha):
+            return False   # 唯讀：狀態輪詢會呼叫這裡，刪檔重抓交給 ensure_model（在模型鎖裡）
     return True
+
+
+def _small_file_ok(p: Path, size: int | None, sha: str | None) -> bool:
+    """小於 1 MB 的設定檔（yaml）也核對 SHA-256（O12：舊版沒核對就下載過）；大檔只看大小。讀不到當成不符。"""
+    if not (sha and size and size < (1 << 20)):
+        return True
+    try:
+        return _sha256(p) == sha
+    except OSError:
+        return False
 
 
 class _SlowSource(Exception):
@@ -1717,7 +1731,9 @@ def ensure_model(name: str, progress=None) -> None:
     p = MODELS / "uvr" / name
     with _model_locks.setdefault(name, threading.Lock()):   # 兩首同時處理時不要重複下載同一個模型
         if p.exists() and (not size or p.stat().st_size == size):
-            return
+            if _small_file_ok(p, size, sha):
+                return
+            p.unlink()   # O12：小設定檔大小對但內容不符（舊版沒核對就下載過）：刪掉重抓（fetch_file 只看大小）
         fetch_file(urls, p, size, sha, progress)
 
 

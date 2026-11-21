@@ -30,7 +30,7 @@ function Get-Python($out) {
   throw "Python 安裝檔檢查碼不符，請確認網路連線後重新執行安裝程式"
 }
 
-# get-pip.py 會被直接執行：釘住 pypa/get-pip 的 commit（pip 26.3，2026-11-21 下載核對過），核對 SHA-256 才執行
+# get-pip.py 會被直接執行：釘住 pypa/get-pip 的 commit（2026-11-03 版，2026-11-21 下載核對過），核對 SHA-256 才執行
 $GetPipUrl = "https://raw.githubusercontent.com/pypa/get-pip/c7135ee10cd1b1fcb8fbf63d5d0004885cba7aa4/public/get-pip.py"
 $GetPipSha = "356e0d0de21cdc348c3394084d90939b85e4246c4d14c76aee6ca4f46646ea98"
 function Get-GetPip($out) {
