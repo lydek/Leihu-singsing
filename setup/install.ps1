@@ -17,6 +17,19 @@ function Get-File($url, $out) {
   throw "無法下載 $url"
 }
 
+# Python 安裝檔固定版本，下載後核對 SHA-256（O14）：下載不完整或被換掉就重下，兩次都不對就停止安裝
+$PyZipUrl = "https://www.python.org/ftp/python/3.11.9/python-3.11.9-embed-amd64.zip"
+$PyZipSha = "009d6bf7e3b2ddca3d784fa09f90fe54336d5b60f0e0f305c37f400bf83cfd3b"
+function Get-Python($out) {
+  for ($i = 1; $i -le 2; $i++) {
+    Get-File $PyZipUrl $out
+    if ((Get-FileHash -Path $out -Algorithm SHA256).Hash -eq $PyZipSha) { return }
+    Say "  Python 安裝檔檢查碼不符（下載不完整或被換掉），重新下載…"
+    Remove-Item $out -Force -ErrorAction SilentlyContinue
+  }
+  throw "Python 安裝檔檢查碼不符，請確認網路連線後重新執行安裝程式"
+}
+
 try {
   Say ""
   Say "雷虎練唱台 安裝程式"
@@ -38,12 +51,12 @@ try {
     Say "下載 Python 3.11（約 11 MB）…"
     $tmp = Join-Path $env:TEMP "leihu-python.zip"
     Remove-Item $tmp -Force -ErrorAction SilentlyContinue
-    Get-File "https://www.python.org/ftp/python/3.11.9/python-3.11.9-embed-amd64.zip" $tmp
+    Get-Python $tmp
     try { Expand-Archive -Path $tmp -DestinationPath (Join-Path $AppDir "python") -Force -ErrorAction Stop }
     catch {   # 壓縮檔下載不完整：重下一次
       Say "  Python 壓縮檔損壞，重新下載…"
       Remove-Item $tmp, (Join-Path $AppDir "python") -Recurse -Force -ErrorAction SilentlyContinue
-      Get-File "https://www.python.org/ftp/python/3.11.9/python-3.11.9-embed-amd64.zip" $tmp
+      Get-Python $tmp
       Expand-Archive -Path $tmp -DestinationPath (Join-Path $AppDir "python") -Force -ErrorAction Stop
     }
     Remove-Item $tmp -Force -ErrorAction SilentlyContinue

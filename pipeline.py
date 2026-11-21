@@ -1440,7 +1440,8 @@ MODEL_FILES = {   # 檔名 → (大小, SHA-256, 下載網址…)
         _HF_UVR + "MDXNet/UVR_MDXNET_KARA_2.onnx", _GH_UVR + "UVR_MDXNET_KARA_2.onnx"]),
     HQ_KARAOKE: (913096801, "1de20d459332fe8869aeb01327a31df0032262706e1365114e852dc271779813", [
         _HF_UVR + "Roformer/MelBand/" + HQ_KARAOKE, _GH_UVR + HQ_KARAOKE, _GH_AS + HQ_KARAOKE]),
-    _HQ_YAML: (None, None, [_GH_AS + _HQ_YAML]),
+    # O12：釘住大小與 SHA-256（2026-11-21 下載核對過）
+    _HQ_YAML: (1726, "b35077d94861f068097cce1a5e54633c055e7dcc2613eade4e4dc7c7c9c3f48b", [_GH_AS + _HQ_YAML]),
     # 2.1.1：Hugging Face 的資料夾是 BandSplit（2.1.0 寫成 BSRoformer → 404）；再多一個 GitHub 來源
     HQ_VOCAL: (639331213, "5b84f37e8d444c8cb30c79d77f613a41c05868ff9c9ac6c7049c00aefae115aa", [
         _HF_UVR + "Roformer/BandSplit/" + HQ_VOCAL, _GH_UVR + HQ_VOCAL, _GH_AS + HQ_VOCAL]),
@@ -1448,12 +1449,18 @@ MODEL_FILES = {   # 檔名 → (大小, SHA-256, 下載網址…)
         _GH_AS + _HQ_VOCAL_YAML, _RAW_CFG + _HQ_VOCAL_YAML]),
 }
 # audio-separator 第一次載入模型時要的設定檔；raw.githubusercontent 不通時改走 jsDelivr
-_RAW = "https://raw.githubusercontent.com/TRvlvr/application_data/main/"
-_JSD = "https://cdn.jsdelivr.net/gh/TRvlvr/application_data@main/"
-MODEL_DATA = {
-    "download_checks.json": [_RAW + "filelists/download_checks.json", _JSD + "filelists/download_checks.json"],
-    "vr_model_data.json": [_RAW + "vr_model_data/model_data_new.json", _JSD + "vr_model_data/model_data_new.json"],
-    "mdx_model_data.json": [_RAW + "mdx_model_data/model_data_new.json", _JSD + "mdx_model_data/model_data_new.json"],
+# 釘住 commit 並核對檢查碼（O12）：抓 main 分支的話內容會變，檢查碼就對不上。
+# 2026-11-21 核對過：main 上的三個檔和這個 commit 的大小、SHA-256 相同
+_DATA_COMMIT = "3826b05b570dbd4fbedbc807758803b35348ba1b"
+_RAW = f"https://raw.githubusercontent.com/TRvlvr/application_data/{_DATA_COMMIT}/"
+_JSD = f"https://cdn.jsdelivr.net/gh/TRvlvr/application_data@{_DATA_COMMIT}/"
+MODEL_DATA = {   # 檔名 → (大小, SHA-256, 下載網址…)
+    "download_checks.json": (28267, "d3622e1fa19c161d3cf704927711b453d593a3f1eb0f2e0838c3136907935151",
+                             [_RAW + "filelists/download_checks.json", _JSD + "filelists/download_checks.json"]),
+    "vr_model_data.json": (4380, "6a2021b9aa355c10f845b68c73944d47bd9e1fdf37b8a584b14ce8f88b09bb2f",
+                           [_RAW + "vr_model_data/model_data_new.json", _JSD + "vr_model_data/model_data_new.json"]),
+    "mdx_model_data.json": (15358, "1aca8f9bcc57233bc714029663a9ec2345d9c7721f91e5e08f46392a879c6a9a",
+                            [_RAW + "mdx_model_data/model_data_new.json", _JSD + "mdx_model_data/model_data_new.json"]),
 }
 HQ_FILES = {k: MODEL_FILES[k] for k in (HQ_KARAOKE, _HQ_YAML)}
 HQ_DL = {"state": "idle", "got": 0, "total": HQ_FILES[HQ_KARAOKE][0], "error": ""}
@@ -1657,7 +1664,7 @@ def fetch_file(urls: list[str], dst: Path, size: int | None = None, sha256: str 
 def ensure_model_data() -> None:
     """audio-separator 需要的模型設定檔；壞掉（例如下載到一半）就重新下載。"""
     uvr = MODELS / "uvr"
-    for name, urls in MODEL_DATA.items():
+    for name, (size, sha, urls) in MODEL_DATA.items():
         p = uvr / name
         if p.exists():
             try:
@@ -1666,7 +1673,7 @@ def ensure_model_data() -> None:
             except Exception:
                 p.unlink(missing_ok=True)
         try:
-            fetch_file(urls, p)
+            fetch_file(urls, p, size, sha)
         except Exception as e:
             log_error(f"model data {name}", e)   # 讓 audio-separator 自己再試一次
 
