@@ -348,6 +348,7 @@ def test_o14_install_ps1_download_flow(tmp_path, fn, url, sha):
     driver = tmp_path / "driver.ps1"
     driver.write_text("\n".join([
         '$ErrorActionPreference = "Stop"',
+        "[Console]::OutputEncoding = [Text.Encoding]::UTF8",  # 例外訊息是中文：CI 的地區編碼不是 UTF-8
         f'${url} = "https://example.invalid/x"',
         f'${sha} = "{hashlib.sha256(good).hexdigest()}"',
         "$script:n = 0",
@@ -365,7 +366,7 @@ def test_o14_install_ps1_download_flow(tmp_path, fn, url, sha):
         env = {k: v for k, v in os.environ.items() if k.upper() != "PSMODULEPATH"}
         env.update(PAYLOAD=base64.b64encode(payload).decode(), DEST=str(dest))
         r = subprocess.run(["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", str(driver)],
-                           capture_output=True, text=True, timeout=120, env=env)
+                           capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=120, env=env)
         return r.stdout.strip().splitlines()[-1] + (f" ｜stderr：{r.stderr.strip()[-300:]}" if r.stderr.strip() else "")
 
     assert run(good) == "ok 1 True"
