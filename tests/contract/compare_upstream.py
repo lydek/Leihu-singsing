@@ -57,6 +57,7 @@ LOG_ALERTS = [
     ("改在主程式裡執行", "顯示卡子程式開不起來，改在主程式裡做"),
     ("改用 CPU", "改用 CPU"),
     ("退回", "退回較低品質的模型或做法"),
+    ("改用標準模型", "高品質模型失敗，改用標準模型"),
     ("卡住", "偵測到卡住"),
     ("逾時", "逾時"),
     ("out of memory", "記憶體不足"),
@@ -147,7 +148,7 @@ def diff(old, new, path: str, out: list[str]) -> None:
     elif isinstance(old, list) and isinstance(new, list) and len(old) == len(new):
         for i, (a, b) in enumerate(zip(old, new, strict=False)):
             diff(a, b, f"{path}[{i}]", out)
-    elif old != new:
+    elif type(old) is not type(new) or old != new:  # True == 1、1 == 1.0 在 Python 成立，JSON 契約卻不同
         out.append(
             f"~ {path}: {json.dumps(new, ensure_ascii=False)[:120]} -> {json.dumps(old, ensure_ascii=False)[:120]}"
         )
@@ -248,6 +249,7 @@ def alerts(run: dict, label: str, known: list[str]) -> list[str]:
 def compare(snap: dict, result: dict) -> tuple[list[str], dict, dict]:
     """snap＝目前這一邊、result＝基準。回傳（完全相同的案例、預期差異、未預期差異）。案例集合不同也算未預期。"""
     same, expected, unexpected = [], {}, {}
+    snap, result = (json.loads(json.dumps(x, ensure_ascii=False)) for x in (snap, result))  # 兩邊都用 JSON 的型別（tuple→list）
     for case in sorted(snap.keys() | result.keys()):
         if case not in snap or case not in result:
             unexpected.setdefault(case, []).append("只有" + ("基準" if case in result else "目前這一邊") + "有這個案例")

@@ -600,7 +600,8 @@ def compare_snapshot(result: dict, path: Path) -> None:
         return
     assert path.exists(), "還沒有快照：先用 LIANTAI_SNAPSHOT_UPDATE=1 錄一次"
     expected = json.loads(path.read_text("utf-8"))
-    changed = [k for k in expected.keys() | result.keys() if expected.get(k) != result.get(k)]
+    # 比 JSON 字串：True 和 1、1 和 1.0 在 Python 相等，JSON 契約卻不同
+    changed = [k for k in expected.keys() | result.keys() if _json(expected.get(k)) != _json(result.get(k))]
     detail = "\n".join(
         f"--- {k}\n預期：{_json(expected.get(k))[:1500]}\n實際：{_json(result.get(k))[:1500]}"
         for k in sorted(changed)[:5]
