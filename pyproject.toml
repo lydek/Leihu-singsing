@@ -39,7 +39,7 @@ pythonpath = ["."]
 testpaths = ["tests"]
 markers = ["models: 需要模型（torch、onnxruntime 與模型檔），用 uv run pytest -m models 手動跑"]
 # tests/private 放本機資料（匯出的基準版程式碼含它自己的測試）；
-# test_contract_snapshot 要 S28 的 LIANTAI_DATA 和 tests/contract/serve.py，S28 完成前不收集
+# test_contract_snapshot：快照是用有推論套件的內嵌 Python 錄的，uv 環境比不起來；改用 tests/contract/check_snapshot.py
 addopts = "-m 'not models' --ignore=tests/private --deselect tests/contract/test_contract.py::test_contract_snapshot"
 
 # 靜態檢查與格式化：uvx ruff check . / uvx ruff format .

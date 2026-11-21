@@ -1,29 +1,49 @@
 """測試共用設定。
 
-2.3.2 只讀 LIANTAI_PORT，沒有 LIANTAI_DATA 之類的覆寫（S28），所以這裡不設環境變數：
-設了也不會生效，只會讓人以為資料有隔離。測試只能 import app 和讀取，不能寫使用者資料。
-測試檔不要在模組頂端 import app、pipeline，一律從下面的 fixture 取得。
+環境變數要在這裡（模組載入時）設好，不能放在 fixture 裡：pytest 會先 import 所有測試檔，
+pipeline.DATA、app.PORT、Jobs 在 import 時就固定了。測試檔不要在模組頂端 import app、pipeline，
+一律從下面的 fixture 取得。
 """
 
 from __future__ import annotations
 
+import os
+import shutil
+import tempfile
 from pathlib import Path
 
 import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
 
-# 2.3.2 寫在安裝資料夾的使用者資料。只檢查這些：掃整個資料夾的話，import pipeline 把 ffmpeg 複製到 bin/、
-# 編輯器、索引工具或同一資料夾裡開著的練唱台（tests/tools/run_dev.py）寫檔，都會被誤判成測試寫的
+# S28：使用者資料放暫存資料夾、不跑背景工作、佇列只排隊、不開外部程式
+_TMP = Path(tempfile.mkdtemp(prefix="liantai-test-"))
+(_TMP / "data" / "library").mkdir(parents=True)  # main() 才會建 library/，測試不跑 main()
+(_TMP / "downloads").mkdir()
+os.environ.update(
+    LIANTAI_DATA=str(_TMP / "data"),
+    LIANTAI_DOWNLOADS=str(_TMP / "downloads"),
+    LIANTAI_NO_BACKGROUND="1",
+    LIANTAI_NO_JOBS="1",
+    LIANTAI_NO_SPAWN="1",
+)
+os.environ.pop("LIANTAI_PORT", None)  # 用預設的 8765
+
+# 沒設 LIANTAI_DATA 時，使用者資料放在安裝資料夾的這些位置。只檢查這些：掃整個資料夾的話，import pipeline 把
+# ffmpeg 複製到 bin/、編輯器、索引工具或同一資料夾裡開著的練唱台（tests/tools/run_dev.py）寫檔，都會被誤判成測試寫的
 _USER_DATA = (
     "library",
     "config.json",
     "usage.json",
     "setlist.json",
+    "setlists",
     "hotkeys_status.json",
     ".hotkeys_pause",
     ".appwin",
     ".duet_cleaned",
+    "spawn.log",
+    "logs/lyrics.log",
+    "logs/claude.log",
     "models/gpu_probe.json",
 )
 
@@ -42,7 +62,7 @@ def _root_files() -> dict[str, object]:
 
 @pytest.fixture(scope="session", autouse=True)
 def _root_untouched():
-    """測試不能動到安裝資料夾的使用者資料（真的歌曲庫、設定檔）。"""
+    """設了 LIANTAI_DATA 之後，測試不能動到安裝資料夾的使用者資料（真的歌曲庫、設定檔）。"""
     before = _root_files()
     yield
     after = _root_files()
@@ -59,3 +79,7 @@ def app_module():
     import app
 
     return app
+
+
+def pytest_sessionfinish(session, exitstatus):
+    shutil.rmtree(_TMP, ignore_errors=True)

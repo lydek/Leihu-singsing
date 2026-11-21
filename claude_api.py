@@ -8,7 +8,7 @@ import time
 
 import pipeline as P
 
-USAGE_PATH = P.ROOT / "usage.json"
+USAGE_PATH = P.DATA / "usage.json"
 _lock = threading.Lock()
 SESSION_START = time.time()
 
@@ -197,8 +197,8 @@ def _json_in_text(text: str):
 
 def log_raw(purpose: str, msg) -> None:
     try:
-        (P.ROOT / "logs").mkdir(exist_ok=True)
-        with open(P.ROOT / "logs" / "claude.log", "a", encoding="utf-8") as f:
+        (P.DATA / "logs").mkdir(exist_ok=True)
+        with open(P.DATA / "logs" / "claude.log", "a", encoding="utf-8") as f:
             f.write(f"\n=== {time.strftime('%Y-%m-%d %H:%M:%S')} {purpose} stop={getattr(msg, 'stop_reason', '')}\n")
             f.write(repr(msg.content)[:4000] + "\n")
     except Exception:

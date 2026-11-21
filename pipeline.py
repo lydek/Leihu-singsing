@@ -30,9 +30,24 @@ import soundfile as sf
 
 APP_NAME = "雷虎練唱台"
 ROOT = Path(__file__).resolve().parent
-LIB = ROOT / "library"
+# S28：使用者資料（歌曲庫、設定、用量、歌單、logs）的根目錄。測試用 LIANTAI_DATA 指到暫存資料夾；沒設時就是程式資料夾。
+# 只給伺服器（app.py）的測試用：桌面版、安裝程式不支援。相對路徑先轉成絕對路徑寫回環境變數，
+# gpu_worker 子程式（cwd 是 ROOT）繼承後才會指到同一個地方
+for _k in ("LIANTAI_DATA", "LIANTAI_DOWNLOADS"):
+    if os.environ.get(_k):
+        os.environ[_k] = str(Path(os.environ[_k]).resolve())
+DATA = Path(os.environ["LIANTAI_DATA"]) if os.environ.get("LIANTAI_DATA") else ROOT
+if DATA != ROOT:
+    DATA.mkdir(parents=True, exist_ok=True)  # 指到還不存在的資料夾也能啟動
+LIB = DATA / "library"
 MODELS = ROOT / "models"
-CONFIG_PATH = ROOT / "config.json"
+CONFIG_PATH = DATA / "config.json"
+# S28：測試與契約快照用，沒設時和原本相同。NO_BACKGROUND：不跑啟動時的背景工作、不在背景下載高品質模型、
+# 不裝套件、不升級 yt-dlp、不在背景探測顯示卡（佇列工作裡的模型下載由 NO_JOBS 一起關掉）；
+# NO_JOBS：佇列只排隊不執行；NO_SPAWN：不開瀏覽器、檔案總管、安裝檔，改記到 DATA/spawn.log
+NO_BACKGROUND = os.environ.get("LIANTAI_NO_BACKGROUND") == "1"
+NO_JOBS = os.environ.get("LIANTAI_NO_JOBS") == "1"
+NO_SPAWN = os.environ.get("LIANTAI_NO_SPAWN") == "1"
 DEFAULT_LIB, DEFAULT_MODELS = LIB, MODELS
 
 
@@ -48,6 +63,15 @@ def _apply_storage() -> None:
 
 
 _apply_storage()
+
+
+def spawned(kind: str, target: str) -> bool:
+    """LIANTAI_NO_SPAWN=1 時，把要開的外部程式記到 DATA/spawn.log 並回傳 True，呼叫端就不真的開。"""
+    if not NO_SPAWN:
+        return False
+    with open(DATA / "spawn.log", "a", encoding="utf-8") as f:
+        f.write(json.dumps({"kind": kind, "target": target}, ensure_ascii=False) + "\n")
+    return True
 
 SR = 44100
 PITCH_SR = 16000
@@ -165,7 +189,7 @@ def gpu_info(block: bool = True) -> dict | None:
         pass
     if not block:
         with _GPU_INFO_LOCK:
-            if not _GPU_PROBING["on"]:
+            if not _GPU_PROBING["on"] and not NO_BACKGROUND:   # S28：測試時不開 gpu_worker 子程式探測顯示卡
                 _GPU_PROBING["on"] = True
                 threading.Thread(target=gpu_info, daemon=True, name="gpu-probe").start()
         return None
@@ -224,6 +248,8 @@ def cuda_ok() -> bool:
 
 def downloads_dir() -> Path:
     """使用者的「下載」資料夾（Windows 會讀系統設定，處理被搬到其他磁碟的情況）。"""
+    if os.environ.get("LIANTAI_DOWNLOADS"):
+        return Path(os.environ["LIANTAI_DOWNLOADS"])
     if sys.platform == "win32":
         try:
             import ctypes
@@ -910,6 +936,8 @@ def new_youtube_song(url: str, title: str = "") -> str:
 
 
 def _upgrade_ytdlp() -> None:
+    if NO_BACKGROUND:
+        return
     import subprocess
     subprocess.run([sys.executable, "-m", "pip", "install", "-U", "yt-dlp", "--disable-pip-version-check"],
                    capture_output=True, timeout=300)
@@ -1671,6 +1699,8 @@ def start_hqv_download() -> None:
 
 
 def _start_download(files: dict, tracker: dict, ready) -> None:
+    if NO_BACKGROUND:
+        return
     with _hq_lock:
         if tracker["state"] == "downloading" or ready():
             return
@@ -2957,6 +2987,8 @@ def kana_status() -> dict:
 
 def start_kana_install() -> None:
     """在背景用 pip 安裝日文讀音字典（舊版升級上來的使用者沒有，不用重跑安裝）。"""
+    if NO_BACKGROUND:
+        return
     with _kana_lock:
         if KANA["state"] == "installing" or kana_ready():
             return
@@ -3432,7 +3464,8 @@ class Jobs:
                 self.paused = bool(load_config().get("queue_paused"))
             except Exception:
                 pass
-        threading.Thread(target=self._run, daemon=True).start()
+        if not NO_JOBS:   # 測試時只排隊不執行：工作會連網、要模型，結果也每次不同
+            threading.Thread(target=self._run, daemon=True).start()
 
     def _held(self, jid: str) -> bool:
         st = self.state.get(jid) or {}
@@ -3966,8 +3999,8 @@ def _http_json(url: str, headers: dict | None = None, timeout: int = 8):
 def log_error(where: str, err: Exception) -> None:
     """把連線等錯誤寫進 logs/lyrics.log，方便之後查原因。"""
     try:
-        (ROOT / "logs").mkdir(exist_ok=True)
-        with open(ROOT / "logs" / "lyrics.log", "a", encoding="utf-8") as f:
+        (DATA / "logs").mkdir(exist_ok=True)
+        with open(DATA / "logs" / "lyrics.log", "a", encoding="utf-8") as f:
             f.write(f"{time.strftime('%Y-%m-%d %H:%M:%S')} {where}: {type(err).__name__}: {err}\n")
     except Exception:
         pass

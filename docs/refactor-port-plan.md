@@ -245,7 +245,7 @@ F 組的修正跟著程式落點放進對應的步驟；改變行為的修正依
    - D 組完成時跑 `compare_upstream.py v2.3.2 --record` 錄一次，這時兩邊相同。舊的 `contract.json` 是重構版的輸出，不能沿用。
    - `RULES` 要先清成空 list：舊的 S15、D1、R2、D2/D4 是 2.0.0 重構版的差異，其中 D1 用案例名稱的字首整個放行，留著會讓未登記的差異被當成預期。
    - 之後 C 組、E 組除了安全修正都不改行為（3.1）；出現差異時（例如安全修正、沙盒要替換的名稱變了），先在 `RULES` 登記並寫原因，再更新快照。除了第一次建立基準，更新都要先寫出候選結果，確認案例集合一致，並和現場跑的 `v2.3.2` 比對；所有差異都符合 `RULES` 才覆寫 `contract.json`，否則 exit 1、保留原快照。
-3. 步驟 1 之前，`refactor` 這邊用 `compare_upstream.py <已 commit 的參照> --record`，以 `serve_upstream.py` 執行匯出的程式，兩邊只要一個啟動器。步驟 1 之後改用 `serve.py` 加 pytest 更新目前工作樹的快照（`LIANTAI_SNAPSHOT_UPDATE=1 uv run pytest tests/contract`，要 S28），不再用 `--record`；`serve.py` 的 `ROOT` 固定是 repo 本身，如果要錄重構後的任意參照，要先讓它接受程式碼資料夾參數。上一點「先比對、全部登記才覆寫」的規則兩種錄法都要做到。`test_contract.py` 同時是工具庫和唯一的 pytest 測試，所以 B 組要讓 CI 不收集 `test_contract_snapshot`（3.11 的 `addopts`），等 C 組完成 S28 後再拿掉。
+3. 步驟 1 之前，`refactor` 這邊用 `compare_upstream.py <已 commit 的參照> --record`，以 `serve_upstream.py` 執行匯出的程式，兩邊只要一個啟動器。步驟 1 之後改用 `serve.py` 比對目前工作樹（內嵌 Python 跑 `tests/contract/check_snapshot.py`，見 3.12），更新快照的指令到時再補，不再用 `--record`；`serve.py` 的 `ROOT` 固定是 repo 本身，如果要錄重構後的任意參照，要先讓它接受程式碼資料夾參數。上一點「先比對、全部登記才覆寫」的規則兩種錄法都要做到。`test_contract.py` 同時是工具庫和唯一的 pytest 測試，所以 B 組讓 CI 不收集 `test_contract_snapshot`（3.11 的 `addopts`）；S28 完成後仍不收集，原因見 3.12。
 4. 步驟 1 會把 `prefetcher`、`lead_fix_sweep` 等背景函式從 `app` 搬走，`serve_upstream.py` 的 `hasattr(app, name)` 找不到就靜默略過，背景執行緒會真的啟動。所以 S28 要在步驟 1 之前完成，之後 `refactor` 這邊改用 `serve.py`。
 
 從行為比對計畫補過來的做法：
@@ -348,14 +348,14 @@ shim 要補的地方：
   - 數值：跑 3 次，第 2、3 次各 14／14 個檔案和第 1 次完全相同；子程式回報每一步實際都在 CPU（MDX 兩個 ONNX session、Whisper VAD 都是 `CPUExecutionProvider`，torchcrepe tiny，Whisper float32）。
   - 效能（中位數，秒／private 尖峰 MiB）：匯入 2.6／1994、分離 87.2／8397、音高 7.4／3990、歌詞 15.5／7383、移調 8.3／6054、評分 13.4／4178、匯出 1.3／4838、閒置 1720 MiB。
   - 相似度（平常條件 3 次）：語音那首音符數差 2～3 個、沒配對到的音符 5～6 個、音高不同 5～6 個；匯出檔 SDR 在評分 offset 差 0.01 秒時約 -2 dB（3 組有 2 組）。
-- **還沒做**：顯示卡基準（3.10）；真實歌曲（`fetch.py` 下載後加 `--songs` 重跑）。`test_contract_snapshot` 需要 `conftest` 和 S28，目前不能用 pytest 跑。
+- **還沒做**：顯示卡基準（3.10）；真實歌曲（`fetch.py` 下載後加 `--songs` 重跑）。`test_contract_snapshot` 在 uv 環境比不起來（見 3.12），pytest 不收集。
 
 ### 3.10 顯示卡基準：目前不錄
 - 第一階段只靠開發機的 CPU 基準證明行為沒變。顯示卡路徑（`gpu_worker` 的顯示卡分支、CUDA 失敗時的退回、高品質模型 BS-Roformer、顯示卡記憶體不足時的行為與效能）沒有基準，重構時改到這些地方要特別小心，並在 PR 寫明沒有驗證。
 - 工具已經支援顯示卡的部分：`--device=cpu|auto`、`similarity.py --fixed`（顯示卡數值基準要用的固定條件下限）、`child_hook.py` 回報每一步的實際裝置、數值基準在顯示卡上改用下限判斷穩定性。都只在 CPU 上跑過，顯示卡分支沒有實際執行過。
 
 ### 3.11 B 組執行計畫
-分支的起點見第 4 節。一個舊 commit 對一個新 commit，依下面的順序；舊 commit 裡的文件（`docs/step0-plan.md`、`docs/improvements.md`、`docs/ruff-handoff.md`、`docs/HANDOFF.md`）不搬，跟 A、G 組一起處理。
+接在 `test/upstream-baseline` 上做。一個舊 commit 對一個新 commit，依下面的順序；舊 commit 裡的文件（`docs/step0-plan.md`、`docs/improvements.md`、`docs/ruff-handoff.md`、`docs/HANDOFF.md`）不搬，跟 A、G 組一起處理。
 
 1. **`447489e` 重做**：
    - `pyproject.toml`、`.python-version`、`uv.lock`：`requires-python`、`[tool.uv]`（`package = false`、`default-groups`、只解 `win32`）和 `test` 群組（扣掉推論和視窗套件，版本照 `requirements-win.txt`）照 `447489e`。不要複製 `sync/upstream-2.3.2` 的版本：它多了 2.3.2 用不到的 `soxr`。`uv lock` 重新產生。
@@ -377,12 +377,30 @@ shim 要補的地方：
 - CI 跑 ruff（`cf7a96e`、`c666a91`）：延到 E 組清完違規之後（3.1）。
 - CI 跑契約快照（`compare_upstream.py v2.3.2`）：要先確認快照在 CI 的機器上兩次相同（例如音檔的 `pcm_sha256` 可能因 CPU 不同而不同），另外評估。
 
-順帶發現，延到後面的版本（修了會改變行為，見 3.1 的原則）：`pipeline.py` 沒有在模組頂端 `import subprocess`，`pipeline.py:3263`（`_running_apps` 在 Windows API 失敗時改用 `tasklist`）和 `pipeline.py:3294`（`_sample_gpu_load` 跑 `nvidia-smi`）會丟 `NameError`，被 `except Exception` 吞掉，所以這兩個功能一直沒有作用、也沒有訊息。契約、數值、效能的沙盒都換掉了這兩個函式，基準測不到。
+順帶發現，延到後面的版本（修了會改變行為，見 3.1 的原則）：`pipeline.py` 沒有在模組頂端 `import subprocess`，`pipeline.py:3263`（`_running_apps` 在 Windows API 失敗時改用 `tasklist`）和 `pipeline.py:3294`（`_sample_gpu_load` 跑 `nvidia-smi`）會丟 `NameError`，被 `except Exception` 吞掉：`tasklist` 備援和 `nvidia-smi` 取樣一直沒有作用、也沒有訊息（Windows API 那條直播偵測正常）。契約、數值、效能的沙盒都換掉了這兩個函式，基準測不到。
+
+**進度（2026-11-21）**：接在 `test/upstream-baseline` 上做完，四個 commit 依序對應上面四步（`f8538e4`、`e234dd4`、`5d3db0d`、`5d430b7`）。
+- 本機 `uv run pytest`：4 個通過、1 個不收集（`test_contract_snapshot`）。`import app` 沒有寫到使用者資料。
+- `uvx ruff@0.17.5 check .`：上游程式（不含 `tests/`）277 個違規，`format --check` 有 10 個檔案要格式化；D 組工具（`tests/`）32 個違規；B 組新增的檔案沒有違規。F821 證實 `pipeline.py` 缺 `import subprocess`。
+- 沒驗證：CI 還沒在 `windows-latest` 跑過（`push` 只跑 `main`，要開 PR 才會跑）；這台電腦沒有 makensis，`build.sh` 沒有實際建立安裝檔。
+
+### 3.12 C 組進度：S28（2026-11-21）
+- 環境變數：`LIANTAI_DATA`（使用者資料：歌曲庫、`config.json`、`usage.json`、`setlist.json`、`setlists/`、快捷鍵狀態檔、`.appwin`、`.duet_cleaned`、`logs/lyrics.log`、`logs/claude.log`）、`LIANTAI_DOWNLOADS`、`LIANTAI_NO_BACKGROUND`（啟動時的背景工作、背景下載高品質模型、裝套件、升級 yt-dlp、背景探測顯示卡）、`LIANTAI_NO_JOBS`（佇列只排隊）、`LIANTAI_NO_SPAWN`（開瀏覽器、檔案總管、app 視窗、安裝檔改記到 `DATA/spawn.log`，記法和 `serve_upstream.py` 相同）。
+- 沒設時和 2.3.2 相同；相對路徑轉成絕對路徑寫回環境變數（`gpu_worker` 子程式繼承），資料夾不存在就建立。模型、`bin/`、安裝位置留在程式資料夾。
+- 只給伺服器（`app.py`）的測試用：桌面版（`desktop.py` 只有快捷鍵狀態檔、讀設定跟著 `LIANTAI_DATA`；共用伺服器只比對程式資料夾、不認 `NO_SPAWN`）和安裝程式（讀程式資料夾的 `config.json`）都不支援。S31 依 3.1 延後。
+- 測試：`tests/test_env_overrides.py`；`conftest` 改成設這些環境變數、資料放暫存資料夾。`tests/contract/serve.py` 從舊分支搬來（拿掉 `--fake`）。
+- 數值、效能沙盒（`tests/numeric/sandbox.py`）原本把 `LIANTAI_DATA` 設成暫存資料夾給 netblock 寫 log，有 S28 的版本會把歌曲庫搬過去；改成清掉所有 `LIANTAI_*`、netblock 改讀 `LEIHU_NET_LOG`。`compare_upstream.py --code=` 不再把 `.venv`、`tests/private` 複製進沙盒。
+- `tests/tools/run_dev.py`（B 組）補上：`gpu_worker` 子程式也先把 repo 放到搜尋路徑最前面，不然會載入安裝版。
+- 驗證：
+  - `uv run pytest`：13 個通過。
+  - 內嵌 Python 跑 `tests/contract/check_snapshot.py`（`serve.py`，141 個案例兩次）和 `compare_upstream.py v2.3.2 --code=.`（上游沙盒）都和快照相同，異常 0。
+  - ruff：上游程式的違規數不變（277）。
+- `test_contract_snapshot` 留在 `addopts` 不收集：快照是用有推論套件的內嵌 Python 錄的，uv 環境的 `/api/status` 的 `modules` 不同。本機改用 `check_snapshot.py`；CI 不跑快照。
+- 沒驗證：數值、效能基準沒有在有 S28 的程式上重跑（要先 commit）；`run_dev.py` 的修正沒有實際開過桌面版。
 
 ## 4. 要先決定的事
 - 舊分支要留著（唯讀）還是封存成 tag，`claude/original-refactor-behavior-comparison-d469de` 也一樣。在搬完之前不要刪。
 - 測試歌曲的清單和授權（3.8）。
-- B 組從哪裡開分支：D 組（`test/upstream-baseline`）先發 PR 合進 `refactor`，B 組再從 `refactor` 開；或 B 組先接在 `test/upstream-baseline` 上，之後一起合併。兩種做法的 B 組內容相同（3.11）。
 - 延後到後面版本的項目（會改變行為，3.1）：`pipeline.py` 缺 `import subprocess`（3.11）、S31、`_set_priority`（3.6）、長音訊旋律分析逾時放寬（3.6）、69 和 70 不屬於防止資料遺失的部分；C、F 組其餘逐項確認後補列。
 - 上游 `gpu_worker` 的主程式備援（`_local`）要保留還是拿掉：保留則子程式壞了仍能處理歌曲，但伺服器會載入 torch；拿掉則遵守「伺服器不載入 torch」，子程式壞了就不能處理（3.6）。拿掉會改變行為，依 3.1 屬於後面的版本，這個版本先保留。
 
