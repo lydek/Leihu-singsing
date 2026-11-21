@@ -41,7 +41,7 @@ def get_lyrics(sid):
                    recognized=meta.get("lyrics_recognized") is not False or (d / "lyrics_auto.lrc").exists(),
                    reasons=(meta.get("lyrics_quality") or {}).get("reasons", []),
                    language=meta.get("language"), song_language=meta.get("lyrics_language"),
-                   kana_fix=meta.get("kana_fix") or {})
+                   kana_fix=meta.get("kana_fix") or {}, kana_at=meta.get("kana_at") or {})
 
 
 @bp.post("/api/furigana")
@@ -63,22 +63,34 @@ def furigana():
 
 @bp.post("/api/songs/<sid>/kana")
 def set_kana(sid):
-    """修改這首歌某個漢字詞的讀音（每首歌各自記住）；讀音空白＝恢復自動判斷。"""
+    """修改這首歌某個漢字的讀音（每首歌各自記住）；讀音空白＝恢復。
+    at：只改這一處（那句歌詞＋第幾次出現＋第幾個字，2.3.3）；沒有 at＝整首歌同字都套用。
+    clear_keys：整首套用時，把這個字先前「只改這一處」的設定一起清掉，整首才會一致。"""
     b = request.get_json(force=True) or {}
     base, reading = str(b.get("base") or "").strip()[:40], str(b.get("reading") or "").strip()[:80]
-    if not base:
+    at = str(b.get("at") or "")[:600]
+    if not base and not at:
         raise P.UserError("缺少要修改的字")
     d = P.song_dir(sid)
     with P._META_LOCK:   # 讀出到寫回之間不讓別的執行緒改這首歌的資料
         meta = P.read_meta(d)
         fix = meta.get("kana_fix") or {}
-        if reading:
-            fix[base] = reading
+        pos = meta.get("kana_at") or {}
+        if at:
+            if reading:
+                pos[at] = reading
+            else:
+                pos.pop(at, None)
         else:
-            fix.pop(base, None)
-        meta["kana_fix"] = fix
+            if reading:
+                fix[base] = reading
+            else:
+                fix.pop(base, None)
+            for k in b.get("clear_keys") or []:   # 這個字先前「只改這一處」的設定（前端算好位置）
+                pos.pop(str(k), None)
+        meta["kana_fix"], meta["kana_at"] = fix, pos
         P.write_meta(d, meta)
-    return jsonify(kana_fix=fix)
+    return jsonify(kana_fix=fix, kana_at=pos)
 
 
 @bp.post("/api/songs/<sid>/lyrics/use")
@@ -290,6 +302,6 @@ def export_lyrics(sid):
         out = "\n".join(rows)
     folder = P.downloads_dir() / P.APP_NAME
     folder.mkdir(parents=True, exist_ok=True)
-    path = folder / f"{_safe_name(meta.get('title', '歌詞'))}.{fmt}"
+    path = P.unique_path(folder / f"{_safe_name(meta.get('title', '歌詞'))}.{fmt}")
     path.write_text(out, encoding="utf-8-sig" if fmt in ("txt", "srt") else "utf-8")
     return jsonify(path=str(path))

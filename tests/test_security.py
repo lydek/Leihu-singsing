@@ -163,6 +163,40 @@ def test_m4_out_path_keeps_dots(app_module):
     assert base.with_suffix(".mp3").name == "S.H.mp3"  # 原本的寫法：S.H.E 的每首歌、每次錄音都撞名、互相覆寫
 
 
+def test_m4_take_export_numbering_keeps_dots(app_module, monkeypatch):
+    """2.3.3 的「同一次錄音匯出過就加編號」和 M4 一起：檢查和產生檔名都不能被歌名裡的「.」截斷。"""
+    import json as _json
+    import shutil
+
+    import pipeline as P
+    import share as SH
+
+    sid, tid = "m4export01", "20261121-1200"
+    d = P.LIB / sid
+    d.mkdir(parents=True, exist_ok=True)
+    (d / "meta.json").write_text(_json.dumps({"id": sid, "title": "S.H.E 中國話"}), "utf-8")
+    from leihu.web import takes
+
+    monkeypatch.setattr(SH, "load_take", lambda d, tid: {})
+    monkeypatch.setattr(takes, "_need_variant", lambda d, sid, tid: None)  # 只看檔名，不產生 KEY 版本
+    folder = P.downloads_dir() / P.APP_NAME
+    folder.mkdir(parents=True, exist_ok=True)
+    c = app_module.app.test_client()
+    try:
+        first = c.post(f"/api/songs/{sid}/takes/{tid}/export", json={"formats": ["png", "mp3"]}).get_json()["files"]
+        assert [Path(f).name for f in first] == [f"S.H.E 中國話_我的演唱_{tid}_成績卡.png", f"S.H.E 中國話_我的演唱_{tid}.mp3"]
+        Path(first[1]).write_bytes(b"x")  # 上一次匯出的 mp3 還在：這次要加編號，不覆蓋
+        again = c.post(f"/api/songs/{sid}/takes/{tid}/export", json={"formats": ["png", "mp3"]}).get_json()["files"]
+        assert [Path(f).name for f in again] == [
+            f"S.H.E 中國話_我的演唱_{tid} (2)_成績卡.png",
+            f"S.H.E 中國話_我的演唱_{tid} (2).mp3",
+        ]
+    finally:
+        shutil.rmtree(d, ignore_errors=True)
+        for f in folder.glob("S.H.E 中國話_*"):
+            f.unlink()
+
+
 # ---------------------------------------------------------------- O12：模型設定檔釘版本、核對檢查碼
 
 

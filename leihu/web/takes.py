@@ -190,6 +190,14 @@ def take_export(sid, tid):
     SH.load_take(d, tid)
     title = P.read_meta(d).get("title", "我的演唱")
     base = P.downloads_dir() / P.APP_NAME / f"{_safe_name(title)[:50]}_我的演唱_{tid[:13]}"
+    # 2.3.3：同一次錄音匯出過，這次的檔名加上編號、不覆蓋上次的。
+    # fork：檢查和產生檔名都用 SH.out_path（M4：歌名有「.」時 with_suffix 會截斷檔名）
+    sib = tuple("." + f for f in ("wav", "mp3", "mp4") if f in opts["formats"]) + (("_成績卡.png",) if "png" in opts["formats"] else ())
+    if any(SH.out_path(base, s).exists() for s in sib):
+        n = 2
+        while any(SH.out_path(base.with_name(f"{base.name} ({n})"), s).exists() for s in sib):
+            n += 1
+        base = base.with_name(f"{base.name} ({n})")
     files = ([str(SH.out_path(base, "_成績卡.png"))] if "png" in opts["formats"] else []) + \
         [str(SH.out_path(base, "." + f)) for f in ("wav", "mp3", "mp4") if f in opts["formats"]]
     jid = jobs.submit("export", sid, lambda report: SH.export_take(d, tid, opts, base, report), label=tid)
