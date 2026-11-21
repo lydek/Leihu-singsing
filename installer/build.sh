@@ -9,5 +9,6 @@ mkdir -p payload/static/fonts && cp ../static/fonts/* payload/static/fonts/
 cp ../static/help.html payload/使用說明.html
 cp ../setup/install.ps1 payload/setup/
 cp license.txt payload/版權與使用聲明.txt
-LANG=C.UTF-8 LC_ALL=C.UTF-8 makensis -V2 leihu.nsi
+# -INPUTCHARSET UTF8：leihu.nsi 是不含 BOM 的 UTF-8；Windows 版 makensis 不指定時用系統的 ANSI 編碼讀（Bad text encoding）
+LANG=C.UTF-8 LC_ALL=C.UTF-8 makensis -V2 -INPUTCHARSET UTF8 leihu.nsi
 ls -la out
