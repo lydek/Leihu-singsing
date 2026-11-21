@@ -11,7 +11,8 @@ r"""錄一個版本在這台電腦上的數值基準（docs/refactor-port-plan.m
 摘要（不含音檔）寫到 tests/numeric/baselines/<版本>-<標籤>.json（進 git，給另一台電腦、之後的重構版對照）。
 
 用法（repo 根目錄，用已安裝版本的內嵌 Python）：
-  <python> tests/numeric/baseline.py [git 參照，預設 v2.3.2] [--label=<這台電腦的名稱，例如 desktop-cpu>] [--runs=2]
+  <python> tests/numeric/baseline.py [git 參照，預設 v2.3.2] [--label=<這台電腦的名稱，例如 desktop-cpu>] [--runs=2] [--songs]
+--songs：tests/private/songs/ 的真實歌曲也一起跑（run.py --songs；單執行緒，一首 3～4 分鐘的歌每次要幾分鐘）。
 有異常時結束代碼是 1。
 """
 
@@ -36,6 +37,7 @@ from compare_upstream import LOG_ALERTS, OUT, _git, export  # noqa: E402
 INPUTS = ROOT / "tests" / "private" / "numeric" / "inputs"
 MODELS = ROOT / "tests" / "private" / "models"
 SUMMARY = HERE / "baselines"
+SONGS = ROOT / "tests" / "private" / "songs"
 
 
 def machine() -> dict:
@@ -123,7 +125,8 @@ def main() -> int:  # noqa: C901
         t0 = time.time()
         with open(base / f"run{i}.log", "w", encoding="utf-8") as f:
             r = subprocess.run(
-                [sys.executable, "-I", str(HERE / "run.py"), str(code), str(INPUTS), str(MODELS), str(out)],
+                [sys.executable, "-I", str(HERE / "run.py"), str(code), str(INPUTS), str(MODELS), str(out)]
+                + ([f"--songs={SONGS}"] if "songs" in opt else []),
                 stdout=f, stderr=subprocess.STDOUT, env=dict(os.environ, PYTHONUTF8="1", PYTHONDONTWRITEBYTECODE="1"),
             )
         wall[i] = round(time.time() - t0, 1)
