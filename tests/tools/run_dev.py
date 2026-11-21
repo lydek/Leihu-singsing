@@ -19,6 +19,18 @@ sys.path.insert(0, str(ROOT))
 os.chdir(ROOT)
 
 if len(sys.argv) > 1 and sys.argv[1] == "--serve":   # desktop 啟動的伺服器子行程
+    _WorkerPopen = subprocess.Popen
+
+    class _Popen(_WorkerPopen):
+        """gpu_worker 的子程式（python -c "import gpu_worker; ..."）也要先把這個資料夾放到搜尋路徑最前面，
+        不然會載入安裝資料夾裡的 gpu_worker、pipeline。要用類別：asyncio 等會繼承 subprocess.Popen。"""
+
+        def __init__(self, args, *a, **k):
+            if isinstance(args, list) and len(args) == 3 and args[1] == "-c" and "gpu_worker.serve(" in args[2]:
+                args = [args[0], "-c", f"import sys; sys.path.insert(0, {str(ROOT)!r}); " + args[2]]
+            super().__init__(args, *a, **k)
+
+    subprocess.Popen = _Popen
     sys.argv = [str(ROOT / "app.py"), *sys.argv[2:]]
     runpy.run_path(str(ROOT / "app.py"), run_name="__main__")
     raise SystemExit
