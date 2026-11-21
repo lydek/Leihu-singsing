@@ -449,6 +449,15 @@ Codex 第 7 次審查後補的（同類問題和繞過路徑）：
 - 契約快照：`open_url` 案例送的是上游專案網址，現在不在白名單裡（200 → 400），登記成 `RULES` 的 `F1` 後用 `--record` 重錄。前端與安裝檔的改動登記在 `OWN_CHANGES`（`--leak` 檢查為空）。
 - 測試：`tests/test_fork_update.py`（版號、4 段比較、只查 fork 的 release、不接受上游的安裝檔、白名單、授權檔仍指向原專案）。
 
+### 3.16 安裝檔的建置與發版（2026-11-22）
+- `.github/workflows/installer.yml`：
+  - `refactor` 有新 commit（只改文件時不建）、PR 改到會打包的檔案、或手動觸發：在 `windows-latest` 建正式版和測試版，存成 artifact（保留 30 天）。runner 沒有 NSIS 就用 `choco install nsis` 安裝，版本沒有固定，log 會印出 `makensis -VERSION`。
+  - 在 `refactor` 上打 `v<版號>` tag：另外建 draft release，附正式版安裝檔和 `.sha256`，由人確認後才發佈。release job 先檢查 tag 等於 `v` 加上 `VERSION`、tag 指到的 commit 在 `refactor` 上，否則不發。只有這個 job 有 `contents: write`。
+  - 正式版改名成 `LeihuLiantai-<版號>-Setup.exe`（程式內更新只接受 `-Setup.exe` 結尾）；測試版叫 `LeihuLiantai-Test-<版號>.exe`，萬一被放進 release，程式內更新也不會選到它。
+  - release 說明寫明原作來源（授權要求）。
+- `.gitattributes`：`*.sh` 一律 LF。Windows 上 `core.autocrlf` 會把 `build.sh` 轉成 CRLF，`sh` 執行時會因為 `\r` 失敗。
+- 本機跑過 `sh installer/build.sh`：複製檔案的步驟正常，停在沒有 makensis；`leihu.nsi` 能不能編譯，要看這個 workflow 第一次跑的結果。
+
 ## 4. 要先決定的事
 - 舊分支要留著（唯讀）還是封存成 tag，`claude/original-refactor-behavior-comparison-d469de` 也一樣。在搬完之前不要刪。
 - 測試歌曲的清單和授權（3.8）。
