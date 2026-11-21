@@ -10,6 +10,26 @@
    "channels": 2,
    "format": "FLAC",
    "frames": 88200,
+   "peak_db": -14.0,
+   "rms_db": -17.0,
+   "rms_db_16": [
+    -17.0,
+    -17.0,
+    -17.0,
+    -17.0,
+    -17.0,
+    -17.0,
+    -17.0,
+    -17.0,
+    -17.0,
+    -17.0,
+    -17.0,
+    -17.0,
+    -17.0,
+    -17.0,
+    -17.0,
+    -17.0
+   ],
    "samplerate": 44100,
    "subtype": "PCM_16"
   },
@@ -39,6 +59,26 @@
    "channels": 2,
    "format": "WAV",
    "frames": 88200,
+   "peak_db": -14.0,
+   "rms_db": -17.0,
+   "rms_db_16": [
+    -17.0,
+    -17.0,
+    -17.0,
+    -17.0,
+    -17.0,
+    -17.0,
+    -17.0,
+    -17.0,
+    -17.0,
+    -17.0,
+    -17.0,
+    -17.0,
+    -17.0,
+    -17.0,
+    -17.0,
+    -17.0
+   ],
    "samplerate": 44100,
    "subtype": "PCM_16"
   },
@@ -404,7 +444,7 @@
      "111": -10.26
     },
     "combo_lufs_sig": "<ns>|<ns>|<ns>|<ns>",
-    "created": "<time>",
+    "created": 1577836800.0,
     "duration": 2.0,
     "fine_queued": true,
     "id": "songnew001",
@@ -580,7 +620,9 @@
   },
   "content_type": "application/json",
   "files": {
-   "DATA/+.hotkeys_pause": "<binary>"
+   "DATA/+.hotkeys_pause": {
+    "sha256": "6b86b273ff34fce1"
+   }
   },
   "headers": {},
   "status": 200
@@ -837,7 +879,7 @@
      "111": -10.26
     },
     "combo_lufs_sig": "<ns>|<ns>|<ns>|<ns>",
-    "created": "<time>",
+    "created": 1577836800.0,
     "duration": 2.0,
     "id": "songnew001",
     "kana_fix": {
@@ -896,7 +938,7 @@
      "111": -10.26
     },
     "combo_lufs_sig": "<ns>|<ns>|<ns>|<ns>",
-    "created": "<time>",
+    "created": 1577836800.0,
     "duration": 2.0,
     "id": "songnew001",
     "kana_fix": {
@@ -1031,7 +1073,7 @@
      "111": -10.26
     },
     "combo_lufs_sig": "<ns>|<ns>|<ns>|<ns>",
-    "created": "<time>",
+    "created": 1577836800.0,
     "duration": 2.0,
     "id": "songnew001",
     "kana_fix": {
@@ -1132,7 +1174,7 @@
      "111": -10.26
     },
     "combo_lufs_sig": "<ns>|<ns>|<ns>|<ns>",
-    "created": "<time>",
+    "created": 1577836800.0,
     "duration": 2.0,
     "id": "songnew001",
     "kana_fix": {
@@ -1200,7 +1242,7 @@
      "111": -10.26
     },
     "combo_lufs_sig": "<ns>|<ns>|<ns>|<ns>",
-    "created": "<time>",
+    "created": 1577836800.0,
     "duration": 2.0,
     "id": "songnew001",
     "kana_fix": {
@@ -1731,7 +1773,7 @@
      "111": -10.26
     },
     "combo_lufs_sig": "<ns>|<ns>|<ns>|<ns>",
-    "created": "<time>",
+    "created": 1577836800.0,
     "duration": 2.0,
     "fine_queued": true,
     "id": "songnew001",
@@ -1858,7 +1900,16 @@
   },
   "content_type": "application/json",
   "files": {
-   "DOWNLOADS/+雷虎練唱台/S.H.E 改過的歌名 旋律譜（A4）/01.png": "<binary>"
+   "DOWNLOADS/+雷虎練唱台/S.H.E 改過的歌名 旋律譜（A4）/01.png": {
+    "image": {
+     "mode": "RGB",
+     "pixels_sha256": "7e442e2ab71c0b9a",
+     "size": [
+      1654,
+      2339
+     ]
+    }
+   }
   },
   "headers": {},
   "status": 200
@@ -1926,7 +1977,7 @@
     "111": -10.26
    },
    "combo_lufs_sig": "<ns>|<ns>|<ns>|<ns>",
-   "created": "<time>",
+   "created": 1577836800.0,
    "duration": 2.0,
    "id": "songnew001",
    "key": 0,
@@ -1952,7 +2003,7 @@
     {
      "acc": 0.75,
      "algo": 4,
-     "created": "<time>",
+     "created": 1577836800.0,
      "duration": 2.0,
      "frames": 150,
      "id": "20000101-000000-fix1",
@@ -1986,7 +2037,7 @@
     },
     {
      "acc": null,
-     "created": "<time>",
+     "created": 1577836800.0,
      "duration": 2.0,
      "error": "評分沒有完成（可能是程式被關掉），可以按「重新評分」",
      "id": "20000101-000000-fix2",
@@ -2013,7 +2064,7 @@
      "111": -10.26
     },
     "combo_lufs_sig": "<ns>|<ns>|<ns>|<ns>",
-    "created": "<time>",
+    "created": 1577836800.0,
     "duration": 2.0,
     "id": "songnew001",
     "key": 0,
@@ -2049,7 +2100,7 @@
     "111": -10.26
    },
    "combo_lufs_sig": "<ns>|<ns>|<ns>|<ns>",
-   "created": "<time>",
+   "created": 1577836800.0,
    "duration": 2.0,
    "id": "songnew001",
    "key": 0,
@@ -2075,7 +2126,7 @@
     {
      "acc": 0.75,
      "algo": 4,
-     "created": "<time>",
+     "created": 1577836800.0,
      "duration": 2.0,
      "frames": 150,
      "id": "20000101-000000-fix1",
@@ -2109,7 +2160,7 @@
     },
     {
      "acc": null,
-     "created": "<time>",
+     "created": 1577836800.0,
      "duration": 2.0,
      "error": "評分沒有完成（可能是程式被關掉），可以按「重新評分」",
      "id": "20000101-000000-fix2",
@@ -2148,7 +2199,7 @@
     "111": -10.19
    },
    "combo_lufs_sig": "<ns>|<ns>|<ns>|<ns>",
-   "created": "<time>",
+   "created": 1500000000.0,
    "duration": 2.0,
    "id": "songold002",
    "last_opened": "<time>",
@@ -2184,7 +2235,7 @@
      "111": -10.19
     },
     "combo_lufs_sig": "<ns>|<ns>|<ns>|<ns>",
-    "created": "<time>",
+    "created": 1500000000.0,
     "duration": 2.0,
     "id": "songold002",
     "last_opened": "<time>",
@@ -2216,7 +2267,7 @@
     "111": -10.19
    },
    "combo_lufs_sig": "<ns>|<ns>|<ns>|<ns>",
-   "created": "<time>",
+   "created": 1500000000.0,
    "duration": 2.0,
    "id": "songold002",
    "last_opened": "<time>",
@@ -2257,7 +2308,7 @@
     "111": -10.26
    },
    "combo_lufs_sig": "<ns>|<ns>|<ns>|<ns>",
-   "created": "<time>",
+   "created": 1577836800.0,
    "duration": 2.0,
    "id": "songnew001",
    "key": 2,
@@ -2292,7 +2343,7 @@
      "111": -10.26
     },
     "combo_lufs_sig": "<ns>|<ns>|<ns>|<ns>",
-    "created": "<time>",
+    "created": 1577836800.0,
     "duration": 2.0,
     "id": "songnew001",
     "key": 2,
@@ -2330,7 +2381,7 @@
     "111": -10.26
    },
    "combo_lufs_sig": "<ns>|<ns>|<ns>|<ns>",
-   "created": "<time>",
+   "created": 1577836800.0,
    "duration": 2.0,
    "id": "songnew001",
    "key": 0,
@@ -2365,7 +2416,7 @@
      "111": -10.26
     },
     "combo_lufs_sig": "<ns>|<ns>|<ns>|<ns>",
-    "created": "<time>",
+    "created": 1577836800.0,
     "duration": 2.0,
     "id": "songnew001",
     "key": 0,
@@ -2403,7 +2454,7 @@
     "111": -10.26
    },
    "combo_lufs_sig": "<ns>|<ns>|<ns>|<ns>",
-   "created": "<time>",
+   "created": 1577836800.0,
    "duration": 2.0,
    "id": "songnew001",
    "key": 0,
@@ -2438,7 +2489,7 @@
      "111": -10.26
     },
     "combo_lufs_sig": "<ns>|<ns>|<ns>|<ns>",
-    "created": "<time>",
+    "created": 1577836800.0,
     "duration": 2.0,
     "id": "songnew001",
     "key": 0,
@@ -2476,7 +2527,7 @@
     "111": -10.26
    },
    "combo_lufs_sig": "<ns>|<ns>|<ns>|<ns>",
-   "created": "<time>",
+   "created": 1577836800.0,
    "duration": 2.0,
    "id": "songnew001",
    "key": 0,
@@ -2511,7 +2562,7 @@
      "111": -10.26
     },
     "combo_lufs_sig": "<ns>|<ns>|<ns>|<ns>",
-    "created": "<time>",
+    "created": 1577836800.0,
     "duration": 2.0,
     "id": "songnew001",
     "key": 0,
@@ -2549,7 +2600,7 @@
     "111": -10.26
    },
    "combo_lufs_sig": "<ns>|<ns>|<ns>|<ns>",
-   "created": "<time>",
+   "created": 1577836800.0,
    "duration": 2.0,
    "id": "songnew001",
    "key": 0,
@@ -2585,7 +2636,7 @@
      "111": -10.26
     },
     "combo_lufs_sig": "<ns>|<ns>|<ns>|<ns>",
-    "created": "<time>",
+    "created": 1577836800.0,
     "duration": 2.0,
     "id": "songnew001",
     "key": 0,
@@ -2633,7 +2684,35 @@
     },
     "title": "take"
    },
-   "DATA/+library/<id12>/original.wav": "<binary>"
+   "DATA/+library/<id12>/original.wav": {
+    "audio": {
+     "channels": 1,
+     "format": "WAV",
+     "frames": 48000,
+     "peak_db": -20.0,
+     "rms_db": -23.0,
+     "rms_db_16": [
+      -23.0,
+      -23.0,
+      -23.0,
+      -23.0,
+      -23.0,
+      -23.0,
+      -23.0,
+      -23.0,
+      -23.0,
+      -23.0,
+      -23.0,
+      -23.0,
+      -23.0,
+      -23.0,
+      -23.0,
+      -23.0
+     ],
+     "samplerate": 48000,
+     "subtype": "PCM_16"
+    }
+   }
   },
   "headers": {},
   "status": 200
@@ -2643,7 +2722,7 @@
    {
     "artist": "測試歌手",
     "best": 0.75,
-    "created": "<time>",
+    "created": 1577836800.0,
     "duration": 2.0,
     "id": "songnew001",
     "key": 0,
@@ -2664,7 +2743,7 @@
    },
    {
     "best": null,
-    "created": "<time>",
+    "created": 1500000000.0,
     "duration": 2.0,
     "id": "songold002",
     "lyrics_text": "第一句 第二句",
@@ -2719,7 +2798,7 @@
      "111": -10.26
     },
     "combo_lufs_sig": "<ns>|<ns>|<ns>|<ns>",
-    "created": "<time>",
+    "created": 1577836800.0,
     "duration": 2.0,
     "fine_queued": true,
     "id": "songnew001",
@@ -2767,7 +2846,7 @@
      "111": -10.19
     },
     "combo_lufs_sig": "<ns>|<ns>|<ns>|<ns>",
-    "created": "<time>",
+    "created": 1500000000.0,
     "duration": 2.0,
     "id": "songold002",
     "last_opened": "<time>",
@@ -3609,6 +3688,26 @@
    "channels": 1,
    "format": "WAV",
    "frames": 88200,
+   "peak_db": -14.0,
+   "rms_db": -17.0,
+   "rms_db_16": [
+    -17.0,
+    -17.0,
+    -17.0,
+    -17.0,
+    -17.0,
+    -17.0,
+    -17.0,
+    -17.0,
+    -17.0,
+    -17.0,
+    -17.0,
+    -17.0,
+    -17.0,
+    -17.0,
+    -17.0,
+    -17.0
+   ],
    "samplerate": 48000,
    "subtype": "PCM_16"
   },
@@ -3667,7 +3766,7 @@
   "body": {
    "acc": 0.75,
    "algo": 4,
-   "created": "<time>",
+   "created": 1577836800.0,
    "duration": 2.0,
    "frames": 150,
    "id": "20000101-000000-fix1",
@@ -3741,7 +3840,35 @@
     "bed_lufs": -13.58,
     "master_db": -3.42
    },
-   "DATA/+library/songnew001/takes/20000101-000000-fix1.vocal_v2_1_light.wav": "<binary>"
+   "DATA/+library/songnew001/takes/20000101-000000-fix1.vocal_v2_1_light.wav": {
+    "audio": {
+     "channels": 1,
+     "format": "WAV",
+     "frames": 88200,
+     "peak_db": -1.9,
+     "rms_db": -10.8,
+     "rms_db_16": [
+      -9.8,
+      -10.5,
+      -10.4,
+      -10.4,
+      -10.4,
+      -10.4,
+      -10.4,
+      -10.4,
+      -10.4,
+      -10.4,
+      -10.4,
+      -10.4,
+      -10.4,
+      -10.4,
+      -12.0,
+      -180.0
+     ],
+     "samplerate": 44100,
+     "subtype": "PCM_16"
+    }
+   }
   },
   "headers": {},
   "status": 200
@@ -3752,7 +3879,35 @@
   },
   "content_type": "application/json",
   "files": {
-   "DATA/+library/songnew001/takes/20000101-000000-fix1.preview.wav": "<binary>"
+   "DATA/+library/songnew001/takes/20000101-000000-fix1.preview.wav": {
+    "audio": {
+     "channels": 2,
+     "format": "WAV",
+     "frames": 88200,
+     "peak_db": -9.6,
+     "rms_db": -16.9,
+     "rms_db_16": [
+      -17.2,
+      -16.1,
+      -16.1,
+      -16.0,
+      -16.0,
+      -16.1,
+      -16.0,
+      -16.1,
+      -16.0,
+      -16.0,
+      -16.1,
+      -16.0,
+      -17.2,
+      -20.1,
+      -24.9,
+      -38.0
+     ],
+     "samplerate": 44100,
+     "subtype": "PCM_16"
+    }
+   }
   },
   "headers": {},
   "status": 200
@@ -3762,6 +3917,26 @@
    "channels": 2,
    "format": "WAV",
    "frames": 88200,
+   "peak_db": -9.6,
+   "rms_db": -16.9,
+   "rms_db_16": [
+    -17.2,
+    -16.1,
+    -16.1,
+    -16.0,
+    -16.0,
+    -16.1,
+    -16.0,
+    -16.1,
+    -16.0,
+    -16.0,
+    -16.1,
+    -16.0,
+    -17.2,
+    -20.1,
+    -24.9,
+    -38.0
+   ],
    "samplerate": 44100,
    "subtype": "PCM_16"
   },
@@ -3798,7 +3973,35 @@
     "start": 0.5,
     "status": "scoring"
    },
-   "DATA/+library/songnew001/takes/<take1>.wav": "<binary>"
+   "DATA/+library/songnew001/takes/<take1>.wav": {
+    "audio": {
+     "channels": 1,
+     "format": "WAV",
+     "frames": 48000,
+     "peak_db": -20.0,
+     "rms_db": -23.0,
+     "rms_db_16": [
+      -23.0,
+      -23.0,
+      -23.0,
+      -23.0,
+      -23.0,
+      -23.0,
+      -23.0,
+      -23.0,
+      -23.0,
+      -23.0,
+      -23.0,
+      -23.0,
+      -23.0,
+      -23.0,
+      -23.0,
+      -23.0
+     ],
+     "samplerate": 48000,
+     "subtype": "PCM_16"
+    }
+   }
   },
   "headers": {},
   "status": 200
