@@ -232,6 +232,39 @@ def match_notes(na: list, nb: list, tol: float = 0.1) -> tuple[list, int, int]:
 assert match_notes([[0, 1, 60], [0.01, 1, 60], [1, 2, 60]], [[0, 1, 60], [1, 2, 60], [9, 10, 60]])[1:] == (1, 1)
 
 
+def take_shape(k: dict) -> list[str]:
+    """評分 JSON 的必要欄位與型別（缺少、null、型別不對都列出來；空的 lines、midi 是合法的，但欄位一定要在）。"""
+    bad = []
+
+    def need(d, key, kind, where):
+        v = d.get(key) if isinstance(d, dict) else None
+        ok = isinstance(v, kind) and not (kind is not bool and isinstance(v, bool))
+        if not ok:
+            bad.append(f"{where}{key} 是 {type(v).__name__}")
+        return v if ok else None
+
+    for key in ("acc", "mean", "spread", "offset", "frames"):
+        need(k, key, (int, float), "")
+    hint = need(k, "key_hint", dict, "")
+    if hint is not None:
+        need(hint, "share", (int, float), "key_hint.")
+        for key in ("shift", "suggest"):
+            if key not in hint:
+                bad.append(f"key_hint.{key} 不存在")
+    if "octave" not in k:
+        bad.append("octave 不存在")
+    lines = need(k, "lines", list, "")
+    for i, ln in enumerate(lines or []):
+        for key, kind in (("t", (int, float)), ("text", str), ("n", int), ("acc", (int, float)), ("mean", (int, float))):
+            need(ln, key, kind, f"lines[{i}].")
+    pitch = need(k, "pitch", dict, "")
+    if pitch is not None:
+        need(pitch, "hop", (int, float), "pitch.")
+        need(pitch, "t0", (int, float), "pitch.")
+        need(pitch, "midi", list, "pitch.")
+    return bad
+
+
 def _num(d: dict, k: str):
     """評分欄位一定要是數字（缺少、null、字串都不是 0）。"""
     v = d.get(k)
@@ -262,6 +295,9 @@ def pair(a: Path, b: Path) -> list[dict]:  # noqa: C901
             if len(ma) != len(mb):
                 rows.append(row(f"{sid} 音高影格數", f"{len(ma)} vs {len(mb)}", "相同", False))
             else:
+                if not len(ma):  # 空的曲線算不出一致率（不能變成 NaN 當成自然差異）
+                    rows.append(row(f"{sid} 音高影格", "兩邊都沒有音高影格", "有音高", False))
+                    ma = mb = np.array([np.nan])  # 這一項已經記失敗；讓下面照常往下比（音符、meta、歌詞）
                 agree = float(np.mean(np.isnan(ma) == np.isnan(mb)))
                 both = ~np.isnan(ma) & ~np.isnan(mb)
                 cents = float(np.median(np.abs(ma[both] - mb[both])) * 100) if both.any() else 0.0
@@ -300,9 +336,9 @@ def pair(a: Path, b: Path) -> list[dict]:  # noqa: C901
         ok = ka.get("status") == kb.get("status") == "done"
         rows.append(row("評分狀態", f"{ka.get('status')} vs {kb.get('status')}", "都是 done", ok))
         if ok:
-            missing = [k for k in ("acc", "mean", "spread", "offset", "frames") for x in (ka, kb) if _num(x, k) is None]
-            if missing:
-                rows.append(row("評分欄位", f"缺少或不是數字：{'、'.join(sorted(set(missing)))}", "都是數字", False))
+            shape = sorted({f"{w}：{x}" for w, k in (("A", ka), ("B", kb)) for x in take_shape(k)})
+            if shape:
+                rows.append(row("評分欄位", "；".join(shape)[:300], "必要欄位都在、型別正確", False))
                 return rows + _export_rows(a, b)
             d = abs(ka["acc"] - kb["acc"]) * 100
             rows.append(row("評分準確率差", f"{d:.1f} 分（{ka['acc']} vs {kb['acc']}）", "<= 1 分", d <= 1, d))
@@ -314,7 +350,7 @@ def pair(a: Path, b: Path) -> list[dict]:  # noqa: C901
             for k in ("shift", "suggest"):
                 rows.append(row(f"評分 key_hint.{k}", f"{ha.get(k)} vs {hb.get(k)}", "相同",
                                 _canon(ha.get(k)) == _canon(hb.get(k))))
-            d = abs((ha.get("share") or 0) - (hb.get("share") or 0))
+            d = abs(ha["share"] - hb["share"])  # take_shape 已確認是數字（null 不再當成 0）
             rows.append(row("評分 key_hint.share 差", f"{d:.3f}（{ha.get('share')} vs {hb.get('share')}）", "<= 0.05",
                             d <= 0.05, d))
             other = sorted((ha.keys() | hb.keys()) - {"shift", "suggest", "share"})
@@ -334,8 +370,7 @@ def pair(a: Path, b: Path) -> list[dict]:  # noqa: C901
 
 
 def _lines_rows(la, lb) -> list[dict]:
-    """評分逐句：句數、每句的時間、文字、影格數要相同，準確率、mean 允許小差距。"""
-    la, lb = la or [], lb or []
+    """評分逐句：句數、每句的時間、文字、影格數要相同，準確率、mean 允許小差距（欄位已由 take_shape 檢查）。"""
     if len(la) != len(lb):
         return [row("評分逐句的句數", f"{len(la)} vs {len(lb)}", "相同", False, abs(len(la) - len(lb)))]
     if not la:
@@ -362,10 +397,12 @@ def _take_pitch_rows(pa, pb) -> list[dict]:
         x, y = _num(pa, k), _num(pb, k)
         ok = x is not None and y is not None and abs(x - y) <= lim
         rows.append(row(f"評分錄音音高 {k}", f"{x} vs {y}", "相同" if lim == 0 else f"差 <= {lim:g} 秒", ok))
-    ma, mb = (np.array([np.nan if v is None else v for v in p.get("midi") or []], dtype=float) for p in (pa, pb))
+    ma, mb = (np.array([np.nan if v is None else v for v in p["midi"]], dtype=float) for p in (pa, pb))
     if len(ma) != len(mb):
         return rows + [row("評分錄音音高影格數", f"{len(ma)} vs {len(mb)}", "相同", False, abs(len(ma) - len(mb)))]
-    agree = float(np.mean(np.isnan(ma) == np.isnan(mb))) if len(ma) else 1.0
+    if not len(ma):  # 錄音沒有音高影格：兩邊一樣是空的，但這不是可以比的結果
+        return rows + [row("評分錄音音高影格", "兩邊都沒有", "有音高", False)]
+    agree = float(np.mean(np.isnan(ma) == np.isnan(mb)))
     both = ~np.isnan(ma) & ~np.isnan(mb)
     cents = float(np.median(np.abs(ma[both] - mb[both])) * 100) if both.any() else 0.0
     rows.append(row("評分錄音有聲判斷一致率", f"{agree:.4f}", ">= 0.98", agree >= 0.98, agree))

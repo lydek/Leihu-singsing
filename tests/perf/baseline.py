@@ -386,6 +386,7 @@ def main() -> int:  # noqa: C901
     if why:
         problems.append(why)
         (base / "perf-report.md").write_text("\n".join(rep) + f"\n\n## 摘要沒有寫入\n\n- {why}\n", "utf-8")
+        print(f"摘要沒有寫入（{out_json} 不是這一次的結果）：{why}")
     print("\n".join(rep))
     print(f"報告：{base / 'perf-report.md'}；摘要：{out_json}")
     return 1 if problems else 0

@@ -35,7 +35,7 @@ sys.path[:0] = [str(HERE), str(ROOT / "tests" / "contract")]
 
 import compare as C  # noqa: E402
 import numpy as np  # noqa: E402
-from baseline import INPUTS, MODELS, SUMMARY, TIMEOUT, log_alerts, machine, run_logged, used  # noqa: E402
+from baseline import INPUTS, MODELS, SUMMARY, TIMEOUT, log_alerts, machine, run_logged, used, valid_runs  # noqa: E402
 from compare_upstream import EXPORT_NOTES, write_summary, tools_dirty, OUT, _git, commit_of, export  # noqa: E402
 
 SONGS = ROOT / "tests" / "private" / "songs"
@@ -106,11 +106,15 @@ def main() -> int:  # noqa: C901
         problems += log_alerts(logs[i], f"第 {i} 次")
         if (out / "run.json").exists():  # 缺檔是執行失敗，不是自然差異
             problems += [f"第 {i} 次輸出不完整：{p}" for p in C.required(out)]
-    ok_runs = [i for i in logs if (base / f"run{i}" / "run.json").exists()
-               and not json.loads((base / f"run{i}" / "run.json").read_text("utf-8")).get("incomplete")]
+    ok_runs = valid_runs(base, logs)
     if len(ok_runs) < 2:
         problems.append("少於兩次成功的執行，沒有相似度可以算")
-    pairs = {f"{i}-{j}": C.pair(base / f"run{i}", base / f"run{j}") for i, j in itertools.combinations(ok_runs, 2)}
+    pairs = {}
+    for i, j in itertools.combinations(ok_runs, 2):
+        try:
+            pairs[f"{i}-{j}"] = C.pair(base / f"run{i}", base / f"run{j}")
+        except Exception as e:  # noqa: BLE001  比對本身出錯也要寫出報告
+            problems.append(f"第 {i} 次和第 {j} 次比對時出錯：{type(e).__name__}: {e}"[:300])
     items: dict[str, dict] = {}
     for rows in pairs.values():
         for r in rows:
@@ -118,7 +122,15 @@ def main() -> int:  # noqa: C901
             it["values"].append(number(r))
             it["raw"].append(r["value"])
             it["over"] += 0 if r["ok"] else 1
-    quality_runs = {i: C.quality(base / f"run{i}") for i in ok_runs}
+    for item, it in items.items():  # 算不出來的值（NaN）不是自然差異
+        if any(v is not None and v != v for v in it["values"]):
+            problems.append(f"{item} 有算不出來的值（NaN），這一項的下限無效")
+    quality_runs = {}
+    for i in ok_runs:
+        try:
+            quality_runs[i] = C.quality(base / f"run{i}")
+        except Exception as e:  # noqa: BLE001
+            problems.append(f"第 {i} 次和標準答案比時出錯：{type(e).__name__}: {e}"[:300])
     rj = json.loads((base / f"run{ok_runs[0]}" / "run.json").read_text("utf-8")) if ok_runs else {}
     mach = machine()
     tool = _git("rev-parse", "--short", "HEAD").strip()
@@ -204,6 +216,8 @@ def main() -> int:  # noqa: C901
     why = write_summary(out_json, summary)
     if why:
         problems.append(why)
+        (base / "similarity-report.md").write_text("\n".join(rep) + f"\n\n## 摘要沒有寫入\n\n- {why}\n", "utf-8")
+        print(f"摘要沒有寫入（{out_json} 不是這一次的結果）：{why}")
     print("\n".join(rep))
     print(f"報告：{base / 'similarity-report.md'}；摘要：{out_json}")
     return 1 if problems else 0
