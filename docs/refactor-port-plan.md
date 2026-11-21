@@ -328,7 +328,12 @@ shim 要補的地方：
   - Whisper 在 CPU 上把 float16 模型自動轉成 float32（ctranslate2 的 warning），列在報告「實際使用的裝置與模型」。
   - 比對工具自我檢查：把一份輸出的音高調高 20 cents、改一個歌詞字，兩項都超過門檻，exit 1。
   - 這裡的處理時間是單執行緒（為了可重現），不是效能基準。
-- **還沒做**：筆電的顯示卡與 CPU 數值基準（複製 `tests/private/numeric/inputs` 和 `tests/private/models` 過去，`baseline.py --label=laptop-3060-gpu`；顯示卡路徑兩次不一定逐位元組相同，看兩次差距表決定門檻）、效能基準（正常執行緒數、真實歌曲、多次取中位數、記憶體）、相似度基準（真實歌曲）、歌曲清單。`test_contract_snapshot` 需要 `conftest` 和 S28，目前不能用 pytest 跑。
+- **效能基準（CPU，開發機）已錄**：`tests/perf/baseline.py v2.3.2 --label=desktop-9900x3d-cpu`，測試工具 `511f1b0`，合成歌（`sing.flac` 接 7 次，217 秒）跑 3 次，異常「無」。摘要在 `tests/perf/baselines/v2.3.2-desktop-9900x3d-cpu.json`，報告、log、取樣在 `tests/private/upstream/v2.3.2/perf/desktop-9900x3d-cpu/`。
+  - 工具：`tests/numeric/sandbox.py`（數值和效能共用的執行環境，從 `run.py` 抽出；抽完重跑數值結果和 `790ec0a` 逐位元組相同）、`tests/perf/run_perf.py`（一首歌從匯入到匯出，記各階段起訖）、`tests/perf/baseline.py`（每首跑 N 次，每 0.25 秒取樣主程式和子程式的記憶體，有 nvidia-smi 時記顯示卡記憶體）。
+  - 和平常使用不同的地方（報告逐項列出）：歌詞用語音辨識（平常預設上網搜尋）；模型資料夾沒有高品質主唱分離模型，顯示卡上 `auto` 會改用標準模型；評分的錄音是歌曲自己分出來的主唱；直播偵測、nvidia-smi 取樣、下載都關掉。
+  - 結果（中位數，秒；記憶體是主程式＋子程式的 private bytes 尖峰）：匯入 2.6、分離 85.7（子程式裡人聲 49.0＋主唱 32.5）、音高 7.4、歌詞 15.3、移調 +2 7.9、評分 13.4、匯出 1.3；記憶體尖峰在分離 8420 MB，閒置 1722 MB（子程式閒置 30 秒後結束）。3 次的差距：分離 85.6～86.5、歌詞 14.0～15.5。
+  - 合成歌沒有歌詞，語音辨識的時間不具代表性；啟動時間只量 import（pipeline、share 0.14 秒，app 0.19 秒），沒有量伺服器開好要多久。
+- **還沒做**：筆電的顯示卡與 CPU 數值、效能基準（複製 `tests/private/numeric/inputs` 和 `tests/private/models` 過去，`tests/numeric/baseline.py --label=laptop-3060-gpu`、`tests/perf/baseline.py --label=laptop-3060-gpu`；顯示卡路徑兩次不一定逐位元組相同，看兩次差距表決定門檻）、真實歌曲的效能基準（放進 `tests/private/songs/` 後重跑）、相似度基準（真實歌曲）、歌曲清單。`test_contract_snapshot` 需要 `conftest` 和 S28，目前不能用 pytest 跑。
 
 ## 4. 要先決定的事
 - 舊分支要留著（唯讀）還是封存成 tag，`claude/original-refactor-behavior-comparison-d469de` 也一樣。在搬完之前不要刪。

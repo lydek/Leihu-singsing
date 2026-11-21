@@ -1,0 +1,561 @@
+{
+ "version": "v2.3.2",
+ "label": "desktop-9900x3d-cpu",
+ "tool_commit": "511f1b0",
+ "machine": {
+  "os": "Windows-10-10.0.26200-SP0",
+  "cpu": "AMD Ryzen 9 9900X3D 12-Core Processor",
+  "gpus": "AMD Radeon(TM) Graphics、AMD Radeon RX 9070 XT",
+  "ram_gb": "31",
+  "logical_cpus": 24,
+  "nvidia_smi": "沒有 nvidia-smi（FileNotFoundError）"
+ },
+ "environment": {
+  "python": "3.11.9",
+  "torch": "2.11.0+cpu",
+  "onnxruntime": "1.22.0",
+  "audio-separator": "0.47.0",
+  "faster-whisper": "1.2.1",
+  "ctranslate2": "4.8.2",
+  "torchcrepe": "0.0.24",
+  "onnx_providers": [
+   "AzureExecutionProvider",
+   "CPUExecutionProvider"
+  ],
+  "gpu_probe": {
+   "ok": false,
+   "note": "",
+   "cc": null,
+   "name": "",
+   "torch": "2.11.0+cpu"
+  }
+ },
+ "conditions": [
+  "pipeline.search_lyrics_later：不搜尋線上歌詞（要連網，和推論無關）",
+  "pipeline._running_apps：直播軟體偵測固定回傳沒有",
+  "pipeline._sample_gpu_load：不跑 nvidia-smi（顯示卡被其他程式佔用時結果會不同）",
+  "pipeline.start_hq_download：不下載模型、不裝套件",
+  "pipeline.start_hqv_download：不下載模型、不裝套件",
+  "pipeline.start_kana_install：不下載模型、不裝套件",
+  "pipeline._upgrade_ytdlp：不下載模型、不裝套件",
+  "歌詞用語音辨識（auto_recognize_lyrics＝True）；平常預設是上網搜尋",
+  "高品質主唱分離模型（Roformer karaoke）不在模型資料夾：要用高品質時會改用標準模型（平常會在背景下載）",
+  "評分用的錄音是這首歌分出來的主唱"
+ ],
+ "quality": "auto",
+ "runs_per_song": 3,
+ "problems": [],
+ "songs": {
+  "synth": {
+   "sha256": "c41bc5b70abac0382ef242e1a4e7699e8bef7cb28323e93ec7e093ebaf784c06",
+   "source": "合成（sing.flac × 7）",
+   "runs": [
+    {
+     "phases": {
+      "idle_before": {
+       "seconds": 3.0,
+       "ok": true,
+       "samples": 11,
+       "main_ws_mb": 51,
+       "main_private_mb": 778,
+       "children_ws_mb": 0,
+       "children_private_mb": 0,
+       "total_ws_mb": 51,
+       "total_private_mb": 778,
+       "procs": [],
+       "gpu_mem_mb": null,
+       "gpu_util": null
+      },
+      "import": {
+       "seconds": 2.35,
+       "ok": true,
+       "samples": 8,
+       "main_ws_mb": 466,
+       "main_private_mb": 1994,
+       "children_ws_mb": 0,
+       "children_private_mb": 0,
+       "total_ws_mb": 466,
+       "total_private_mb": 1994,
+       "procs": [],
+       "gpu_mem_mb": null,
+       "gpu_util": null
+      },
+      "separate": {
+       "seconds": 85.57,
+       "ok": true,
+       "samples": 312,
+       "main_ws_mb": 384,
+       "main_private_mb": 1813,
+       "children_ws_mb": 3462,
+       "children_private_mb": 6831,
+       "total_ws_mb": 3664,
+       "total_private_mb": 8461,
+       "procs": [
+        "conhost.exe",
+        "ffmpeg.exe",
+        "python.exe"
+       ],
+       "gpu_mem_mb": null,
+       "gpu_util": null
+      },
+      "pitch": {
+       "seconds": 7.44,
+       "ok": true,
+       "samples": 28,
+       "main_ws_mb": 242,
+       "main_private_mb": 1703,
+       "children_ws_mb": 810,
+       "children_private_mb": 2345,
+       "total_ws_mb": 1025,
+       "total_private_mb": 3988,
+       "procs": [
+        "conhost.exe",
+        "python.exe"
+       ],
+       "gpu_mem_mb": null,
+       "gpu_util": null
+      },
+      "lyrics": {
+       "seconds": 15.31,
+       "ok": true,
+       "samples": 57,
+       "main_ws_mb": 313,
+       "main_private_mb": 1740,
+       "children_ws_mb": 4169,
+       "children_private_mb": 5737,
+       "total_ws_mb": 4386,
+       "total_private_mb": 7381,
+       "procs": [
+        "conhost.exe",
+        "python.exe"
+       ],
+       "gpu_mem_mb": null,
+       "gpu_util": null
+      },
+      "variant": {
+       "seconds": 7.83,
+       "ok": true,
+       "samples": 28,
+       "main_ws_mb": 1245,
+       "main_private_mb": 3692,
+       "children_ws_mb": 856,
+       "children_private_mb": 2418,
+       "total_ws_mb": 2101,
+       "total_private_mb": 6110,
+       "procs": [
+        "conhost.exe",
+        "python.exe"
+       ],
+       "gpu_mem_mb": null,
+       "gpu_util": null
+      },
+      "score": {
+       "seconds": 13.35,
+       "ok": true,
+       "samples": 50,
+       "main_ws_mb": 300,
+       "main_private_mb": 1733,
+       "children_ws_mb": 884,
+       "children_private_mb": 2448,
+       "total_ws_mb": 1184,
+       "total_private_mb": 4181,
+       "procs": [
+        "conhost.exe",
+        "python.exe"
+       ],
+       "gpu_mem_mb": null,
+       "gpu_util": null
+      },
+      "export": {
+       "seconds": 1.27,
+       "ok": true,
+       "samples": 5,
+       "main_ws_mb": 835,
+       "main_private_mb": 2270,
+       "children_ws_mb": 861,
+       "children_private_mb": 2424,
+       "total_ws_mb": 1696,
+       "total_private_mb": 4694,
+       "procs": [
+        "conhost.exe",
+        "python.exe"
+       ],
+       "gpu_mem_mb": null,
+       "gpu_util": null
+      },
+      "idle_after": {
+       "seconds": 5.0,
+       "ok": true,
+       "samples": 19,
+       "main_ws_mb": 290,
+       "main_private_mb": 1722,
+       "children_ws_mb": 0,
+       "children_private_mb": 0,
+       "total_ws_mb": 290,
+       "total_private_mb": 1722,
+       "procs": [],
+       "gpu_mem_mb": null,
+       "gpu_util": null
+      }
+     },
+     "gpu_tasks": [
+      "probe 1.7",
+      "separate 48.2",
+      "separate 32.9",
+      "pitch 7.2",
+      "whisper 15.1",
+      "pitch 13.3"
+     ],
+     "startup": {
+      "import_pipeline_share": 0.14,
+      "import_app": 0.19
+     },
+     "song": {
+      "duration": 217.0,
+      "separation": "uvr",
+      "vocal_model": "mdx",
+      "karaoke": "UVR_MDXNET_KARA_2.onnx",
+      "lyrics_unreliable": true
+     }
+    },
+    {
+     "phases": {
+      "idle_before": {
+       "seconds": 3.0,
+       "ok": true,
+       "samples": 11,
+       "main_ws_mb": 52,
+       "main_private_mb": 778,
+       "children_ws_mb": 0,
+       "children_private_mb": 0,
+       "total_ws_mb": 52,
+       "total_private_mb": 778,
+       "procs": [],
+       "gpu_mem_mb": null,
+       "gpu_util": null
+      },
+      "import": {
+       "seconds": 2.55,
+       "ok": true,
+       "samples": 9,
+       "main_ws_mb": 605,
+       "main_private_mb": 2140,
+       "children_ws_mb": 0,
+       "children_private_mb": 0,
+       "total_ws_mb": 605,
+       "total_private_mb": 2140,
+       "procs": [],
+       "gpu_mem_mb": null,
+       "gpu_util": null
+      },
+      "separate": {
+       "seconds": 85.69,
+       "ok": true,
+       "samples": 310,
+       "main_ws_mb": 421,
+       "main_private_mb": 1849,
+       "children_ws_mb": 3438,
+       "children_private_mb": 6765,
+       "total_ws_mb": 3640,
+       "total_private_mb": 8395,
+       "procs": [
+        "conhost.exe",
+        "python.exe"
+       ],
+       "gpu_mem_mb": null,
+       "gpu_util": null
+      },
+      "pitch": {
+       "seconds": 7.47,
+       "ok": true,
+       "samples": 28,
+       "main_ws_mb": 430,
+       "main_private_mb": 1922,
+       "children_ws_mb": 813,
+       "children_private_mb": 2345,
+       "total_ws_mb": 1028,
+       "total_private_mb": 3988,
+       "procs": [
+        "conhost.exe",
+        "python.exe"
+       ],
+       "gpu_mem_mb": null,
+       "gpu_util": null
+      },
+      "lyrics": {
+       "seconds": 15.49,
+       "ok": true,
+       "samples": 58,
+       "main_ws_mb": 244,
+       "main_private_mb": 1704,
+       "children_ws_mb": 4172,
+       "children_private_mb": 5738,
+       "total_ws_mb": 4389,
+       "total_private_mb": 7382,
+       "procs": [
+        "conhost.exe",
+        "python.exe"
+       ],
+       "gpu_mem_mb": null,
+       "gpu_util": null
+      },
+      "variant": {
+       "seconds": 8.38,
+       "ok": true,
+       "samples": 30,
+       "main_ws_mb": 1242,
+       "main_private_mb": 3630,
+       "children_ws_mb": 859,
+       "children_private_mb": 2419,
+       "total_ws_mb": 2101,
+       "total_private_mb": 6049,
+       "procs": [
+        "conhost.exe",
+        "python.exe"
+       ],
+       "gpu_mem_mb": null,
+       "gpu_util": null
+      },
+      "score": {
+       "seconds": 13.2,
+       "ok": true,
+       "samples": 49,
+       "main_ws_mb": 301,
+       "main_private_mb": 1727,
+       "children_ws_mb": 886,
+       "children_private_mb": 2448,
+       "total_ws_mb": 1187,
+       "total_private_mb": 4175,
+       "procs": [
+        "conhost.exe",
+        "python.exe"
+       ],
+       "gpu_mem_mb": null,
+       "gpu_util": null
+      },
+      "export": {
+       "seconds": 1.24,
+       "ok": true,
+       "samples": 5,
+       "main_ws_mb": 886,
+       "main_private_mb": 2415,
+       "children_ws_mb": 864,
+       "children_private_mb": 2424,
+       "total_ws_mb": 1750,
+       "total_private_mb": 4839,
+       "procs": [
+        "conhost.exe",
+        "python.exe"
+       ],
+       "gpu_mem_mb": null,
+       "gpu_util": null
+      },
+      "idle_after": {
+       "seconds": 5.0,
+       "ok": true,
+       "samples": 19,
+       "main_ws_mb": 294,
+       "main_private_mb": 1720,
+       "children_ws_mb": 0,
+       "children_private_mb": 0,
+       "total_ws_mb": 294,
+       "total_private_mb": 1720,
+       "procs": [],
+       "gpu_mem_mb": null,
+       "gpu_util": null
+      }
+     },
+     "gpu_tasks": [
+      "probe 1.2",
+      "separate 49.0",
+      "separate 32.5",
+      "pitch 7.1",
+      "whisper 15.3",
+      "pitch 13.1"
+     ],
+     "startup": {
+      "import_pipeline_share": 0.14,
+      "import_app": 0.17
+     },
+     "song": {
+      "duration": 217.0,
+      "separation": "uvr",
+      "vocal_model": "mdx",
+      "karaoke": "UVR_MDXNET_KARA_2.onnx",
+      "lyrics_unreliable": true
+     }
+    },
+    {
+     "phases": {
+      "idle_before": {
+       "seconds": 3.0,
+       "ok": true,
+       "samples": 12,
+       "main_ws_mb": 51,
+       "main_private_mb": 777,
+       "children_ws_mb": 0,
+       "children_private_mb": 0,
+       "total_ws_mb": 51,
+       "total_private_mb": 777,
+       "procs": [],
+       "gpu_mem_mb": null,
+       "gpu_util": null
+      },
+      "import": {
+       "seconds": 2.96,
+       "ok": true,
+       "samples": 11,
+       "main_ws_mb": 681,
+       "main_private_mb": 2140,
+       "children_ws_mb": 6,
+       "children_private_mb": 1,
+       "total_ws_mb": 681,
+       "total_private_mb": 2140,
+       "procs": [
+        "ffmpeg.exe"
+       ],
+       "gpu_mem_mb": null,
+       "gpu_util": null
+      },
+      "separate": {
+       "seconds": 86.5,
+       "ok": true,
+       "samples": 310,
+       "main_ws_mb": 421,
+       "main_private_mb": 1849,
+       "children_ws_mb": 3472,
+       "children_private_mb": 6790,
+       "total_ws_mb": 3674,
+       "total_private_mb": 8420,
+       "procs": [
+        "conhost.exe",
+        "ffmpeg.exe",
+        "python.exe"
+       ],
+       "gpu_mem_mb": null,
+       "gpu_util": null
+      },
+      "pitch": {
+       "seconds": 7.33,
+       "ok": true,
+       "samples": 27,
+       "main_ws_mb": 312,
+       "main_private_mb": 1739,
+       "children_ws_mb": 810,
+       "children_private_mb": 2346,
+       "total_ws_mb": 1025,
+       "total_private_mb": 3989,
+       "procs": [
+        "conhost.exe",
+        "python.exe"
+       ],
+       "gpu_mem_mb": null,
+       "gpu_util": null
+      },
+      "lyrics": {
+       "seconds": 14.02,
+       "ok": true,
+       "samples": 52,
+       "main_ws_mb": 266,
+       "main_private_mb": 1704,
+       "children_ws_mb": 4171,
+       "children_private_mb": 5737,
+       "total_ws_mb": 4388,
+       "total_private_mb": 7381,
+       "procs": [
+        "conhost.exe",
+        "python.exe"
+       ],
+       "gpu_mem_mb": null,
+       "gpu_util": null
+      },
+      "variant": {
+       "seconds": 7.94,
+       "ok": true,
+       "samples": 28,
+       "main_ws_mb": 1252,
+       "main_private_mb": 3644,
+       "children_ws_mb": 854,
+       "children_private_mb": 2418,
+       "total_ws_mb": 2106,
+       "total_private_mb": 6062,
+       "procs": [
+        "conhost.exe",
+        "python.exe"
+       ],
+       "gpu_mem_mb": null,
+       "gpu_util": null
+      },
+      "score": {
+       "seconds": 13.73,
+       "ok": true,
+       "samples": 51,
+       "main_ws_mb": 315,
+       "main_private_mb": 1746,
+       "children_ws_mb": 978,
+       "children_private_mb": 2545,
+       "total_ws_mb": 1280,
+       "total_private_mb": 4276,
+       "procs": [
+        "conhost.exe",
+        "python.exe"
+       ],
+       "gpu_mem_mb": null,
+       "gpu_util": null
+      },
+      "export": {
+       "seconds": 1.26,
+       "ok": true,
+       "samples": 5,
+       "main_ws_mb": 828,
+       "main_private_mb": 2271,
+       "children_ws_mb": 859,
+       "children_private_mb": 2424,
+       "total_ws_mb": 1687,
+       "total_private_mb": 4695,
+       "procs": [
+        "conhost.exe",
+        "python.exe"
+       ],
+       "gpu_mem_mb": null,
+       "gpu_util": null
+      },
+      "idle_after": {
+       "seconds": 5.0,
+       "ok": true,
+       "samples": 19,
+       "main_ws_mb": 293,
+       "main_private_mb": 1723,
+       "children_ws_mb": 0,
+       "children_private_mb": 0,
+       "total_ws_mb": 293,
+       "total_private_mb": 1723,
+       "procs": [],
+       "gpu_mem_mb": null,
+       "gpu_util": null
+      }
+     },
+     "gpu_tasks": [
+      "probe 1.5",
+      "separate 50.8",
+      "separate 31.3",
+      "pitch 7.0",
+      "whisper 13.8",
+      "pitch 13.6"
+     ],
+     "startup": {
+      "import_pipeline_share": 0.16,
+      "import_app": 0.21
+     },
+     "song": {
+      "duration": 217.0,
+      "separation": "uvr",
+      "vocal_model": "mdx",
+      "karaoke": "UVR_MDXNET_KARA_2.onnx",
+      "lyrics_unreliable": true
+     }
+    }
+   ]
+  }
+ }
+}
