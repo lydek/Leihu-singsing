@@ -13,7 +13,7 @@ r"""錄一個版本在這台電腦上的效能基準（docs/refactor-port-plan.m
 
 用法（repo 根目錄，用已安裝版本的內嵌 Python）：
   <python> tests/perf/baseline.py [git 參照，預設 v2.3.2] [--label=<這台電腦的名稱>] [--runs=3] [--quality=auto|standard]
-  [--timeout=<每次執行的秒數上限，預設 7200>]
+  [--timeout=<每次執行的秒數上限，預設 7200>] [--device=auto|cpu]
 有異常時結束代碼是 1。
 """
 
@@ -37,8 +37,8 @@ HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[1]
 sys.path[:0] = [str(ROOT / "tests" / "numeric"), str(ROOT / "tests" / "contract")]
 
-from baseline import TIMEOUT, device_lines, kill_tree, log_alerts, machine  # noqa: E402  tests/numeric/baseline.py
-from compare_upstream import scrub, tools_dirty, OUT, _git, commit_of, export  # noqa: E402
+from baseline import TIMEOUT, device_report, kill_tree, log_alerts, machine  # noqa: E402  tests/numeric/baseline.py
+from compare_upstream import write_summary, tools_dirty, OUT, _git, commit_of, export  # noqa: E402
 
 PRIVATE = ROOT / "tests" / "private"
 MODELS = PRIVATE / "models"
@@ -149,13 +149,18 @@ def synth_song() -> Path:
     return dst
 
 
-def run_one(code: Path, song: Path, out: Path, quality: str, timeout: float) -> tuple[int | None, list[dict], list[dict], str]:
+def ok_run(r: dict) -> bool:
+    """成功的一次：結束代碼 0、有 run.json、不是中途中斷寫的 run.json。統計、啟動時間、摘要都用這個條件。"""
+    return r["rc"] == 0 and bool(r["run"]) and not r["run"].get("incomplete")
+
+
+def run_one(code: Path, song: Path, out: Path, quality: str, timeout: float, device: str = "auto") -> tuple[int | None, list[dict], list[dict], str]:
     """跑一次 run_perf.py 並取樣；超過 timeout 秒就結束整個行程樹，結束代碼回傳 None。"""
     log = out.with_suffix(".log")
     with open(log, "w", encoding="utf-8") as f:
         p = subprocess.Popen(
             [sys.executable, "-I", str(HERE / "run_perf.py"), str(code), str(song), str(MODELS), str(out),
-             f"--quality={quality}"],
+             f"--quality={quality}", f"--device={device}"],
             stdout=f, stderr=subprocess.STDOUT, env=dict(os.environ, PYTHONUTF8="1", PYTHONDONTWRITEBYTECODE="1"),
         )
         mems: list[dict] = []
@@ -239,7 +244,7 @@ def main() -> int:  # noqa: C901
     results: dict[str, dict] = {}
     first_log = ""
     first_run = None
-    all_logs: list[str] = []  # 每一次的 log：實際裝置取所有次的聯集（有一次退回 CPU 也看得到）
+    all_logs: dict[str, str] = {}  # 每一次的 log：實際裝置逐次列
     for sid, song in songs:
         sha = hashlib.sha256(song.read_bytes()).hexdigest()
         rec = {"sha256": sha, "source": "合成（sing.flac × 7）" if sid == "synth" else "tests/private/songs", "runs": []}
@@ -250,14 +255,15 @@ def main() -> int:  # noqa: C901
 
                 shutil.rmtree(out)
             print(f"{sid} 第 {i} 次 → {out}", flush=True)
-            rc, mems, gpus, log = run_one(code, song, out, quality, float(opt.get("timeout", TIMEOUT)))
+            rc, mems, gpus, log = run_one(code, song, out, quality, float(opt.get("timeout", TIMEOUT)),
+                                          opt.get("device", "auto"))
             if rc is None:
                 from sandbox import clean_stale
 
                 problems += [f"{sid} 第 {i} 次超過 {opt.get('timeout', TIMEOUT)} 秒沒有結束，已結束整個行程樹，結果不完整",
                              *clean_stale()]
-            all_logs.append(log)
             label_i = f"{sid} 第 {i} 次"
+            all_logs[label_i] = log
             if rc:
                 problems.append(f"{label_i} run_perf.py 結束代碼 {rc}（log：{out.with_suffix('.log')}）")
             rj = json.loads((out / "run.json").read_text("utf-8")) if (out / "run.json").exists() else None
@@ -265,12 +271,12 @@ def main() -> int:  # noqa: C901
                 problems.append(f"{label_i} 沒有產生 run.json，結果不完整")
             else:
                 problems += [f"{label_i}：{p}" for p in rj["problems"]]
-            problems += log_alerts(log.replace("[perf] 子程式載入", "[numeric] 子程式載入"), label_i)
+            problems += log_alerts(log, label_i)
             phases = json.loads((out / "phases.json").read_text("utf-8")) if (out / "phases.json").exists() else []
-            rec["runs"].append({"rc": rc, "phases": per_phase(phases, mems, gpus), "gpu_tasks": gpu_tasks(log),
-                                "run": rj})
+            r = {"rc": rc, "phases": per_phase(phases, mems, gpus), "gpu_tasks": gpu_tasks(log), "run": rj}
+            rec["runs"].append(r)
             (out / "samples.json").write_text(json.dumps({"mem": mems, "gpu": gpus}), "utf-8")
-            if first_run is None and rj is not None:
+            if first_run is None and ok_run(r):
                 first_run, first_log = rj, log
         results[sid] = rec
     mach = machine()
@@ -301,8 +307,8 @@ def main() -> int:  # noqa: C901
         "## 實際使用的裝置與模型",
         "",
         f"- 顯示卡探測（子程式）：{json.dumps(probe, ensure_ascii=False) if probe else '沒有探測結果'}"
-        "（只代表探測用的小運算能不能在顯示卡上跑；每一步實際用的裝置看下面的「實際裝置」，是所有次的聯集）",
-        *device_lines("\n".join(all_logs)),
+        "（只代表探測用的小運算能不能在顯示卡上跑；每一步實際用的裝置看下面的「實際裝置」）",
+        *device_report(all_logs),
         f"- ONNX Runtime 可用的 provider：{env.get('onnx_providers')}",
         "- 套件：" + "、".join(f"{k} {v}" for k, v in env.items() if k not in ("onnx_providers", "gpu_probe", "executable")),
         "- log 的「[gpu] 顯示卡處理程式」是子程式的名稱，不代表一定用顯示卡",
@@ -313,7 +319,7 @@ def main() -> int:  # noqa: C901
     dev = sorted({ln.strip()[:160] for ln in first_log.splitlines()
                   if re.search(r"(?i)\[cuda\]|\[ctranslate2\].*warning|\[separate\]", ln)})
     rep += [f"- log：{d}" for d in dev[:10]]
-    startup = [r["run"]["startup"] for rec in results.values() for r in rec["runs"] if r["run"]]
+    startup = [r["run"]["startup"] for rec in results.values() for r in rec["runs"] if ok_run(r) and r["run"].get("startup")]
     rep += [
         "",
         "## 啟動",
@@ -329,8 +335,7 @@ def main() -> int:  # noqa: C901
                 "|---|---|---|---|---|---|---|---|---|"]
         for ph in order:
             # 只算成功的那幾次：結束代碼 0、有 run.json、這個階段沒有丟例外
-            vals = [r["phases"][ph] for r in rec["runs"]
-                    if r["rc"] == 0 and r["run"] and ph in r["phases"] and r["phases"][ph]["ok"]]
+            vals = [r["phases"][ph] for r in rec["runs"] if ok_run(r) and ph in r["phases"] and r["phases"][ph]["ok"]]
             if not vals:
                 rep.append(f"| {ph} | 沒有成功的資料 | | | | | | | |")
                 continue
@@ -358,13 +363,18 @@ def main() -> int:  # noqa: C901
         "runs_per_song": runs,
         "problems": problems,
         "songs": {sid: {"sha256": rec["sha256"], "source": rec["source"],
-                        "runs": [{"phases": r["phases"], "gpu_tasks": r["gpu_tasks"],
+                        "runs": [{"ok": ok_run(r), "rc": r["rc"], "incomplete": bool((r["run"] or {}).get("incomplete")),
+                                  "problems": (r["run"] or {}).get("problems", ["沒有 run.json"]),
+                                  "phases": r["phases"], "gpu_tasks": r["gpu_tasks"],
                                   "startup": (r["run"] or {}).get("startup"), "song": (r["run"] or {}).get("song")}
                                  for r in rec["runs"]]}
                   for sid, rec in results.items()},
     }
     out_json = SUMMARY / f"{name}-{label}.json"
-    out_json.write_text(json.dumps(scrub(summary), ensure_ascii=False, indent=1), "utf-8")
+    why = write_summary(out_json, summary)
+    if why:
+        problems.append(why)
+        (base / "perf-report.md").write_text("\n".join(rep) + f"\n\n## 摘要沒有寫入\n\n- {why}\n", "utf-8")
     print("\n".join(rep))
     print(f"報告：{base / 'perf-report.md'}；摘要：{out_json}")
     return 1 if problems else 0

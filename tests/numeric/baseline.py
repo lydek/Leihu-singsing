@@ -13,7 +13,10 @@ r"""錄一個版本在這台電腦上的數值基準（docs/refactor-port-plan.m
 
 用法（repo 根目錄，用已安裝版本的內嵌 Python）：
   <python> tests/numeric/baseline.py [git 參照，預設 v2.3.2] [--label=<這台電腦的名稱，例如 desktop-cpu>] [--runs=2] [--songs]
-  [--timeout=<每次執行的秒數上限，預設 7200>]
+  [--timeout=<每次執行的秒數上限，預設 7200>] [--device=auto|cpu]
+--device=cpu：強制只用 CPU（CUDA_VISIBLE_DEVICES=-1），例如在有 NVIDIA 顯示卡的筆電上錄 CPU 基準；不能只靠 --label 區分。
+穩定性：所有步驟實際都在 CPU 上（看 [device]）時，各次輸出要逐檔完全相同；有任何一步在顯示卡上時，
+  浮點運算順序本來就可能不同，改用差距表的門檻判斷，逐檔核對只列出來參考。
 --songs：tests/private/songs/ 的真實歌曲也一起跑（run.py --songs；單執行緒，一首 3～4 分鐘的歌每次要幾分鐘）。
 有異常時結束代碼是 1。
 """
@@ -34,7 +37,7 @@ ROOT = HERE.parents[1]
 sys.path[:0] = [str(HERE), str(ROOT / "tests" / "contract")]
 
 import compare as C  # noqa: E402
-from compare_upstream import scrub, tools_dirty, LOG_ALERTS, OUT, _git, commit_of, export  # noqa: E402
+from compare_upstream import write_summary, tools_dirty, LOG_ALERTS, OUT, _git, commit_of, export  # noqa: E402
 
 INPUTS = ROOT / "tests" / "private" / "numeric" / "inputs"
 MODELS = ROOT / "tests" / "private" / "models"
@@ -107,9 +110,13 @@ def log_alerts(log: str, label: str) -> list[str]:
                 break
     loaded = [("gpu_worker.py", m.group(1).strip()) for m in re.finditer(r"\[(?:numeric|perf)\] 子程式載入 (.+)", log)]
     loaded += [("pipeline.py", m.group(1).strip()) for m in re.finditer(r"\[source\] pipeline (.+)", log)]
-    for want, p in loaded:
-        if "leihu-numeric-" not in p or not p.endswith(os.path.join("app", want)):
-            out.append(f"{label} 子程式載入了暫存資料夾以外的程式：{p}")
+    roots = re.findall(r"\[(?:numeric|perf)\] 沙盒 (.+)", log)
+    root = roots[0].strip() if roots else None
+    if loaded and root is None:
+        out.append(f"{label} log 裡沒有這次的沙盒路徑，子程式來源無法核對")
+    for want, p in loaded:  # 一定要是這一次自己的沙盒（不是別的 session 的同名資料夾）
+        if root is None or os.path.normcase(p) != os.path.normcase(os.path.join(root, want)):
+            out.append(f"{label} 子程式載入了這次沙盒以外的程式：{p}")
     if "[gpu] " in log and not any(w == "pipeline.py" for w, _ in loaded):
         out.append(f"{label} 子程式沒有回報 pipeline 的來源（child_hook 沒有生效）")
     return out
@@ -127,15 +134,30 @@ def device_lines(log: str) -> list[str]:
     return out
 
 
-def used(run_dir: Path, log: str) -> list[str]:
-    """實際使用的裝置與模型。"""
+def device_report(logs: dict[str, str]) -> list[str]:
+    """每一次各自的實際裝置；每次都一樣就只列一次並註明。"""
+    per = {k: device_lines(v) for k, v in logs.items()}
+    uniq = {tuple(v) for v in per.values()}
+    if len(uniq) == 1:
+        return [*next(iter(uniq)), f"- （{'、'.join(per)}的實際裝置都一樣）"]
+    return [x for k, v in per.items() for x in (f"- {k}：", *[f"  {y}" for y in v])]
+
+
+def gpu_used(logs: dict[str, str]) -> bool:
+    """有沒有任何一步實際在顯示卡上跑（看 [device] 紀錄）。"""
+    return any("cuda" in ln.lower() for log in logs.values() for ln in log.splitlines() if ln.startswith("[device] "))
+
+
+def used(run_dir: Path, logs: dict[str, str]) -> list[str]:
+    """實際使用的裝置與模型（裝置逐次列；模型、套件看第一次成功的那次）。"""
+    log = "\n".join(logs.values())
     rj = json.loads((run_dir / "run.json").read_text("utf-8"))
     env = rj["environment"]
     probe = env.get("gpu_probe") or {}
     lines = [
         f"- 顯示卡探測（子程式）：{json.dumps(probe, ensure_ascii=False) if probe else '沒有探測結果'}"
         "（只代表探測用的小運算能不能在顯示卡上跑；每一步實際用的裝置看下面的「實際裝置」）",
-        *device_lines(log),
+        *device_report(logs),
         f"- ONNX Runtime 可用的 provider：{env.get('onnx_providers')}",
         "- 套件：" + "、".join(f"{k} {v}" for k, v in env.items() if k not in ("onnx_providers", "gpu_probe", "executable")),
         f"- 顯示卡子程式開了 {rj['worker_spawns']} 次（log 的「[gpu] 顯示卡處理程式」是子程式的名稱，不代表一定用顯示卡）",
@@ -180,7 +202,7 @@ def main() -> int:  # noqa: C901
         t0 = time.time()
         rc, late = run_logged(
             [sys.executable, "-I", str(HERE / "run.py"), str(code), str(INPUTS), str(MODELS), str(out)]
-            + ([f"--songs={SONGS}"] if "songs" in opt else []),
+            + ([f"--songs={SONGS}"] if "songs" in opt else []) + [f"--device={opt.get('device', 'auto')}"],
             base / f"run{i}.log", float(opt.get("timeout", TIMEOUT)),
         )
         wall[i] = round(time.time() - t0, 1)
@@ -197,11 +219,14 @@ def main() -> int:  # noqa: C901
             problems += [f"第 {i} 次輸出不完整：{p}" for p in C.required(out)]
     ok_runs = [i for i in logs if (base / f"run{i}" / "run.json").exists()
                and not json.loads((base / f"run{i}" / "run.json").read_text("utf-8")).get("incomplete")]
-    # 穩定性：第 2 次起每一次都和第 1 次逐檔核對（CPU、固定條件下要完全相同）；差距表只是參考
+    # 穩定性：第 2 次起每一次都和第 1 次比。全部在 CPU 上要逐檔完全相同；有用到顯示卡改看差距表的門檻
+    on_gpu = gpu_used({f"第 {i} 次": logs[i] for i in ok_runs})
     exact = {i: C.exact(base / "run1", base / f"run{i}") for i in ok_runs if i != 1 and 1 in ok_runs}
-    for i, rows in exact.items():
-        problems += [f"第 1 次和第 {i} 次不完全相同：{r['item']} {r['value']}" for r in rows if not r["ok"]]
-    pair = C.pair(base / "run1", base / "run2") if {1, 2} <= set(ok_runs) else []
+    pairs = {i: C.pair(base / "run1", base / f"run{i}") for i in exact}
+    for i in exact:
+        rows, what = (pairs[i], "超過差距門檻") if on_gpu else (exact[i], "不完全相同")
+        problems += [f"第 1 次和第 {i} 次{what}：{r['item']} {r['value']}" for r in rows if not r["ok"]]
+    pair = pairs.get(2, [])
     if runs >= 2 and not exact:
         problems.append("少於兩次成功的執行，沒有做穩定性比對")
     quality = {i: C.quality(base / f"run{i}") for i in ok_runs}
@@ -232,7 +257,11 @@ def main() -> int:  # noqa: C901
         "",
         "## 實際使用的裝置與模型",
         "",
-        *(used(base / f"run{ok_runs[0]}", logs[ok_runs[0]]) if ok_runs else ["（沒有成功的執行）"]),
+        *(used(base / f"run{ok_runs[0]}", {f"第 {i} 次": logs[i] for i in ok_runs}) if ok_runs
+          else ["（沒有成功的執行）"]),
+        "",
+        "穩定性判斷：" + ("有步驟在顯示卡上跑，用差距表的門檻（逐檔核對只供參考）" if on_gpu
+                          else "全部在 CPU 上，各次輸出要逐檔完全相同"),
         "",
         "## 同一版各次輸出逐檔核對（和第 1 次比）",
         "",
@@ -261,13 +290,17 @@ def main() -> int:  # noqa: C901
         "songs": rj.get("songs"),  # run.py --songs 的真實歌曲：匿名編號 → sha256（不記檔名）
         "models": rj.get("models"),  # 模型檔 → sha256
         "problems": problems,
+        "on_gpu": on_gpu,
         "exact": {str(i): rows for i, rows in exact.items()},
         "stability": pair,
         "quality": {str(i): q for i, q in quality.items()},
         "wall_seconds": wall,
     }
     out_json = SUMMARY / f"{name}-{label}.json"
-    out_json.write_text(json.dumps(scrub(summary), ensure_ascii=False, allow_nan=False, indent=1), "utf-8")
+    why = write_summary(out_json, summary)
+    if why:
+        problems.append(why)
+        (base / "numeric-report.md").write_text("\n".join(rep) + f"\n\n## 摘要沒有寫入\n\n- {why}\n", "utf-8")
     print("\n".join(rep))
     print(f"報告：{base / 'numeric-report.md'}；摘要：{out_json}")
     return 1 if problems else 0

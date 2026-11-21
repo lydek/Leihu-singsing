@@ -14,7 +14,7 @@ r"""錄一個版本在這台電腦上的相似度基準（docs/refactor-port-pla
 
 用法（repo 根目錄，用已安裝版本的內嵌 Python）：
   <python> tests/numeric/similarity.py [git 參照，預設 v2.3.2] [--label=<這台電腦的名稱>] [--runs=3] [--quality=standard|auto]
-  [--timeout=<每次執行的秒數上限，預設 7200>]
+  [--timeout=<每次執行的秒數上限，預設 7200>] [--device=auto|cpu]
 有異常時結束代碼是 1。
 """
 
@@ -36,7 +36,7 @@ sys.path[:0] = [str(HERE), str(ROOT / "tests" / "contract")]
 import compare as C  # noqa: E402
 import numpy as np  # noqa: E402
 from baseline import INPUTS, MODELS, SUMMARY, TIMEOUT, log_alerts, machine, run_logged, used  # noqa: E402
-from compare_upstream import scrub, tools_dirty, OUT, _git, commit_of, export  # noqa: E402
+from compare_upstream import write_summary, tools_dirty, OUT, _git, commit_of, export  # noqa: E402
 
 SONGS = ROOT / "tests" / "private" / "songs"
 
@@ -91,7 +91,7 @@ def main() -> int:  # noqa: C901
             shutil.rmtree(out)
         print(f"第 {i} 次：{name} → {out}", flush=True)
         cmd = [sys.executable, "-I", str(HERE / "run.py"), str(code), str(INPUTS), str(MODELS), str(out), "--normal",
-               f"--quality={quality}"] + ([f"--songs={SONGS}"] if has_songs else [])
+               f"--quality={quality}", f"--device={opt.get('device', 'auto')}"] + ([f"--songs={SONGS}"] if has_songs else [])
         t0 = time.time()
         rc, late = run_logged(cmd, base / f"run{i}.log", float(opt.get("timeout", TIMEOUT)))
         wall[i] = round(time.time() - t0, 1)
@@ -164,7 +164,8 @@ def main() -> int:  # noqa: C901
         "",
         "## 實際使用的裝置與模型",
         "",
-        *(used(base / f"run{ok_runs[0]}", logs[ok_runs[0]]) if ok_runs else ["（沒有成功的執行）"]),
+        *(used(base / f"run{ok_runs[0]}", {f"第 {i} 次": logs[i] for i in ok_runs}) if ok_runs
+          else ["（沒有成功的執行）"]),
         "",
         "## 上游自己跑多次的差距（第二階段門檻的下限）",
         "",
@@ -200,7 +201,9 @@ def main() -> int:  # noqa: C901
         "wall_seconds": wall,
     }
     out_json = SUMMARY / f"{name}-{label}-similarity.json"
-    out_json.write_text(json.dumps(scrub(summary), ensure_ascii=False, allow_nan=False, indent=1, default=str), "utf-8")
+    why = write_summary(out_json, summary)
+    if why:
+        problems.append(why)
     print("\n".join(rep))
     print(f"報告：{base / 'similarity-report.md'}；摘要：{out_json}")
     return 1 if problems else 0

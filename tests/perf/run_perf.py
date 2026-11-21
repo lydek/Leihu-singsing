@@ -49,7 +49,8 @@ def phase(name: str):
     return _P()
 
 
-BOX = Sandbox(code, models, "[perf]", deterministic=False)
+BOX = Sandbox(code, models, "[perf]", deterministic=False, device=opt.get("device", "auto"))
+BOX.cond("計時前已經把模型檔完整讀過一遍（算 sha256），模型載入的時間是檔案在系統快取裡的情況，不是冷啟動")
 P, SH = BOX.P, BOX.SH
 t0 = time.time()
 import app  # noqa: E402, F401  只 import（啟動伺服器要 app.main()）；量 import 的時間
