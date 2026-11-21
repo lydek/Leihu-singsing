@@ -4,7 +4,7 @@ r"""上游（基準）與目前這一邊的契約比對（docs/refactor-port-pla
 逐案例和目前這一邊的快照（snapshots/contract.json）比 JSON 結構，依 RULES 把差異分成「預期」和「未預期」，
 報告寫到 tests/private/upstream/<名稱>/contract-report.md。有未預期差異或異常時結束代碼是 1。
 
-用法（repo 根目錄）：python tests/contract/compare_upstream.py [git 參照，預設 v2.3.2] [--twice] [--numeric]
+用法（repo 根目錄）：python tests/contract/compare_upstream.py [git 參照，預設 v2.3.2] [--twice]
 --record：錄 contract.json。用 serve_upstream.py 跑指定的已 commit 參照，得到候選結果；
   快照已經存在時，再現場跑 --base=<參照>（預設 v2.3.2）比對，所有差異都符合 RULES 才覆寫，否則 exit 1、保留原快照。
   快照還不存在時（第一次建立基準）直接寫入。只能用在步驟 1 之前（serve_upstream.py 要改得到 app 的背景函式）。
@@ -15,15 +15,12 @@ r"""上游（基準）與目前這一邊的契約比對（docs/refactor-port-pla
   上游在 --since..<參照> 之間新增到 app.py、pipeline.py 的名稱，重構版都要找得到（刻意不移植的列在 NOT_PORTED）。
   --since=<參照> 預設是上次的同步點（git merge-base HEAD <參照>）；已經 merge -s ours 過的版本要自己給（例如 v2.1.0 是 v2.0.0）。
 --code=<資料夾>：不從 git 匯出，直接比對這份程式碼（名稱用資料夾名稱；例如檢查比對工具抓不抓得到故意改過的地方）。
---numeric：另外跑數值比對（tests/numeric/run.py 分別處理上游和目前的程式碼，再用 tests/test_numeric.py 以上游為基準比對）。
-  要用裝好推論套件的 Python（預設 %LOCALAPPDATA%\LeihuLiantai\python\python.exe，或設 LEIHU_ML_PYTHON），
-  素材和模型照 tests/numeric/run.py 的說明先準備在 tests/private/numeric/inputs、tests/private/models。
+數值比對是另一支工具：tests/numeric/baseline.py（舊的 --numeric 依賴 2.0.0 重構版的 ml-worker，已拿掉）。
 """
 
 from __future__ import annotations
 
 import json
-import os
 import re
 import shutil
 import subprocess
@@ -161,51 +158,6 @@ def classify(case: str, d: str) -> str | None:
         if pred(case, d):
             return name
     return None
-
-
-def numeric(name: str, code: Path) -> int:
-    py = os.environ.get("LEIHU_ML_PYTHON") or str(
-        Path(os.environ.get("LOCALAPPDATA", "")) / "LeihuLiantai" / "python" / "python.exe"
-    )
-    num = ROOT / "tests" / "private" / "numeric"
-    inputs, models = num / "inputs", ROOT / "tests" / "private" / "models"
-    if not (Path(py).exists() and inputs.exists() and models.exists()):
-        print(f"數值比對略過：找不到 {py}、{inputs} 或 {models}（見 tests/numeric/run.py）")
-        return 2
-    tmp = Path(tempfile.mkdtemp(prefix="leihu-upstream-num-"))
-    try:  # 上游不認 LIANTAI_DATA，歌曲會寫在程式碼資料夾裡：處理複製出來的那份
-        shutil.copytree(code, tmp / "code")
-        for src, out in ((tmp / "code", num / f"upstream-{name}"), (ROOT, num / "current")):
-            shutil.rmtree(out, ignore_errors=True)
-            r = subprocess.run(
-                [py, "-I", str(ROOT / "tests" / "numeric" / "run.py"), str(src), str(inputs), str(models), str(out)],
-                capture_output=True,
-                text=True,
-                encoding="utf-8",
-                errors="replace",
-            )
-            (OUT / name / f"numeric-run-{out.name}.log").write_text(r.stdout + r.stderr, "utf-8")
-            if r.returncode:
-                print(f"run.py 失敗（{src}），log 在 {OUT / name}")
-                return 1
-    finally:
-        shutil.rmtree(tmp, ignore_errors=True)
-    r = subprocess.run(
-        [sys.executable, "-m", "pytest", "-q", "-m", "models", "tests/test_numeric.py"],
-        cwd=ROOT,
-        env=dict(os.environ, NUMERIC_BASE=f"upstream-{name}"),
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
-    )
-    (OUT / name / "numeric-report.txt").write_text(r.stdout + r.stderr, "utf-8")
-    print(
-        "數值比對："
-        + (r.stdout.strip().splitlines() or ["（沒有輸出）"])[-1]
-        + f"；報告：{OUT / name / 'numeric-report.txt'}"
-    )
-    return r.returncode
 
 
 _IDS = {
@@ -434,8 +386,6 @@ def main() -> int:  # noqa: C901
         )
         print(f"漏移檢查：{len(problems)} 項；報告：{OUT / name / 'leak-report.md'}")
         rc = max(rc, 1 if problems else 0)
-    if "--numeric" in opt:
-        rc = max(rc, numeric(name, code))
     return rc
 
 
