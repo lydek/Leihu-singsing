@@ -196,9 +196,23 @@ def device_report(logs: dict[str, str]) -> list[str]:
     return [x for k, v in per.items() for x in (f"- {k}：", *[f"  {y}" for y in v])]
 
 
+def final_devices(log: str) -> dict[str, str]:
+    """child_hook 每個項目最後回報的實際裝置（「[device] <項目>：… 實際=<裝置>」，同一個項目後面的蓋掉前面的）。"""
+    out: dict[str, str] = {}
+    for ln in log.splitlines():
+        m = re.match(r"\[device\] (.+?)：.* 實際=(\S+)\s*$", ln)
+        if m:
+            out[m.group(1)] = m.group(2)
+    return out
+
+
 def gpu_used(logs: dict[str, str]) -> bool:
-    """有沒有任何一步實際在顯示卡上跑（看 [device] 紀錄）。"""
-    return any("cuda" in ln.lower() for log in logs.values() for ln in log.splitlines() if ln.startswith("[device] "))
+    """有沒有任何一步最後實際在顯示卡上跑（要求值、中途失敗後退回 CPU 的嘗試都不算）。"""
+    return any(dev.startswith("cuda") for log in logs.values() for dev in final_devices(log).values())
+
+
+assert final_devices("[device] whisper 模型：device=cuda（要求 auto） 實際=cuda\n"
+                     "[device] whisper 模型：device=cpu（要求 cpu） 實際=cpu\n") == {"whisper 模型": "cpu"}
 
 
 def used(run_dir: Path, logs: dict[str, str]) -> list[str]:

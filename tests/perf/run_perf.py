@@ -124,14 +124,23 @@ def main() -> None:
     meta = json.loads((d / "meta.json").read_text("utf-8"))
     take = json.loads((td / "take01.json").read_text("utf-8"))
     problems += BOX.problems(out)
+    # 讓這一次不能當效能資料的問題（父程式的 ok_run 看這個）
+    invalid = []
     if take.get("status") != "done":
-        problems.append(f"評分沒有完成：{take.get('status')} {take.get('error', '')}")
+        invalid.append(f"評分沒有完成：{take.get('status')} {take.get('error', '')}")
+    notes = [x for x in meta.get("notes", []) if "沒有完成" in x or "失敗" in x]
+    invalid += [f"處理時被測程式記下的失敗：{x}" for x in notes]
+    want = ["idle_before", "import", "separate", "pitch", "lyrics", "variant", "score", "export", "idle_after"]
+    got = {ph["name"]: ph["ok"] for ph in PHASES}
+    invalid += [f"階段 {w} " + ("沒有跑" if w not in got else "丟了例外") for w in want if not got.get(w)]
+    problems += invalid
     (out / "run.json").write_text(
         json.dumps(
             {
                 "code": str(code),
                 "conditions": BOX.conditions,
                 "problems": problems,
+                "invalid": invalid,
                 "worker_spawns": BOX.spawns,
                 "environment": BOX.environment(),
                 "models": BOX.models_sha,

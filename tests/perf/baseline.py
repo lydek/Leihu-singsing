@@ -153,8 +153,10 @@ RUN_STATE = {"stopped": True, "kill_note": ""}  # run_one 最後一次逾時處�
 
 
 def ok_run(r: dict) -> bool:
-    """成功的一次：結束代碼 0、有 run.json、不是中途中斷寫的 run.json。統計、啟動時間、摘要都用這個條件。"""
-    return r["rc"] == 0 and bool(r["run"]) and not r["run"].get("incomplete")
+    """成功的一次：結束代碼 0、有 run.json、不是中途中斷、工作都做完（run_perf 的 invalid 是空的）、
+    這一次的 log 沒有異常（改用 CPU、退回標準模型等會讓時間不能比）。統計、啟動時間、摘要都用這個條件。"""
+    return (r["rc"] == 0 and bool(r["run"]) and not r["run"].get("incomplete") and not r["run"].get("invalid", ["沒有 invalid 欄位"])
+            and not r.get("alerts"))
 
 
 def run_one(code: Path, song: Path, out: Path, quality: str, timeout: float, device: str = "auto") -> tuple[int | None, list[dict], list[dict], str]:
@@ -282,9 +284,10 @@ def main() -> int:  # noqa: C901
                 problems.append(f"{label_i} 沒有產生 run.json，結果不完整")
             else:
                 problems += [f"{label_i}：{p}" for p in rj["problems"]]
-            problems += log_alerts(log, label_i)
+            alerts = log_alerts(log, label_i)
+            problems += alerts
             phases = json.loads((out / "phases.json").read_text("utf-8")) if (out / "phases.json").exists() else []
-            r = {"rc": rc, "phases": per_phase(phases, mems, gpus), "gpu_tasks": gpu_tasks(log), "run": rj}
+            r = {"rc": rc, "phases": per_phase(phases, mems, gpus), "gpu_tasks": gpu_tasks(log), "run": rj, "alerts": alerts}
             rec["runs"].append(r)
             (out / "samples.json").write_text(json.dumps({"mem": mems, "gpu": gpus}), "utf-8")
             if first_run is None and ok_run(r):
@@ -376,6 +379,7 @@ def main() -> int:  # noqa: C901
         "songs": {sid: {"sha256": rec["sha256"], "source": rec["source"],
                         "runs": [{"ok": ok_run(r), "rc": r["rc"], "incomplete": bool((r["run"] or {}).get("incomplete")),
                                   "problems": (r["run"] or {}).get("problems", ["沒有 run.json"]),
+                                  "invalid": (r["run"] or {}).get("invalid"), "alerts": r["alerts"],
                                   "phases": r["phases"], "gpu_tasks": r["gpu_tasks"],
                                   "startup": (r["run"] or {}).get("startup"), "song": (r["run"] or {}).get("song")}
                                  for r in rec["runs"]]}
