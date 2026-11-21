@@ -1,7 +1,7 @@
 {
  "version": "v2.3.2",
  "label": "desktop-9900x3d-cpu",
- "tool_commit": "fe9431f",
+ "tool_commit": "b181dd9",
  "machine": {
   "os": "Windows-10-10.0.26200-SP0",
   "cpu": "AMD Ryzen 9 9900X3D 12-Core Processor",
@@ -69,10 +69,1297 @@
   "whisper/models--mobiuslabsgmbh--faster-whisper-large-v3-turbo/snapshots/0a363e9161cbc7ed1431c9597a8ceaf0c4f78fcf/vocabulary.json": "c69260f2ab26d659b7c398f9a2b2b48ed0df16c3b47d7326782fd9cba71690c1",
   "whisper/models--mobiuslabsgmbh--faster-whisper-large-v3-turbo/trees/0a363e9161cbc7ed1431c9597a8ceaf0c4f78fcf.json": "7d08abef5876605d66d3fc4f95b3bb53a0a73aca8b03faa15c57a9282275e988"
  },
- "songs": {},
+ "songs": {
+  "song01": "4f07cd12df0589d6a2e4732195445a0b3d97cbbfcbdf0f15d2f11a6a9e81c184",
+  "song02": "864de25d6aac5e45f8edcd02a82a9426f82b5b0ee2c17ede1b33f0f7fd2aa1bc",
+  "song03": "11c76d17d2f5bf5c05a55bb37a687dd94363fa173c87bf3daba1c24448830045",
+  "song04": "b7fef6607fe81365d6cbaa9b850a10d8e1378f3155239766ec28c78dd315a50f",
+  "song05": "a82575118ced9025b4e4bc180f75efd338a87228ab47047ea3e91608afaa4efa",
+  "song06": "659796f77cc69ac3c9bc3475f40452d9fedf85e140df375d9a307a3ccefbfd0c",
+  "song07": "b5345e3dd22e4c5afb48a83342bc76edc6dcd89d19204fa0b859596cf217fd6b",
+  "song08": "f45747ca4b015f546ed2890a66f1e27a25bde374b0450c5d9e768aa68d4534f9",
+  "song09": "afd07b842ca4ccffe3bd4711cbe265a2abd441d0b78055d66d1ebe18f0819cbe",
+  "song10": "4e00cb543b175afb9a02e7606ab5a3c8c00213f5baadd87c98f148b3c37b8ae0"
+ },
  "problems": [],
  "pairs": {
   "1-2": [
+   {
+    "item": "songsing01 lead 分離 SDR",
+    "value": "inf dB",
+    "limit": "> 30 dB",
+    "ok": true,
+    "num": "inf"
+   },
+   {
+    "item": "songsing01 back 分離 SDR",
+    "value": "inf dB",
+    "limit": "> 30 dB",
+    "ok": true,
+    "num": "inf"
+   },
+   {
+    "item": "songsing01 inst 分離 SDR",
+    "value": "inf dB",
+    "limit": "> 30 dB",
+    "ok": true,
+    "num": "inf"
+   },
+   {
+    "item": "songsing01 音高 hop",
+    "value": "0.01 vs 0.01",
+    "limit": "相同",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "songsing01 有聲判斷一致率",
+    "value": "1.0000",
+    "limit": ">= 0.98",
+    "ok": true,
+    "num": 1.0
+   },
+   {
+    "item": "songsing01 音高差中位數",
+    "value": "8.00 cents",
+    "limit": "< 10 cents",
+    "ok": true,
+    "num": 7.9999999999998295
+   },
+   {
+    "item": "songsing01 音符數",
+    "value": "25 vs 25",
+    "limit": "差 <= max(1, 2%)",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "songsing01 沒有配對到的音符",
+    "value": "A 多 0 個、B 多 0 個",
+    "limit": "各 <= max(1, 2%)",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "songsing01 音符起點差中位數",
+    "value": "0.0 ms",
+    "limit": "< 20 ms",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "songsing01 音符結束差中位數",
+    "value": "0.0 ms",
+    "limit": "< 20 ms",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "songsing01 音符音高不同的個數",
+    "value": "0／25",
+    "limit": "<= max(1, 2%)",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "songsing01 meta（separation、vocal_model、karaoke、acapella、language、lyrics_unreliable、harmony）",
+    "value": "相同",
+    "limit": "相同",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "songspeech01 lead 分離 SDR",
+    "value": "inf dB",
+    "limit": "> 30 dB",
+    "ok": true,
+    "num": "inf"
+   },
+   {
+    "item": "songspeech01 back 分離 SDR",
+    "value": "inf dB",
+    "limit": "> 30 dB",
+    "ok": true,
+    "num": "inf"
+   },
+   {
+    "item": "songspeech01 inst 分離 SDR",
+    "value": "inf dB",
+    "limit": "> 30 dB",
+    "ok": true,
+    "num": "inf"
+   },
+   {
+    "item": "songspeech01 音高 hop",
+    "value": "0.01 vs 0.01",
+    "limit": "相同",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "songspeech01 有聲判斷一致率",
+    "value": "0.9981",
+    "limit": ">= 0.98",
+    "ok": true,
+    "num": 0.9980997624703087
+   },
+   {
+    "item": "songspeech01 音高差中位數",
+    "value": "9.00 cents",
+    "limit": "< 10 cents",
+    "ok": true,
+    "num": 8.99999999999963
+   },
+   {
+    "item": "songspeech01 音符數",
+    "value": "41 vs 44",
+    "limit": "差 <= max(1, 2%)",
+    "ok": false,
+    "num": 3.0
+   },
+   {
+    "item": "songspeech01 沒有配對到的音符",
+    "value": "A 多 0 個、B 多 3 個",
+    "limit": "各 <= max(1, 2%)",
+    "ok": false,
+    "num": 3.0
+   },
+   {
+    "item": "songspeech01 音符起點差中位數",
+    "value": "0.0 ms",
+    "limit": "< 20 ms",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "songspeech01 音符結束差中位數",
+    "value": "0.0 ms",
+    "limit": "< 20 ms",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "songspeech01 音符音高不同的個數",
+    "value": "6／41",
+    "limit": "<= max(1, 2%)",
+    "ok": false,
+    "num": 6.0
+   },
+   {
+    "item": "songspeech01 meta（separation、vocal_model、karaoke、acapella、language、lyrics_unreliable、harmony）",
+    "value": "相同",
+    "limit": "相同",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "songspeech01 歌詞字元錯誤率",
+    "value": "0.000（53 字 vs 53 字）",
+    "limit": "< 0.01",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "songspeech01 歌詞起點差中位數",
+    "value": "0 ms",
+    "limit": "< 80 ms",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song01 lead 分離 SDR",
+    "value": "inf dB",
+    "limit": "> 30 dB",
+    "ok": true,
+    "num": "inf"
+   },
+   {
+    "item": "song01 back 分離 SDR",
+    "value": "inf dB",
+    "limit": "> 30 dB",
+    "ok": true,
+    "num": "inf"
+   },
+   {
+    "item": "song01 inst 分離 SDR",
+    "value": "inf dB",
+    "limit": "> 30 dB",
+    "ok": true,
+    "num": "inf"
+   },
+   {
+    "item": "song01 音高 hop",
+    "value": "0.01 vs 0.01",
+    "limit": "相同",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song01 有聲判斷一致率",
+    "value": "0.9979",
+    "limit": ">= 0.98",
+    "ok": true,
+    "num": 0.9978622789402086
+   },
+   {
+    "item": "song01 音高差中位數",
+    "value": "8.00 cents",
+    "limit": "< 10 cents",
+    "ok": true,
+    "num": 7.9999999999998295
+   },
+   {
+    "item": "song01 音符數",
+    "value": "235 vs 235",
+    "limit": "差 <= max(1, 2%)",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song01 沒有配對到的音符",
+    "value": "A 多 19 個、B 多 19 個",
+    "limit": "各 <= max(1, 2%)",
+    "ok": false,
+    "num": 38.0
+   },
+   {
+    "item": "song01 音符起點差中位數",
+    "value": "0.0 ms",
+    "limit": "< 20 ms",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song01 音符結束差中位數",
+    "value": "0.0 ms",
+    "limit": "< 20 ms",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song01 音符音高不同的個數",
+    "value": "28／216",
+    "limit": "<= max(1, 2%)",
+    "ok": false,
+    "num": 28.0
+   },
+   {
+    "item": "song01 meta（separation、vocal_model、karaoke、acapella、language、lyrics_unreliable、harmony）",
+    "value": "相同",
+    "limit": "相同",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song01 歌詞字元錯誤率",
+    "value": "0.015（806 字 vs 806 字）",
+    "limit": "< 0.01",
+    "ok": false,
+    "num": 0.01488833746898263
+   },
+   {
+    "item": "song01 歌詞起點差中位數",
+    "value": "0 ms",
+    "limit": "< 80 ms",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song02 lead 分離 SDR",
+    "value": "inf dB",
+    "limit": "> 30 dB",
+    "ok": true,
+    "num": "inf"
+   },
+   {
+    "item": "song02 back 分離 SDR",
+    "value": "inf dB",
+    "limit": "> 30 dB",
+    "ok": true,
+    "num": "inf"
+   },
+   {
+    "item": "song02 inst 分離 SDR",
+    "value": "inf dB",
+    "limit": "> 30 dB",
+    "ok": true,
+    "num": "inf"
+   },
+   {
+    "item": "song02 音高 hop",
+    "value": "0.01 vs 0.01",
+    "limit": "相同",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song02 有聲判斷一致率",
+    "value": "0.9996",
+    "limit": ">= 0.98",
+    "ok": true,
+    "num": 0.9996455157745481
+   },
+   {
+    "item": "song02 音高差中位數",
+    "value": "8.00 cents",
+    "limit": "< 10 cents",
+    "ok": true,
+    "num": 7.9999999999998295
+   },
+   {
+    "item": "song02 音符數",
+    "value": "482 vs 483",
+    "limit": "差 <= max(1, 2%)",
+    "ok": true,
+    "num": 1.0
+   },
+   {
+    "item": "song02 沒有配對到的音符",
+    "value": "A 多 14 個、B 多 15 個",
+    "limit": "各 <= max(1, 2%)",
+    "ok": false,
+    "num": 29.0
+   },
+   {
+    "item": "song02 音符起點差中位數",
+    "value": "0.0 ms",
+    "limit": "< 20 ms",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song02 音符結束差中位數",
+    "value": "0.0 ms",
+    "limit": "< 20 ms",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song02 音符音高不同的個數",
+    "value": "25／468",
+    "limit": "<= max(1, 2%)",
+    "ok": false,
+    "num": 25.0
+   },
+   {
+    "item": "song02 meta（separation、vocal_model、karaoke、acapella、language、lyrics_unreliable、harmony）",
+    "value": "相同",
+    "limit": "相同",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song02 歌詞字元錯誤率",
+    "value": "0.000（202 字 vs 202 字）",
+    "limit": "< 0.01",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song02 歌詞起點差中位數",
+    "value": "0 ms",
+    "limit": "< 80 ms",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song03 lead 分離 SDR",
+    "value": "inf dB",
+    "limit": "> 30 dB",
+    "ok": true,
+    "num": "inf"
+   },
+   {
+    "item": "song03 back 分離 SDR",
+    "value": "inf dB",
+    "limit": "> 30 dB",
+    "ok": true,
+    "num": "inf"
+   },
+   {
+    "item": "song03 inst 分離 SDR",
+    "value": "inf dB",
+    "limit": "> 30 dB",
+    "ok": true,
+    "num": "inf"
+   },
+   {
+    "item": "song03 音高 hop",
+    "value": "0.01 vs 0.01",
+    "limit": "相同",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song03 有聲判斷一致率",
+    "value": "0.9991",
+    "limit": ">= 0.98",
+    "ok": true,
+    "num": 0.9991020437484286
+   },
+   {
+    "item": "song03 音高差中位數",
+    "value": "8.00 cents",
+    "limit": "< 10 cents",
+    "ok": true,
+    "num": 7.9999999999998295
+   },
+   {
+    "item": "song03 音符數",
+    "value": "891 vs 889",
+    "limit": "差 <= max(1, 2%)",
+    "ok": true,
+    "num": 2.0
+   },
+   {
+    "item": "song03 沒有配對到的音符",
+    "value": "A 多 28 個、B 多 26 個",
+    "limit": "各 <= max(1, 2%)",
+    "ok": false,
+    "num": 54.0
+   },
+   {
+    "item": "song03 音符起點差中位數",
+    "value": "0.0 ms",
+    "limit": "< 20 ms",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song03 音符結束差中位數",
+    "value": "0.0 ms",
+    "limit": "< 20 ms",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song03 音符音高不同的個數",
+    "value": "56／863",
+    "limit": "<= max(1, 2%)",
+    "ok": false,
+    "num": 56.0
+   },
+   {
+    "item": "song03 meta（separation、vocal_model、karaoke、acapella、language、lyrics_unreliable、harmony）",
+    "value": "相同",
+    "limit": "相同",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song03 歌詞字元錯誤率",
+    "value": "0.000（0 字 vs 0 字）",
+    "limit": "< 0.01",
+    "ok": false,
+    "num": 0.0
+   },
+   {
+    "item": "song03 歌詞行數",
+    "value": "0 vs 0",
+    "limit": "相同",
+    "ok": false,
+    "num": 0.0
+   },
+   {
+    "item": "song04 lead 分離 SDR",
+    "value": "inf dB",
+    "limit": "> 30 dB",
+    "ok": true,
+    "num": "inf"
+   },
+   {
+    "item": "song04 back 分離 SDR",
+    "value": "inf dB",
+    "limit": "> 30 dB",
+    "ok": true,
+    "num": "inf"
+   },
+   {
+    "item": "song04 inst 分離 SDR",
+    "value": "inf dB",
+    "limit": "> 30 dB",
+    "ok": true,
+    "num": "inf"
+   },
+   {
+    "item": "song04 音高 hop",
+    "value": "0.01 vs 0.01",
+    "limit": "相同",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song04 有聲判斷一致率",
+    "value": "0.9992",
+    "limit": ">= 0.98",
+    "ok": true,
+    "num": 0.9991674375578168
+   },
+   {
+    "item": "song04 音高差中位數",
+    "value": "8.00 cents",
+    "limit": "< 10 cents",
+    "ok": true,
+    "num": 7.9999999999998295
+   },
+   {
+    "item": "song04 音符數",
+    "value": "303 vs 304",
+    "limit": "差 <= max(1, 2%)",
+    "ok": true,
+    "num": 1.0
+   },
+   {
+    "item": "song04 沒有配對到的音符",
+    "value": "A 多 13 個、B 多 14 個",
+    "limit": "各 <= max(1, 2%)",
+    "ok": false,
+    "num": 27.0
+   },
+   {
+    "item": "song04 音符起點差中位數",
+    "value": "0.0 ms",
+    "limit": "< 20 ms",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song04 音符結束差中位數",
+    "value": "0.0 ms",
+    "limit": "< 20 ms",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song04 音符音高不同的個數",
+    "value": "16／290",
+    "limit": "<= max(1, 2%)",
+    "ok": false,
+    "num": 16.0
+   },
+   {
+    "item": "song04 meta（separation、vocal_model、karaoke、acapella、language、lyrics_unreliable、harmony）",
+    "value": "相同",
+    "limit": "相同",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song04 歌詞字元錯誤率",
+    "value": "0.138（537 字 vs 506 字）",
+    "limit": "< 0.01",
+    "ok": false,
+    "num": 0.1378026070763501
+   },
+   {
+    "item": "song04 歌詞行數",
+    "value": "42 vs 38",
+    "limit": "相同",
+    "ok": false,
+    "num": 4.0
+   },
+   {
+    "item": "song05 lead 分離 SDR",
+    "value": "inf dB",
+    "limit": "> 30 dB",
+    "ok": true,
+    "num": "inf"
+   },
+   {
+    "item": "song05 back 分離 SDR",
+    "value": "inf dB",
+    "limit": "> 30 dB",
+    "ok": true,
+    "num": "inf"
+   },
+   {
+    "item": "song05 inst 分離 SDR",
+    "value": "inf dB",
+    "limit": "> 30 dB",
+    "ok": true,
+    "num": "inf"
+   },
+   {
+    "item": "song05 音高 hop",
+    "value": "0.01 vs 0.01",
+    "limit": "相同",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song05 有聲判斷一致率",
+    "value": "0.9982",
+    "limit": ">= 0.98",
+    "ok": true,
+    "num": 0.9981638614550007
+   },
+   {
+    "item": "song05 音高差中位數",
+    "value": "8.00 cents",
+    "limit": "< 10 cents",
+    "ok": true,
+    "num": 7.9999999999998295
+   },
+   {
+    "item": "song05 音符數",
+    "value": "434 vs 426",
+    "limit": "差 <= max(1, 2%)",
+    "ok": true,
+    "num": 8.0
+   },
+   {
+    "item": "song05 沒有配對到的音符",
+    "value": "A 多 22 個、B 多 14 個",
+    "limit": "各 <= max(1, 2%)",
+    "ok": false,
+    "num": 36.0
+   },
+   {
+    "item": "song05 音符起點差中位數",
+    "value": "0.0 ms",
+    "limit": "< 20 ms",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song05 音符結束差中位數",
+    "value": "0.0 ms",
+    "limit": "< 20 ms",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song05 音符音高不同的個數",
+    "value": "17／412",
+    "limit": "<= max(1, 2%)",
+    "ok": false,
+    "num": 17.0
+   },
+   {
+    "item": "song05 meta（separation、vocal_model、karaoke、acapella、language、lyrics_unreliable、harmony）",
+    "value": "相同",
+    "limit": "相同",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song05 歌詞字元錯誤率",
+    "value": "0.000（693 字 vs 693 字）",
+    "limit": "< 0.01",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song05 歌詞起點差中位數",
+    "value": "0 ms",
+    "limit": "< 80 ms",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song06 lead 分離 SDR",
+    "value": "inf dB",
+    "limit": "> 30 dB",
+    "ok": true,
+    "num": "inf"
+   },
+   {
+    "item": "song06 back 分離 SDR",
+    "value": "inf dB",
+    "limit": "> 30 dB",
+    "ok": true,
+    "num": "inf"
+   },
+   {
+    "item": "song06 inst 分離 SDR",
+    "value": "inf dB",
+    "limit": "> 30 dB",
+    "ok": true,
+    "num": "inf"
+   },
+   {
+    "item": "song06 音高 hop",
+    "value": "0.01 vs 0.01",
+    "limit": "相同",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song06 有聲判斷一致率",
+    "value": "0.9987",
+    "limit": ">= 0.98",
+    "ok": true,
+    "num": 0.9987365317797354
+   },
+   {
+    "item": "song06 音高差中位數",
+    "value": "8.00 cents",
+    "limit": "< 10 cents",
+    "ok": true,
+    "num": 7.9999999999998295
+   },
+   {
+    "item": "song06 音符數",
+    "value": "555 vs 546",
+    "limit": "差 <= max(1, 2%)",
+    "ok": true,
+    "num": 9.0
+   },
+   {
+    "item": "song06 沒有配對到的音符",
+    "value": "A 多 29 個、B 多 20 個",
+    "limit": "各 <= max(1, 2%)",
+    "ok": false,
+    "num": 49.0
+   },
+   {
+    "item": "song06 音符起點差中位數",
+    "value": "0.0 ms",
+    "limit": "< 20 ms",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song06 音符結束差中位數",
+    "value": "0.0 ms",
+    "limit": "< 20 ms",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song06 音符音高不同的個數",
+    "value": "37／526",
+    "limit": "<= max(1, 2%)",
+    "ok": false,
+    "num": 37.0
+   },
+   {
+    "item": "song06 meta（separation、vocal_model、karaoke、acapella、language、lyrics_unreliable、harmony）",
+    "value": "相同",
+    "limit": "相同",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song06 歌詞字元錯誤率",
+    "value": "0.000（1108 字 vs 1108 字）",
+    "limit": "< 0.01",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song06 歌詞起點差中位數",
+    "value": "0 ms",
+    "limit": "< 80 ms",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song07 lead 分離 SDR",
+    "value": "inf dB",
+    "limit": "> 30 dB",
+    "ok": true,
+    "num": "inf"
+   },
+   {
+    "item": "song07 back 分離 SDR",
+    "value": "inf dB",
+    "limit": "> 30 dB",
+    "ok": true,
+    "num": "inf"
+   },
+   {
+    "item": "song07 inst 分離 SDR",
+    "value": "inf dB",
+    "limit": "> 30 dB",
+    "ok": true,
+    "num": "inf"
+   },
+   {
+    "item": "song07 音高 hop",
+    "value": "0.01 vs 0.01",
+    "limit": "相同",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song07 有聲判斷一致率",
+    "value": "0.9994",
+    "limit": ">= 0.98",
+    "ok": true,
+    "num": 0.9993890269235469
+   },
+   {
+    "item": "song07 音高差中位數",
+    "value": "8.00 cents",
+    "limit": "< 10 cents",
+    "ok": true,
+    "num": 7.9999999999998295
+   },
+   {
+    "item": "song07 音符數",
+    "value": "470 vs 481",
+    "limit": "差 <= max(1, 2%)",
+    "ok": false,
+    "num": 11.0
+   },
+   {
+    "item": "song07 沒有配對到的音符",
+    "value": "A 多 14 個、B 多 25 個",
+    "limit": "各 <= max(1, 2%)",
+    "ok": false,
+    "num": 39.0
+   },
+   {
+    "item": "song07 音符起點差中位數",
+    "value": "0.0 ms",
+    "limit": "< 20 ms",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song07 音符結束差中位數",
+    "value": "0.0 ms",
+    "limit": "< 20 ms",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song07 音符音高不同的個數",
+    "value": "27／456",
+    "limit": "<= max(1, 2%)",
+    "ok": false,
+    "num": 27.0
+   },
+   {
+    "item": "song07 meta（separation、vocal_model、karaoke、acapella、language、lyrics_unreliable、harmony）",
+    "value": "相同",
+    "limit": "相同",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song07 歌詞字元錯誤率",
+    "value": "0.000（424 字 vs 424 字）",
+    "limit": "< 0.01",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song07 歌詞起點差中位數",
+    "value": "0 ms",
+    "limit": "< 80 ms",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song08 lead 分離 SDR",
+    "value": "inf dB",
+    "limit": "> 30 dB",
+    "ok": true,
+    "num": "inf"
+   },
+   {
+    "item": "song08 back 分離 SDR",
+    "value": "inf dB",
+    "limit": "> 30 dB",
+    "ok": true,
+    "num": "inf"
+   },
+   {
+    "item": "song08 inst 分離 SDR",
+    "value": "inf dB",
+    "limit": "> 30 dB",
+    "ok": true,
+    "num": "inf"
+   },
+   {
+    "item": "song08 音高 hop",
+    "value": "0.01 vs 0.01",
+    "limit": "相同",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song08 有聲判斷一致率",
+    "value": "0.9983",
+    "limit": ">= 0.98",
+    "ok": true,
+    "num": 0.9982809319158561
+   },
+   {
+    "item": "song08 音高差中位數",
+    "value": "8.00 cents",
+    "limit": "< 10 cents",
+    "ok": true,
+    "num": 7.9999999999998295
+   },
+   {
+    "item": "song08 音符數",
+    "value": "489 vs 493",
+    "limit": "差 <= max(1, 2%)",
+    "ok": true,
+    "num": 4.0
+   },
+   {
+    "item": "song08 沒有配對到的音符",
+    "value": "A 多 19 個、B 多 23 個",
+    "limit": "各 <= max(1, 2%)",
+    "ok": false,
+    "num": 42.0
+   },
+   {
+    "item": "song08 音符起點差中位數",
+    "value": "0.0 ms",
+    "limit": "< 20 ms",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song08 音符結束差中位數",
+    "value": "0.0 ms",
+    "limit": "< 20 ms",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song08 音符音高不同的個數",
+    "value": "26／470",
+    "limit": "<= max(1, 2%)",
+    "ok": false,
+    "num": 26.0
+   },
+   {
+    "item": "song08 meta（separation、vocal_model、karaoke、acapella、language、lyrics_unreliable、harmony）",
+    "value": "相同",
+    "limit": "相同",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song08 歌詞字元錯誤率",
+    "value": "0.000（538 字 vs 538 字）",
+    "limit": "< 0.01",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song08 歌詞起點差中位數",
+    "value": "0 ms",
+    "limit": "< 80 ms",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song09 lead 分離 SDR",
+    "value": "inf dB",
+    "limit": "> 30 dB",
+    "ok": true,
+    "num": "inf"
+   },
+   {
+    "item": "song09 back 分離 SDR",
+    "value": "inf dB",
+    "limit": "> 30 dB",
+    "ok": true,
+    "num": "inf"
+   },
+   {
+    "item": "song09 inst 分離 SDR",
+    "value": "inf dB",
+    "limit": "> 30 dB",
+    "ok": true,
+    "num": "inf"
+   },
+   {
+    "item": "song09 音高 hop",
+    "value": "0.01 vs 0.01",
+    "limit": "相同",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song09 有聲判斷一致率",
+    "value": "0.9996",
+    "limit": ">= 0.98",
+    "ok": true,
+    "num": 0.9995819239101517
+   },
+   {
+    "item": "song09 音高差中位數",
+    "value": "8.00 cents",
+    "limit": "< 10 cents",
+    "ok": true,
+    "num": 7.9999999999998295
+   },
+   {
+    "item": "song09 音符數",
+    "value": "521 vs 520",
+    "limit": "差 <= max(1, 2%)",
+    "ok": true,
+    "num": 1.0
+   },
+   {
+    "item": "song09 沒有配對到的音符",
+    "value": "A 多 13 個、B 多 12 個",
+    "limit": "各 <= max(1, 2%)",
+    "ok": false,
+    "num": 25.0
+   },
+   {
+    "item": "song09 音符起點差中位數",
+    "value": "0.0 ms",
+    "limit": "< 20 ms",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song09 音符結束差中位數",
+    "value": "0.0 ms",
+    "limit": "< 20 ms",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song09 音符音高不同的個數",
+    "value": "27／508",
+    "limit": "<= max(1, 2%)",
+    "ok": false,
+    "num": 27.0
+   },
+   {
+    "item": "song09 meta（separation、vocal_model、karaoke、acapella、language、lyrics_unreliable、harmony）",
+    "value": "相同",
+    "limit": "相同",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song09 歌詞字元錯誤率",
+    "value": "0.000（394 字 vs 394 字）",
+    "limit": "< 0.01",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song09 歌詞起點差中位數",
+    "value": "0 ms",
+    "limit": "< 80 ms",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song10 lead 分離 SDR",
+    "value": "inf dB",
+    "limit": "> 30 dB",
+    "ok": true,
+    "num": "inf"
+   },
+   {
+    "item": "song10 back 分離 SDR",
+    "value": "inf dB",
+    "limit": "> 30 dB",
+    "ok": true,
+    "num": "inf"
+   },
+   {
+    "item": "song10 inst 分離 SDR",
+    "value": "inf dB",
+    "limit": "> 30 dB",
+    "ok": true,
+    "num": "inf"
+   },
+   {
+    "item": "song10 音高 hop",
+    "value": "0.01 vs 0.01",
+    "limit": "相同",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song10 有聲判斷一致率",
+    "value": "0.9981",
+    "limit": ">= 0.98",
+    "ok": true,
+    "num": 0.9980826215792226
+   },
+   {
+    "item": "song10 音高差中位數",
+    "value": "8.00 cents",
+    "limit": "< 10 cents",
+    "ok": true,
+    "num": 7.9999999999998295
+   },
+   {
+    "item": "song10 音符數",
+    "value": "550 vs 550",
+    "limit": "差 <= max(1, 2%)",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song10 沒有配對到的音符",
+    "value": "A 多 19 個、B 多 19 個",
+    "limit": "各 <= max(1, 2%)",
+    "ok": false,
+    "num": 38.0
+   },
+   {
+    "item": "song10 音符起點差中位數",
+    "value": "0.0 ms",
+    "limit": "< 20 ms",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song10 音符結束差中位數",
+    "value": "0.0 ms",
+    "limit": "< 20 ms",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song10 音符音高不同的個數",
+    "value": "44／531",
+    "limit": "<= max(1, 2%)",
+    "ok": false,
+    "num": 44.0
+   },
+   {
+    "item": "song10 meta（separation、vocal_model、karaoke、acapella、language、lyrics_unreliable、harmony）",
+    "value": "相同",
+    "limit": "相同",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song10 歌詞字元錯誤率",
+    "value": "0.000（279 字 vs 279 字）",
+    "limit": "< 0.01",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song10 歌詞起點差中位數",
+    "value": "0 ms",
+    "limit": "< 80 ms",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "評分狀態",
+    "value": "done vs done",
+    "limit": "都是 done",
+    "ok": true,
+    "num": null
+   },
+   {
+    "item": "評分準確率差",
+    "value": "0.1 分（0.999 vs 0.998）",
+    "limit": "<= 1 分",
+    "ok": true,
+    "num": 0.10000000000000009
+   },
+   {
+    "item": "評分影格數差",
+    "value": "0（2508 vs 2508）",
+    "limit": "<= 2%",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "評分 key_hint.shift",
+    "value": "0 vs 0",
+    "limit": "相同",
+    "ok": true,
+    "num": null
+   },
+   {
+    "item": "評分 key_hint.suggest",
+    "value": "0 vs 0",
+    "limit": "相同",
+    "ok": true,
+    "num": null
+   },
+   {
+    "item": "評分 key_hint.share 差",
+    "value": "0.000（0.9 vs 0.9）",
+    "limit": "<= 0.05",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "評分 octave",
+    "value": "0 vs 0",
+    "limit": "相同",
+    "ok": true,
+    "num": null
+   },
+   {
+    "item": "評分 mean 差",
+    "value": "0.3 cents（12.2 vs 12.5）",
+    "limit": "<= 3 cents",
+    "ok": true,
+    "num": 0.3000000000000007
+   },
+   {
+    "item": "評分 spread 差",
+    "value": "0.3 cents（12.6 vs 12.9）",
+    "limit": "<= 3 cents",
+    "ok": true,
+    "num": 0.3000000000000007
+   },
+   {
+    "item": "評分 offset 差",
+    "value": "0.010 秒（-0.21 vs -0.2）",
+    "limit": "<= 0.02 秒",
+    "ok": true,
+    "num": 0.009999999999999981
+   },
+   {
+    "item": "評分錄音音高 hop",
+    "value": "0.01 vs 0.01",
+    "limit": "相同",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "評分錄音音高 t0",
+    "value": "-0.21 vs -0.2",
+    "limit": "差 <= 0.02 秒",
+    "ok": true,
+    "num": 0.009999999999999981
+   },
+   {
+    "item": "評分錄音有聲判斷一致率",
+    "value": "1.0000",
+    "limit": ">= 0.98",
+    "ok": true,
+    "num": 1.0
+   },
+   {
+    "item": "評分錄音音高差中位數",
+    "value": "8.00 cents",
+    "limit": "< 10 cents",
+    "ok": true,
+    "num": 7.9999999999998295
+   },
+   {
+    "item": "匯出檔 SDR",
+    "value": "-2.0 dB",
+    "limit": "> 30 dB",
+    "ok": false,
+    "num": -1.9641095335526368
+   },
+   {
+    "item": "匯出檔 RMS 差",
+    "value": "0.003 dB",
+    "limit": "<= 0.1 dB",
+    "ok": true,
+    "num": 0.003250504649406405
+   }
+  ],
+  "1-3": [
    {
     "item": "songsing01 lead 分離 SDR",
     "value": "inf dB",
@@ -194,24 +1481,24 @@
    },
    {
     "item": "songspeech01 音高差中位數",
-    "value": "7.00 cents",
+    "value": "8.00 cents",
     "limit": "< 10 cents",
     "ok": true,
-    "num": 7.000000000000028
+    "num": 7.9999999999998295
    },
    {
     "item": "songspeech01 音符數",
-    "value": "40 vs 42",
+    "value": "41 vs 41",
     "limit": "差 <= max(1, 2%)",
-    "ok": false,
-    "num": 2.0
+    "ok": true,
+    "num": 0.0
    },
    {
     "item": "songspeech01 沒有配對到的音符",
-    "value": "A 多 2 個、B 多 4 個",
+    "value": "A 多 4 個、B 多 4 個",
     "limit": "各 <= max(1, 2%)",
     "ok": false,
-    "num": 6.0
+    "num": 8.0
    },
    {
     "item": "songspeech01 音符起點差中位數",
@@ -229,10 +1516,10 @@
    },
    {
     "item": "songspeech01 音符音高不同的個數",
-    "value": "6／38",
+    "value": "4／37",
     "limit": "<= max(1, 2%)",
     "ok": false,
-    "num": 6.0
+    "num": 4.0
    },
    {
     "item": "songspeech01 meta（separation、vocal_model、karaoke、acapella、language、lyrics_unreliable、harmony）",
@@ -250,6 +1537,986 @@
    },
    {
     "item": "songspeech01 歌詞起點差中位數",
+    "value": "0 ms",
+    "limit": "< 80 ms",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song01 lead 分離 SDR",
+    "value": "inf dB",
+    "limit": "> 30 dB",
+    "ok": true,
+    "num": "inf"
+   },
+   {
+    "item": "song01 back 分離 SDR",
+    "value": "inf dB",
+    "limit": "> 30 dB",
+    "ok": true,
+    "num": "inf"
+   },
+   {
+    "item": "song01 inst 分離 SDR",
+    "value": "inf dB",
+    "limit": "> 30 dB",
+    "ok": true,
+    "num": "inf"
+   },
+   {
+    "item": "song01 音高 hop",
+    "value": "0.01 vs 0.01",
+    "limit": "相同",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song01 有聲判斷一致率",
+    "value": "0.9972",
+    "limit": ">= 0.98",
+    "ok": true,
+    "num": 0.9972144846796658
+   },
+   {
+    "item": "song01 音高差中位數",
+    "value": "8.00 cents",
+    "limit": "< 10 cents",
+    "ok": true,
+    "num": 7.9999999999998295
+   },
+   {
+    "item": "song01 音符數",
+    "value": "235 vs 243",
+    "limit": "差 <= max(1, 2%)",
+    "ok": false,
+    "num": 8.0
+   },
+   {
+    "item": "song01 沒有配對到的音符",
+    "value": "A 多 15 個、B 多 23 個",
+    "limit": "各 <= max(1, 2%)",
+    "ok": false,
+    "num": 38.0
+   },
+   {
+    "item": "song01 音符起點差中位數",
+    "value": "0.0 ms",
+    "limit": "< 20 ms",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song01 音符結束差中位數",
+    "value": "0.0 ms",
+    "limit": "< 20 ms",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song01 音符音高不同的個數",
+    "value": "24／220",
+    "limit": "<= max(1, 2%)",
+    "ok": false,
+    "num": 24.0
+   },
+   {
+    "item": "song01 meta（separation、vocal_model、karaoke、acapella、language、lyrics_unreliable、harmony）",
+    "value": "相同",
+    "limit": "相同",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song01 歌詞字元錯誤率",
+    "value": "0.000（806 字 vs 806 字）",
+    "limit": "< 0.01",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song01 歌詞起點差中位數",
+    "value": "0 ms",
+    "limit": "< 80 ms",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song02 lead 分離 SDR",
+    "value": "inf dB",
+    "limit": "> 30 dB",
+    "ok": true,
+    "num": "inf"
+   },
+   {
+    "item": "song02 back 分離 SDR",
+    "value": "inf dB",
+    "limit": "> 30 dB",
+    "ok": true,
+    "num": "inf"
+   },
+   {
+    "item": "song02 inst 分離 SDR",
+    "value": "inf dB",
+    "limit": "> 30 dB",
+    "ok": true,
+    "num": "inf"
+   },
+   {
+    "item": "song02 音高 hop",
+    "value": "0.01 vs 0.01",
+    "limit": "相同",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song02 有聲判斷一致率",
+    "value": "0.9991",
+    "limit": ">= 0.98",
+    "ok": true,
+    "num": 0.9990940958682895
+   },
+   {
+    "item": "song02 音高差中位數",
+    "value": "8.00 cents",
+    "limit": "< 10 cents",
+    "ok": true,
+    "num": 7.9999999999998295
+   },
+   {
+    "item": "song02 音符數",
+    "value": "482 vs 476",
+    "limit": "差 <= max(1, 2%)",
+    "ok": true,
+    "num": 6.0
+   },
+   {
+    "item": "song02 沒有配對到的音符",
+    "value": "A 多 18 個、B 多 12 個",
+    "limit": "各 <= max(1, 2%)",
+    "ok": false,
+    "num": 30.0
+   },
+   {
+    "item": "song02 音符起點差中位數",
+    "value": "0.0 ms",
+    "limit": "< 20 ms",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song02 音符結束差中位數",
+    "value": "0.0 ms",
+    "limit": "< 20 ms",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song02 音符音高不同的個數",
+    "value": "23／464",
+    "limit": "<= max(1, 2%)",
+    "ok": false,
+    "num": 23.0
+   },
+   {
+    "item": "song02 meta（separation、vocal_model、karaoke、acapella、language、lyrics_unreliable、harmony）",
+    "value": "相同",
+    "limit": "相同",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song02 歌詞字元錯誤率",
+    "value": "0.000（202 字 vs 202 字）",
+    "limit": "< 0.01",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song02 歌詞起點差中位數",
+    "value": "0 ms",
+    "limit": "< 80 ms",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song03 lead 分離 SDR",
+    "value": "inf dB",
+    "limit": "> 30 dB",
+    "ok": true,
+    "num": "inf"
+   },
+   {
+    "item": "song03 back 分離 SDR",
+    "value": "inf dB",
+    "limit": "> 30 dB",
+    "ok": true,
+    "num": "inf"
+   },
+   {
+    "item": "song03 inst 分離 SDR",
+    "value": "inf dB",
+    "limit": "> 30 dB",
+    "ok": true,
+    "num": "inf"
+   },
+   {
+    "item": "song03 音高 hop",
+    "value": "0.01 vs 0.01",
+    "limit": "相同",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song03 有聲判斷一致率",
+    "value": "0.9994",
+    "limit": ">= 0.98",
+    "ok": true,
+    "num": 0.9994073488739629
+   },
+   {
+    "item": "song03 音高差中位數",
+    "value": "8.00 cents",
+    "limit": "< 10 cents",
+    "ok": true,
+    "num": 7.9999999999998295
+   },
+   {
+    "item": "song03 音符數",
+    "value": "891 vs 881",
+    "limit": "差 <= max(1, 2%)",
+    "ok": true,
+    "num": 10.0
+   },
+   {
+    "item": "song03 沒有配對到的音符",
+    "value": "A 多 33 個、B 多 23 個",
+    "limit": "各 <= max(1, 2%)",
+    "ok": false,
+    "num": 56.0
+   },
+   {
+    "item": "song03 音符起點差中位數",
+    "value": "0.0 ms",
+    "limit": "< 20 ms",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song03 音符結束差中位數",
+    "value": "0.0 ms",
+    "limit": "< 20 ms",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song03 音符音高不同的個數",
+    "value": "45／858",
+    "limit": "<= max(1, 2%)",
+    "ok": false,
+    "num": 45.0
+   },
+   {
+    "item": "song03 meta（separation、vocal_model、karaoke、acapella、language、lyrics_unreliable、harmony）",
+    "value": "相同",
+    "limit": "相同",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song03 歌詞字元錯誤率",
+    "value": "0.000（0 字 vs 0 字）",
+    "limit": "< 0.01",
+    "ok": false,
+    "num": 0.0
+   },
+   {
+    "item": "song03 歌詞行數",
+    "value": "0 vs 0",
+    "limit": "相同",
+    "ok": false,
+    "num": 0.0
+   },
+   {
+    "item": "song04 lead 分離 SDR",
+    "value": "inf dB",
+    "limit": "> 30 dB",
+    "ok": true,
+    "num": "inf"
+   },
+   {
+    "item": "song04 back 分離 SDR",
+    "value": "inf dB",
+    "limit": "> 30 dB",
+    "ok": true,
+    "num": "inf"
+   },
+   {
+    "item": "song04 inst 分離 SDR",
+    "value": "inf dB",
+    "limit": "> 30 dB",
+    "ok": true,
+    "num": "inf"
+   },
+   {
+    "item": "song04 音高 hop",
+    "value": "0.01 vs 0.01",
+    "limit": "相同",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song04 有聲判斷一致率",
+    "value": "0.9991",
+    "limit": ">= 0.98",
+    "ok": true,
+    "num": 0.9991211840888067
+   },
+   {
+    "item": "song04 音高差中位數",
+    "value": "8.00 cents",
+    "limit": "< 10 cents",
+    "ok": true,
+    "num": 7.9999999999998295
+   },
+   {
+    "item": "song04 音符數",
+    "value": "303 vs 318",
+    "limit": "差 <= max(1, 2%)",
+    "ok": false,
+    "num": 15.0
+   },
+   {
+    "item": "song04 沒有配對到的音符",
+    "value": "A 多 9 個、B 多 24 個",
+    "limit": "各 <= max(1, 2%)",
+    "ok": false,
+    "num": 33.0
+   },
+   {
+    "item": "song04 音符起點差中位數",
+    "value": "0.0 ms",
+    "limit": "< 20 ms",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song04 音符結束差中位數",
+    "value": "0.0 ms",
+    "limit": "< 20 ms",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song04 音符音高不同的個數",
+    "value": "20／294",
+    "limit": "<= max(1, 2%)",
+    "ok": false,
+    "num": 20.0
+   },
+   {
+    "item": "song04 meta（separation、vocal_model、karaoke、acapella、language、lyrics_unreliable、harmony）",
+    "value": "相同",
+    "limit": "相同",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song04 歌詞字元錯誤率",
+    "value": "0.177（537 字 vs 444 字）",
+    "limit": "< 0.01",
+    "ok": false,
+    "num": 0.17690875232774675
+   },
+   {
+    "item": "song04 歌詞行數",
+    "value": "42 vs 34",
+    "limit": "相同",
+    "ok": false,
+    "num": 8.0
+   },
+   {
+    "item": "song05 lead 分離 SDR",
+    "value": "inf dB",
+    "limit": "> 30 dB",
+    "ok": true,
+    "num": "inf"
+   },
+   {
+    "item": "song05 back 分離 SDR",
+    "value": "inf dB",
+    "limit": "> 30 dB",
+    "ok": true,
+    "num": "inf"
+   },
+   {
+    "item": "song05 inst 分離 SDR",
+    "value": "inf dB",
+    "limit": "> 30 dB",
+    "ok": true,
+    "num": "inf"
+   },
+   {
+    "item": "song05 音高 hop",
+    "value": "0.01 vs 0.01",
+    "limit": "相同",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song05 有聲判斷一致率",
+    "value": "0.9988",
+    "limit": ">= 0.98",
+    "ok": true,
+    "num": 0.9988315481986368
+   },
+   {
+    "item": "song05 音高差中位數",
+    "value": "8.00 cents",
+    "limit": "< 10 cents",
+    "ok": true,
+    "num": 7.9999999999998295
+   },
+   {
+    "item": "song05 音符數",
+    "value": "434 vs 428",
+    "limit": "差 <= max(1, 2%)",
+    "ok": true,
+    "num": 6.0
+   },
+   {
+    "item": "song05 沒有配對到的音符",
+    "value": "A 多 18 個、B 多 12 個",
+    "limit": "各 <= max(1, 2%)",
+    "ok": false,
+    "num": 30.0
+   },
+   {
+    "item": "song05 音符起點差中位數",
+    "value": "0.0 ms",
+    "limit": "< 20 ms",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song05 音符結束差中位數",
+    "value": "0.0 ms",
+    "limit": "< 20 ms",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song05 音符音高不同的個數",
+    "value": "23／416",
+    "limit": "<= max(1, 2%)",
+    "ok": false,
+    "num": 23.0
+   },
+   {
+    "item": "song05 meta（separation、vocal_model、karaoke、acapella、language、lyrics_unreliable、harmony）",
+    "value": "相同",
+    "limit": "相同",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song05 歌詞字元錯誤率",
+    "value": "0.000（693 字 vs 693 字）",
+    "limit": "< 0.01",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song05 歌詞起點差中位數",
+    "value": "0 ms",
+    "limit": "< 80 ms",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song06 lead 分離 SDR",
+    "value": "inf dB",
+    "limit": "> 30 dB",
+    "ok": true,
+    "num": "inf"
+   },
+   {
+    "item": "song06 back 分離 SDR",
+    "value": "inf dB",
+    "limit": "> 30 dB",
+    "ok": true,
+    "num": "inf"
+   },
+   {
+    "item": "song06 inst 分離 SDR",
+    "value": "inf dB",
+    "limit": "> 30 dB",
+    "ok": true,
+    "num": "inf"
+   },
+   {
+    "item": "song06 音高 hop",
+    "value": "0.01 vs 0.01",
+    "limit": "相同",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song06 有聲判斷一致率",
+    "value": "0.9983",
+    "limit": ">= 0.98",
+    "ok": true,
+    "num": 0.9983153757063138
+   },
+   {
+    "item": "song06 音高差中位數",
+    "value": "8.00 cents",
+    "limit": "< 10 cents",
+    "ok": true,
+    "num": 7.9999999999998295
+   },
+   {
+    "item": "song06 音符數",
+    "value": "555 vs 546",
+    "limit": "差 <= max(1, 2%)",
+    "ok": true,
+    "num": 9.0
+   },
+   {
+    "item": "song06 沒有配對到的音符",
+    "value": "A 多 31 個、B 多 22 個",
+    "limit": "各 <= max(1, 2%)",
+    "ok": false,
+    "num": 53.0
+   },
+   {
+    "item": "song06 音符起點差中位數",
+    "value": "0.0 ms",
+    "limit": "< 20 ms",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song06 音符結束差中位數",
+    "value": "0.0 ms",
+    "limit": "< 20 ms",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song06 音符音高不同的個數",
+    "value": "45／524",
+    "limit": "<= max(1, 2%)",
+    "ok": false,
+    "num": 45.0
+   },
+   {
+    "item": "song06 meta（separation、vocal_model、karaoke、acapella、language、lyrics_unreliable、harmony）",
+    "value": "相同",
+    "limit": "相同",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song06 歌詞字元錯誤率",
+    "value": "0.000（1108 字 vs 1108 字）",
+    "limit": "< 0.01",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song06 歌詞起點差中位數",
+    "value": "0 ms",
+    "limit": "< 80 ms",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song07 lead 分離 SDR",
+    "value": "inf dB",
+    "limit": "> 30 dB",
+    "ok": true,
+    "num": "inf"
+   },
+   {
+    "item": "song07 back 分離 SDR",
+    "value": "inf dB",
+    "limit": "> 30 dB",
+    "ok": true,
+    "num": "inf"
+   },
+   {
+    "item": "song07 inst 分離 SDR",
+    "value": "inf dB",
+    "limit": "> 30 dB",
+    "ok": true,
+    "num": "inf"
+   },
+   {
+    "item": "song07 音高 hop",
+    "value": "0.01 vs 0.01",
+    "limit": "相同",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song07 有聲判斷一致率",
+    "value": "0.9992",
+    "limit": ">= 0.98",
+    "ok": true,
+    "num": 0.9992261007698261
+   },
+   {
+    "item": "song07 音高差中位數",
+    "value": "8.00 cents",
+    "limit": "< 10 cents",
+    "ok": true,
+    "num": 7.9999999999998295
+   },
+   {
+    "item": "song07 音符數",
+    "value": "470 vs 475",
+    "limit": "差 <= max(1, 2%)",
+    "ok": true,
+    "num": 5.0
+   },
+   {
+    "item": "song07 沒有配對到的音符",
+    "value": "A 多 18 個、B 多 23 個",
+    "limit": "各 <= max(1, 2%)",
+    "ok": false,
+    "num": 41.0
+   },
+   {
+    "item": "song07 音符起點差中位數",
+    "value": "0.0 ms",
+    "limit": "< 20 ms",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song07 音符結束差中位數",
+    "value": "0.0 ms",
+    "limit": "< 20 ms",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song07 音符音高不同的個數",
+    "value": "27／452",
+    "limit": "<= max(1, 2%)",
+    "ok": false,
+    "num": 27.0
+   },
+   {
+    "item": "song07 meta（separation、vocal_model、karaoke、acapella、language、lyrics_unreliable、harmony）",
+    "value": "相同",
+    "limit": "相同",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song07 歌詞字元錯誤率",
+    "value": "0.000（424 字 vs 424 字）",
+    "limit": "< 0.01",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song07 歌詞起點差中位數",
+    "value": "0 ms",
+    "limit": "< 80 ms",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song08 lead 分離 SDR",
+    "value": "inf dB",
+    "limit": "> 30 dB",
+    "ok": true,
+    "num": "inf"
+   },
+   {
+    "item": "song08 back 分離 SDR",
+    "value": "inf dB",
+    "limit": "> 30 dB",
+    "ok": true,
+    "num": "inf"
+   },
+   {
+    "item": "song08 inst 分離 SDR",
+    "value": "inf dB",
+    "limit": "> 30 dB",
+    "ok": true,
+    "num": "inf"
+   },
+   {
+    "item": "song08 音高 hop",
+    "value": "0.01 vs 0.01",
+    "limit": "相同",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song08 有聲判斷一致率",
+    "value": "0.9982",
+    "limit": ">= 0.98",
+    "ok": true,
+    "num": 0.9981904546482696
+   },
+   {
+    "item": "song08 音高差中位數",
+    "value": "8.00 cents",
+    "limit": "< 10 cents",
+    "ok": true,
+    "num": 7.9999999999998295
+   },
+   {
+    "item": "song08 音符數",
+    "value": "489 vs 490",
+    "limit": "差 <= max(1, 2%)",
+    "ok": true,
+    "num": 1.0
+   },
+   {
+    "item": "song08 沒有配對到的音符",
+    "value": "A 多 23 個、B 多 24 個",
+    "limit": "各 <= max(1, 2%)",
+    "ok": false,
+    "num": 47.0
+   },
+   {
+    "item": "song08 音符起點差中位數",
+    "value": "0.0 ms",
+    "limit": "< 20 ms",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song08 音符結束差中位數",
+    "value": "0.0 ms",
+    "limit": "< 20 ms",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song08 音符音高不同的個數",
+    "value": "27／466",
+    "limit": "<= max(1, 2%)",
+    "ok": false,
+    "num": 27.0
+   },
+   {
+    "item": "song08 meta（separation、vocal_model、karaoke、acapella、language、lyrics_unreliable、harmony）",
+    "value": "相同",
+    "limit": "相同",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song08 歌詞字元錯誤率",
+    "value": "0.000（538 字 vs 538 字）",
+    "limit": "< 0.01",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song08 歌詞起點差中位數",
+    "value": "0 ms",
+    "limit": "< 80 ms",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song09 lead 分離 SDR",
+    "value": "inf dB",
+    "limit": "> 30 dB",
+    "ok": true,
+    "num": "inf"
+   },
+   {
+    "item": "song09 back 分離 SDR",
+    "value": "inf dB",
+    "limit": "> 30 dB",
+    "ok": true,
+    "num": "inf"
+   },
+   {
+    "item": "song09 inst 分離 SDR",
+    "value": "inf dB",
+    "limit": "> 30 dB",
+    "ok": true,
+    "num": "inf"
+   },
+   {
+    "item": "song09 音高 hop",
+    "value": "0.01 vs 0.01",
+    "limit": "相同",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song09 有聲判斷一致率",
+    "value": "0.9990",
+    "limit": ">= 0.98",
+    "ok": true,
+    "num": 0.9989738132340086
+   },
+   {
+    "item": "song09 音高差中位數",
+    "value": "8.00 cents",
+    "limit": "< 10 cents",
+    "ok": true,
+    "num": 7.9999999999998295
+   },
+   {
+    "item": "song09 音符數",
+    "value": "521 vs 512",
+    "limit": "差 <= max(1, 2%)",
+    "ok": true,
+    "num": 9.0
+   },
+   {
+    "item": "song09 沒有配對到的音符",
+    "value": "A 多 23 個、B 多 14 個",
+    "limit": "各 <= max(1, 2%)",
+    "ok": false,
+    "num": 37.0
+   },
+   {
+    "item": "song09 音符起點差中位數",
+    "value": "0.0 ms",
+    "limit": "< 20 ms",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song09 音符結束差中位數",
+    "value": "0.0 ms",
+    "limit": "< 20 ms",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song09 音符音高不同的個數",
+    "value": "24／498",
+    "limit": "<= max(1, 2%)",
+    "ok": false,
+    "num": 24.0
+   },
+   {
+    "item": "song09 meta（separation、vocal_model、karaoke、acapella、language、lyrics_unreliable、harmony）",
+    "value": "相同",
+    "limit": "相同",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song09 歌詞字元錯誤率",
+    "value": "0.000（394 字 vs 394 字）",
+    "limit": "< 0.01",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song09 歌詞起點差中位數",
+    "value": "0 ms",
+    "limit": "< 80 ms",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song10 lead 分離 SDR",
+    "value": "inf dB",
+    "limit": "> 30 dB",
+    "ok": true,
+    "num": "inf"
+   },
+   {
+    "item": "song10 back 分離 SDR",
+    "value": "inf dB",
+    "limit": "> 30 dB",
+    "ok": true,
+    "num": "inf"
+   },
+   {
+    "item": "song10 inst 分離 SDR",
+    "value": "inf dB",
+    "limit": "> 30 dB",
+    "ok": true,
+    "num": "inf"
+   },
+   {
+    "item": "song10 音高 hop",
+    "value": "0.01 vs 0.01",
+    "limit": "相同",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song10 有聲判斷一致率",
+    "value": "0.9993",
+    "limit": ">= 0.98",
+    "ok": true,
+    "num": 0.9993027714833537
+   },
+   {
+    "item": "song10 音高差中位數",
+    "value": "8.00 cents",
+    "limit": "< 10 cents",
+    "ok": true,
+    "num": 7.9999999999998295
+   },
+   {
+    "item": "song10 音符數",
+    "value": "550 vs 546",
+    "limit": "差 <= max(1, 2%)",
+    "ok": true,
+    "num": 4.0
+   },
+   {
+    "item": "song10 沒有配對到的音符",
+    "value": "A 多 23 個、B 多 19 個",
+    "limit": "各 <= max(1, 2%)",
+    "ok": false,
+    "num": 42.0
+   },
+   {
+    "item": "song10 音符起點差中位數",
+    "value": "0.0 ms",
+    "limit": "< 20 ms",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song10 音符結束差中位數",
+    "value": "0.0 ms",
+    "limit": "< 20 ms",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song10 音符音高不同的個數",
+    "value": "45／527",
+    "limit": "<= max(1, 2%)",
+    "ok": false,
+    "num": 45.0
+   },
+   {
+    "item": "song10 meta（separation、vocal_model、karaoke、acapella、language、lyrics_unreliable、harmony）",
+    "value": "相同",
+    "limit": "相同",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song10 歌詞字元錯誤率",
+    "value": "0.000（279 字 vs 279 字）",
+    "limit": "< 0.01",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song10 歌詞起點差中位數",
     "value": "0 ms",
     "limit": "< 80 ms",
     "ok": true,
@@ -292,303 +2559,7 @@
    },
    {
     "item": "評分 key_hint.share 差",
-    "value": "0.010（0.91 vs 0.9）",
-    "limit": "<= 0.05",
-    "ok": true,
-    "num": 0.010000000000000009
-   },
-   {
-    "item": "評分 octave",
-    "value": "0 vs 0",
-    "limit": "相同",
-    "ok": true,
-    "num": null
-   },
-   {
-    "item": "評分 mean 差",
-    "value": "0.2 cents（12.3 vs 12.1）",
-    "limit": "<= 3 cents",
-    "ok": true,
-    "num": 0.20000000000000107
-   },
-   {
-    "item": "評分 spread 差",
-    "value": "0.2 cents（12.7 vs 12.5）",
-    "limit": "<= 3 cents",
-    "ok": true,
-    "num": 0.1999999999999993
-   },
-   {
-    "item": "評分 offset 差",
-    "value": "0.010 秒（-0.2 vs -0.21）",
-    "limit": "<= 0.02 秒",
-    "ok": true,
-    "num": 0.009999999999999981
-   },
-   {
-    "item": "評分錄音音高 hop",
-    "value": "0.01 vs 0.01",
-    "limit": "相同",
-    "ok": true,
-    "num": 0.0
-   },
-   {
-    "item": "評分錄音音高 t0",
-    "value": "-0.2 vs -0.21",
-    "limit": "差 <= 0.02 秒",
-    "ok": true,
-    "num": 0.009999999999999981
-   },
-   {
-    "item": "評分錄音有聲判斷一致率",
-    "value": "1.0000",
-    "limit": ">= 0.98",
-    "ok": true,
-    "num": 1.0
-   },
-   {
-    "item": "評分錄音音高差中位數",
-    "value": "8.00 cents",
-    "limit": "< 10 cents",
-    "ok": true,
-    "num": 7.9999999999998295
-   },
-   {
-    "item": "匯出檔 SDR",
-    "value": "-2.0 dB",
-    "limit": "> 30 dB",
-    "ok": false,
-    "num": -1.960859028903229
-   },
-   {
-    "item": "匯出檔 RMS 差",
-    "value": "0.003 dB",
-    "limit": "<= 0.1 dB",
-    "ok": true,
-    "num": 0.0032505046494069267
-   }
-  ],
-  "1-3": [
-   {
-    "item": "songsing01 lead 分離 SDR",
-    "value": "inf dB",
-    "limit": "> 30 dB",
-    "ok": true,
-    "num": "inf"
-   },
-   {
-    "item": "songsing01 back 分離 SDR",
-    "value": "inf dB",
-    "limit": "> 30 dB",
-    "ok": true,
-    "num": "inf"
-   },
-   {
-    "item": "songsing01 inst 分離 SDR",
-    "value": "inf dB",
-    "limit": "> 30 dB",
-    "ok": true,
-    "num": "inf"
-   },
-   {
-    "item": "songsing01 音高 hop",
-    "value": "0.01 vs 0.01",
-    "limit": "相同",
-    "ok": true,
-    "num": 0.0
-   },
-   {
-    "item": "songsing01 有聲判斷一致率",
-    "value": "1.0000",
-    "limit": ">= 0.98",
-    "ok": true,
-    "num": 1.0
-   },
-   {
-    "item": "songsing01 音高差中位數",
-    "value": "8.00 cents",
-    "limit": "< 10 cents",
-    "ok": true,
-    "num": 7.9999999999998295
-   },
-   {
-    "item": "songsing01 音符數",
-    "value": "25 vs 25",
-    "limit": "差 <= max(1, 2%)",
-    "ok": true,
-    "num": 0.0
-   },
-   {
-    "item": "songsing01 沒有配對到的音符",
-    "value": "A 多 0 個、B 多 0 個",
-    "limit": "各 <= max(1, 2%)",
-    "ok": true,
-    "num": 0.0
-   },
-   {
-    "item": "songsing01 音符起點差中位數",
-    "value": "0.0 ms",
-    "limit": "< 20 ms",
-    "ok": true,
-    "num": 0.0
-   },
-   {
-    "item": "songsing01 音符結束差中位數",
-    "value": "0.0 ms",
-    "limit": "< 20 ms",
-    "ok": true,
-    "num": 0.0
-   },
-   {
-    "item": "songsing01 音符音高不同的個數",
-    "value": "0／25",
-    "limit": "<= max(1, 2%)",
-    "ok": true,
-    "num": 0.0
-   },
-   {
-    "item": "songsing01 meta（separation、vocal_model、karaoke、acapella、language、lyrics_unreliable、harmony）",
-    "value": "相同",
-    "limit": "相同",
-    "ok": true,
-    "num": 0.0
-   },
-   {
-    "item": "songspeech01 lead 分離 SDR",
-    "value": "inf dB",
-    "limit": "> 30 dB",
-    "ok": true,
-    "num": "inf"
-   },
-   {
-    "item": "songspeech01 back 分離 SDR",
-    "value": "inf dB",
-    "limit": "> 30 dB",
-    "ok": true,
-    "num": "inf"
-   },
-   {
-    "item": "songspeech01 inst 分離 SDR",
-    "value": "inf dB",
-    "limit": "> 30 dB",
-    "ok": true,
-    "num": "inf"
-   },
-   {
-    "item": "songspeech01 音高 hop",
-    "value": "0.01 vs 0.01",
-    "limit": "相同",
-    "ok": true,
-    "num": 0.0
-   },
-   {
-    "item": "songspeech01 有聲判斷一致率",
-    "value": "0.9976",
-    "limit": ">= 0.98",
-    "ok": true,
-    "num": 0.997624703087886
-   },
-   {
-    "item": "songspeech01 音高差中位數",
-    "value": "7.00 cents",
-    "limit": "< 10 cents",
-    "ok": true,
-    "num": 7.000000000000028
-   },
-   {
-    "item": "songspeech01 音符數",
-    "value": "40 vs 43",
-    "limit": "差 <= max(1, 2%)",
-    "ok": false,
-    "num": 3.0
-   },
-   {
-    "item": "songspeech01 沒有配對到的音符",
-    "value": "A 多 0 個、B 多 3 個",
-    "limit": "各 <= max(1, 2%)",
-    "ok": false,
-    "num": 3.0
-   },
-   {
-    "item": "songspeech01 音符起點差中位數",
-    "value": "0.0 ms",
-    "limit": "< 20 ms",
-    "ok": true,
-    "num": 0.0
-   },
-   {
-    "item": "songspeech01 音符結束差中位數",
-    "value": "0.0 ms",
-    "limit": "< 20 ms",
-    "ok": true,
-    "num": 0.0
-   },
-   {
-    "item": "songspeech01 音符音高不同的個數",
-    "value": "5／40",
-    "limit": "<= max(1, 2%)",
-    "ok": false,
-    "num": 5.0
-   },
-   {
-    "item": "songspeech01 meta（separation、vocal_model、karaoke、acapella、language、lyrics_unreliable、harmony）",
-    "value": "相同",
-    "limit": "相同",
-    "ok": true,
-    "num": 0.0
-   },
-   {
-    "item": "songspeech01 歌詞字元錯誤率",
-    "value": "0.000（53 字 vs 53 字）",
-    "limit": "< 0.01",
-    "ok": true,
-    "num": 0.0
-   },
-   {
-    "item": "songspeech01 歌詞起點差中位數",
-    "value": "0 ms",
-    "limit": "< 80 ms",
-    "ok": true,
-    "num": 0.0
-   },
-   {
-    "item": "評分狀態",
-    "value": "done vs done",
-    "limit": "都是 done",
-    "ok": true,
-    "num": null
-   },
-   {
-    "item": "評分準確率差",
-    "value": "0.0 分（0.999 vs 0.999）",
-    "limit": "<= 1 分",
-    "ok": true,
-    "num": 0.0
-   },
-   {
-    "item": "評分影格數差",
-    "value": "0（2508 vs 2508）",
-    "limit": "<= 2%",
-    "ok": true,
-    "num": 0.0
-   },
-   {
-    "item": "評分 key_hint.shift",
-    "value": "0 vs 0",
-    "limit": "相同",
-    "ok": true,
-    "num": null
-   },
-   {
-    "item": "評分 key_hint.suggest",
-    "value": "0 vs 0",
-    "limit": "相同",
-    "ok": true,
-    "num": null
-   },
-   {
-    "item": "評分 key_hint.share 差",
-    "value": "0.000（0.91 vs 0.91）",
+    "value": "0.000（0.9 vs 0.9）",
     "limit": "<= 0.05",
     "ok": true,
     "num": 0.0
@@ -602,21 +2573,21 @@
    },
    {
     "item": "評分 mean 差",
-    "value": "0.1 cents（12.3 vs 12.2）",
+    "value": "0.5 cents（12.2 vs 11.7）",
     "limit": "<= 3 cents",
     "ok": true,
-    "num": 0.10000000000000142
+    "num": 0.5
    },
    {
     "item": "評分 spread 差",
-    "value": "0.2 cents（12.7 vs 12.5）",
+    "value": "0.5 cents（12.6 vs 12.1）",
     "limit": "<= 3 cents",
     "ok": true,
-    "num": 0.1999999999999993
+    "num": 0.5
    },
    {
     "item": "評分 offset 差",
-    "value": "0.000 秒（-0.2 vs -0.2）",
+    "value": "0.000 秒（-0.21 vs -0.21）",
     "limit": "<= 0.02 秒",
     "ok": true,
     "num": 0.0
@@ -630,7 +2601,7 @@
    },
    {
     "item": "評分錄音音高 t0",
-    "value": "-0.2 vs -0.2",
+    "value": "-0.21 vs -0.21",
     "limit": "差 <= 0.02 秒",
     "ok": true,
     "num": 0.0
@@ -779,31 +2750,31 @@
    },
    {
     "item": "songspeech01 有聲判斷一致率",
-    "value": "0.9981",
+    "value": "0.9976",
     "limit": ">= 0.98",
     "ok": true,
-    "num": 0.9980997624703087
+    "num": 0.997624703087886
    },
    {
     "item": "songspeech01 音高差中位數",
-    "value": "8.00 cents",
+    "value": "7.00 cents",
     "limit": "< 10 cents",
     "ok": true,
-    "num": 7.9999999999998295
+    "num": 7.000000000000028
    },
    {
     "item": "songspeech01 音符數",
-    "value": "42 vs 43",
+    "value": "44 vs 41",
     "limit": "差 <= max(1, 2%)",
-    "ok": true,
-    "num": 1.0
+    "ok": false,
+    "num": 3.0
    },
    {
     "item": "songspeech01 沒有配對到的音符",
-    "value": "A 多 2 個、B 多 3 個",
+    "value": "A 多 5 個、B 多 2 個",
     "limit": "各 <= max(1, 2%)",
     "ok": false,
-    "num": 5.0
+    "num": 7.0
    },
    {
     "item": "songspeech01 音符起點差中位數",
@@ -821,10 +2792,10 @@
    },
    {
     "item": "songspeech01 音符音高不同的個數",
-    "value": "5／40",
+    "value": "6／39",
     "limit": "<= max(1, 2%)",
     "ok": false,
-    "num": 5.0
+    "num": 6.0
    },
    {
     "item": "songspeech01 meta（separation、vocal_model、karaoke、acapella、language、lyrics_unreliable、harmony）",
@@ -848,6 +2819,986 @@
     "num": 0.0
    },
    {
+    "item": "song01 lead 分離 SDR",
+    "value": "inf dB",
+    "limit": "> 30 dB",
+    "ok": true,
+    "num": "inf"
+   },
+   {
+    "item": "song01 back 分離 SDR",
+    "value": "inf dB",
+    "limit": "> 30 dB",
+    "ok": true,
+    "num": "inf"
+   },
+   {
+    "item": "song01 inst 分離 SDR",
+    "value": "inf dB",
+    "limit": "> 30 dB",
+    "ok": true,
+    "num": "inf"
+   },
+   {
+    "item": "song01 音高 hop",
+    "value": "0.01 vs 0.01",
+    "limit": "相同",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song01 有聲判斷一致率",
+    "value": "0.9983",
+    "limit": ">= 0.98",
+    "ok": true,
+    "num": 0.9983157349225886
+   },
+   {
+    "item": "song01 音高差中位數",
+    "value": "8.00 cents",
+    "limit": "< 10 cents",
+    "ok": true,
+    "num": 7.9999999999998295
+   },
+   {
+    "item": "song01 音符數",
+    "value": "235 vs 243",
+    "limit": "差 <= max(1, 2%)",
+    "ok": false,
+    "num": 8.0
+   },
+   {
+    "item": "song01 沒有配對到的音符",
+    "value": "A 多 16 個、B 多 24 個",
+    "limit": "各 <= max(1, 2%)",
+    "ok": false,
+    "num": 40.0
+   },
+   {
+    "item": "song01 音符起點差中位數",
+    "value": "0.0 ms",
+    "limit": "< 20 ms",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song01 音符結束差中位數",
+    "value": "0.0 ms",
+    "limit": "< 20 ms",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song01 音符音高不同的個數",
+    "value": "29／219",
+    "limit": "<= max(1, 2%)",
+    "ok": false,
+    "num": 29.0
+   },
+   {
+    "item": "song01 meta（separation、vocal_model、karaoke、acapella、language、lyrics_unreliable、harmony）",
+    "value": "相同",
+    "limit": "相同",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song01 歌詞字元錯誤率",
+    "value": "0.015（806 字 vs 806 字）",
+    "limit": "< 0.01",
+    "ok": false,
+    "num": 0.01488833746898263
+   },
+   {
+    "item": "song01 歌詞起點差中位數",
+    "value": "0 ms",
+    "limit": "< 80 ms",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song02 lead 分離 SDR",
+    "value": "inf dB",
+    "limit": "> 30 dB",
+    "ok": true,
+    "num": "inf"
+   },
+   {
+    "item": "song02 back 分離 SDR",
+    "value": "inf dB",
+    "limit": "> 30 dB",
+    "ok": true,
+    "num": "inf"
+   },
+   {
+    "item": "song02 inst 分離 SDR",
+    "value": "inf dB",
+    "limit": "> 30 dB",
+    "ok": true,
+    "num": "inf"
+   },
+   {
+    "item": "song02 音高 hop",
+    "value": "0.01 vs 0.01",
+    "limit": "相同",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song02 有聲判斷一致率",
+    "value": "0.9994",
+    "limit": ">= 0.98",
+    "ok": true,
+    "num": 0.9994485800937414
+   },
+   {
+    "item": "song02 音高差中位數",
+    "value": "8.00 cents",
+    "limit": "< 10 cents",
+    "ok": true,
+    "num": 7.9999999999998295
+   },
+   {
+    "item": "song02 音符數",
+    "value": "483 vs 476",
+    "limit": "差 <= max(1, 2%)",
+    "ok": true,
+    "num": 7.0
+   },
+   {
+    "item": "song02 沒有配對到的音符",
+    "value": "A 多 16 個、B 多 9 個",
+    "limit": "各 <= max(1, 2%)",
+    "ok": false,
+    "num": 25.0
+   },
+   {
+    "item": "song02 音符起點差中位數",
+    "value": "0.0 ms",
+    "limit": "< 20 ms",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song02 音符結束差中位數",
+    "value": "0.0 ms",
+    "limit": "< 20 ms",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song02 音符音高不同的個數",
+    "value": "25／467",
+    "limit": "<= max(1, 2%)",
+    "ok": false,
+    "num": 25.0
+   },
+   {
+    "item": "song02 meta（separation、vocal_model、karaoke、acapella、language、lyrics_unreliable、harmony）",
+    "value": "相同",
+    "limit": "相同",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song02 歌詞字元錯誤率",
+    "value": "0.000（202 字 vs 202 字）",
+    "limit": "< 0.01",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song02 歌詞起點差中位數",
+    "value": "0 ms",
+    "limit": "< 80 ms",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song03 lead 分離 SDR",
+    "value": "inf dB",
+    "limit": "> 30 dB",
+    "ok": true,
+    "num": "inf"
+   },
+   {
+    "item": "song03 back 分離 SDR",
+    "value": "inf dB",
+    "limit": "> 30 dB",
+    "ok": true,
+    "num": "inf"
+   },
+   {
+    "item": "song03 inst 分離 SDR",
+    "value": "inf dB",
+    "limit": "> 30 dB",
+    "ok": true,
+    "num": "inf"
+   },
+   {
+    "item": "song03 音高 hop",
+    "value": "0.01 vs 0.01",
+    "limit": "相同",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song03 有聲判斷一致率",
+    "value": "0.9990",
+    "limit": ">= 0.98",
+    "ok": true,
+    "num": 0.9990122481232714
+   },
+   {
+    "item": "song03 音高差中位數",
+    "value": "8.00 cents",
+    "limit": "< 10 cents",
+    "ok": true,
+    "num": 7.9999999999998295
+   },
+   {
+    "item": "song03 音符數",
+    "value": "889 vs 881",
+    "limit": "差 <= max(1, 2%)",
+    "ok": true,
+    "num": 8.0
+   },
+   {
+    "item": "song03 沒有配對到的音符",
+    "value": "A 多 27 個、B 多 19 個",
+    "limit": "各 <= max(1, 2%)",
+    "ok": false,
+    "num": 46.0
+   },
+   {
+    "item": "song03 音符起點差中位數",
+    "value": "0.0 ms",
+    "limit": "< 20 ms",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song03 音符結束差中位數",
+    "value": "0.0 ms",
+    "limit": "< 20 ms",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song03 音符音高不同的個數",
+    "value": "55／862",
+    "limit": "<= max(1, 2%)",
+    "ok": false,
+    "num": 55.0
+   },
+   {
+    "item": "song03 meta（separation、vocal_model、karaoke、acapella、language、lyrics_unreliable、harmony）",
+    "value": "相同",
+    "limit": "相同",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song03 歌詞字元錯誤率",
+    "value": "0.000（0 字 vs 0 字）",
+    "limit": "< 0.01",
+    "ok": false,
+    "num": 0.0
+   },
+   {
+    "item": "song03 歌詞行數",
+    "value": "0 vs 0",
+    "limit": "相同",
+    "ok": false,
+    "num": 0.0
+   },
+   {
+    "item": "song04 lead 分離 SDR",
+    "value": "inf dB",
+    "limit": "> 30 dB",
+    "ok": true,
+    "num": "inf"
+   },
+   {
+    "item": "song04 back 分離 SDR",
+    "value": "inf dB",
+    "limit": "> 30 dB",
+    "ok": true,
+    "num": "inf"
+   },
+   {
+    "item": "song04 inst 分離 SDR",
+    "value": "inf dB",
+    "limit": "> 30 dB",
+    "ok": true,
+    "num": "inf"
+   },
+   {
+    "item": "song04 音高 hop",
+    "value": "0.01 vs 0.01",
+    "limit": "相同",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song04 有聲判斷一致率",
+    "value": "0.9995",
+    "limit": ">= 0.98",
+    "ok": true,
+    "num": 0.9994912118408881
+   },
+   {
+    "item": "song04 音高差中位數",
+    "value": "8.00 cents",
+    "limit": "< 10 cents",
+    "ok": true,
+    "num": 7.9999999999998295
+   },
+   {
+    "item": "song04 音符數",
+    "value": "304 vs 318",
+    "limit": "差 <= max(1, 2%)",
+    "ok": false,
+    "num": 14.0
+   },
+   {
+    "item": "song04 沒有配對到的音符",
+    "value": "A 多 6 個、B 多 20 個",
+    "limit": "各 <= max(1, 2%)",
+    "ok": false,
+    "num": 26.0
+   },
+   {
+    "item": "song04 音符起點差中位數",
+    "value": "0.0 ms",
+    "limit": "< 20 ms",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song04 音符結束差中位數",
+    "value": "0.0 ms",
+    "limit": "< 20 ms",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song04 音符音高不同的個數",
+    "value": "23／298",
+    "limit": "<= max(1, 2%)",
+    "ok": false,
+    "num": 23.0
+   },
+   {
+    "item": "song04 meta（separation、vocal_model、karaoke、acapella、language、lyrics_unreliable、harmony）",
+    "value": "相同",
+    "limit": "相同",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song04 歌詞字元錯誤率",
+    "value": "0.125（506 字 vs 444 字）",
+    "limit": "< 0.01",
+    "ok": false,
+    "num": 0.12450592885375494
+   },
+   {
+    "item": "song04 歌詞行數",
+    "value": "38 vs 34",
+    "limit": "相同",
+    "ok": false,
+    "num": 4.0
+   },
+   {
+    "item": "song05 lead 分離 SDR",
+    "value": "inf dB",
+    "limit": "> 30 dB",
+    "ok": true,
+    "num": "inf"
+   },
+   {
+    "item": "song05 back 分離 SDR",
+    "value": "inf dB",
+    "limit": "> 30 dB",
+    "ok": true,
+    "num": "inf"
+   },
+   {
+    "item": "song05 inst 分離 SDR",
+    "value": "inf dB",
+    "limit": "> 30 dB",
+    "ok": true,
+    "num": "inf"
+   },
+   {
+    "item": "song05 音高 hop",
+    "value": "0.01 vs 0.01",
+    "limit": "相同",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song05 有聲判斷一致率",
+    "value": "0.9984",
+    "limit": ">= 0.98",
+    "ok": true,
+    "num": 0.9983864237028794
+   },
+   {
+    "item": "song05 音高差中位數",
+    "value": "8.00 cents",
+    "limit": "< 10 cents",
+    "ok": true,
+    "num": 7.9999999999998295
+   },
+   {
+    "item": "song05 音符數",
+    "value": "426 vs 428",
+    "limit": "差 <= max(1, 2%)",
+    "ok": true,
+    "num": 2.0
+   },
+   {
+    "item": "song05 沒有配對到的音符",
+    "value": "A 多 17 個、B 多 19 個",
+    "limit": "各 <= max(1, 2%)",
+    "ok": false,
+    "num": 36.0
+   },
+   {
+    "item": "song05 音符起點差中位數",
+    "value": "0.0 ms",
+    "limit": "< 20 ms",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song05 音符結束差中位數",
+    "value": "0.0 ms",
+    "limit": "< 20 ms",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song05 音符音高不同的個數",
+    "value": "21／409",
+    "limit": "<= max(1, 2%)",
+    "ok": false,
+    "num": 21.0
+   },
+   {
+    "item": "song05 meta（separation、vocal_model、karaoke、acapella、language、lyrics_unreliable、harmony）",
+    "value": "相同",
+    "limit": "相同",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song05 歌詞字元錯誤率",
+    "value": "0.000（693 字 vs 693 字）",
+    "limit": "< 0.01",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song05 歌詞起點差中位數",
+    "value": "0 ms",
+    "limit": "< 80 ms",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song06 lead 分離 SDR",
+    "value": "inf dB",
+    "limit": "> 30 dB",
+    "ok": true,
+    "num": "inf"
+   },
+   {
+    "item": "song06 back 分離 SDR",
+    "value": "inf dB",
+    "limit": "> 30 dB",
+    "ok": true,
+    "num": "inf"
+   },
+   {
+    "item": "song06 inst 分離 SDR",
+    "value": "inf dB",
+    "limit": "> 30 dB",
+    "ok": true,
+    "num": "inf"
+   },
+   {
+    "item": "song06 音高 hop",
+    "value": "0.01 vs 0.01",
+    "limit": "相同",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song06 有聲判斷一致率",
+    "value": "0.9985",
+    "limit": ">= 0.98",
+    "ok": true,
+    "num": 0.9985259537430246
+   },
+   {
+    "item": "song06 音高差中位數",
+    "value": "8.00 cents",
+    "limit": "< 10 cents",
+    "ok": true,
+    "num": 7.9999999999998295
+   },
+   {
+    "item": "song06 音符數",
+    "value": "546 vs 546",
+    "limit": "差 <= max(1, 2%)",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song06 沒有配對到的音符",
+    "value": "A 多 31 個、B 多 31 個",
+    "limit": "各 <= max(1, 2%)",
+    "ok": false,
+    "num": 62.0
+   },
+   {
+    "item": "song06 音符起點差中位數",
+    "value": "0.0 ms",
+    "limit": "< 20 ms",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song06 音符結束差中位數",
+    "value": "0.0 ms",
+    "limit": "< 20 ms",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song06 音符音高不同的個數",
+    "value": "40／515",
+    "limit": "<= max(1, 2%)",
+    "ok": false,
+    "num": 40.0
+   },
+   {
+    "item": "song06 meta（separation、vocal_model、karaoke、acapella、language、lyrics_unreliable、harmony）",
+    "value": "相同",
+    "limit": "相同",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song06 歌詞字元錯誤率",
+    "value": "0.000（1108 字 vs 1108 字）",
+    "limit": "< 0.01",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song06 歌詞起點差中位數",
+    "value": "0 ms",
+    "limit": "< 80 ms",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song07 lead 分離 SDR",
+    "value": "inf dB",
+    "limit": "> 30 dB",
+    "ok": true,
+    "num": "inf"
+   },
+   {
+    "item": "song07 back 分離 SDR",
+    "value": "inf dB",
+    "limit": "> 30 dB",
+    "ok": true,
+    "num": "inf"
+   },
+   {
+    "item": "song07 inst 分離 SDR",
+    "value": "inf dB",
+    "limit": "> 30 dB",
+    "ok": true,
+    "num": "inf"
+   },
+   {
+    "item": "song07 音高 hop",
+    "value": "0.01 vs 0.01",
+    "limit": "相同",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song07 有聲判斷一致率",
+    "value": "0.9989",
+    "limit": ">= 0.98",
+    "ok": true,
+    "num": 0.9988595169239542
+   },
+   {
+    "item": "song07 音高差中位數",
+    "value": "8.00 cents",
+    "limit": "< 10 cents",
+    "ok": true,
+    "num": 7.9999999999998295
+   },
+   {
+    "item": "song07 音符數",
+    "value": "481 vs 475",
+    "limit": "差 <= max(1, 2%)",
+    "ok": true,
+    "num": 6.0
+   },
+   {
+    "item": "song07 沒有配對到的音符",
+    "value": "A 多 17 個、B 多 11 個",
+    "limit": "各 <= max(1, 2%)",
+    "ok": false,
+    "num": 28.0
+   },
+   {
+    "item": "song07 音符起點差中位數",
+    "value": "0.0 ms",
+    "limit": "< 20 ms",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song07 音符結束差中位數",
+    "value": "0.0 ms",
+    "limit": "< 20 ms",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song07 音符音高不同的個數",
+    "value": "24／464",
+    "limit": "<= max(1, 2%)",
+    "ok": false,
+    "num": 24.0
+   },
+   {
+    "item": "song07 meta（separation、vocal_model、karaoke、acapella、language、lyrics_unreliable、harmony）",
+    "value": "相同",
+    "limit": "相同",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song07 歌詞字元錯誤率",
+    "value": "0.000（424 字 vs 424 字）",
+    "limit": "< 0.01",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song07 歌詞起點差中位數",
+    "value": "0 ms",
+    "limit": "< 80 ms",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song08 lead 分離 SDR",
+    "value": "inf dB",
+    "limit": "> 30 dB",
+    "ok": true,
+    "num": "inf"
+   },
+   {
+    "item": "song08 back 分離 SDR",
+    "value": "inf dB",
+    "limit": "> 30 dB",
+    "ok": true,
+    "num": "inf"
+   },
+   {
+    "item": "song08 inst 分離 SDR",
+    "value": "inf dB",
+    "limit": "> 30 dB",
+    "ok": true,
+    "num": "inf"
+   },
+   {
+    "item": "song08 音高 hop",
+    "value": "0.01 vs 0.01",
+    "limit": "相同",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song08 有聲判斷一致率",
+    "value": "0.9974",
+    "limit": ">= 0.98",
+    "ok": true,
+    "num": 0.9973761592399909
+   },
+   {
+    "item": "song08 音高差中位數",
+    "value": "8.00 cents",
+    "limit": "< 10 cents",
+    "ok": true,
+    "num": 7.9999999999998295
+   },
+   {
+    "item": "song08 音符數",
+    "value": "493 vs 490",
+    "limit": "差 <= max(1, 2%)",
+    "ok": true,
+    "num": 3.0
+   },
+   {
+    "item": "song08 沒有配對到的音符",
+    "value": "A 多 27 個、B 多 24 個",
+    "limit": "各 <= max(1, 2%)",
+    "ok": false,
+    "num": 51.0
+   },
+   {
+    "item": "song08 音符起點差中位數",
+    "value": "0.0 ms",
+    "limit": "< 20 ms",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song08 音符結束差中位數",
+    "value": "0.0 ms",
+    "limit": "< 20 ms",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song08 音符音高不同的個數",
+    "value": "27／466",
+    "limit": "<= max(1, 2%)",
+    "ok": false,
+    "num": 27.0
+   },
+   {
+    "item": "song08 meta（separation、vocal_model、karaoke、acapella、language、lyrics_unreliable、harmony）",
+    "value": "相同",
+    "limit": "相同",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song08 歌詞字元錯誤率",
+    "value": "0.000（538 字 vs 538 字）",
+    "limit": "< 0.01",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song08 歌詞起點差中位數",
+    "value": "0 ms",
+    "limit": "< 80 ms",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song09 lead 分離 SDR",
+    "value": "inf dB",
+    "limit": "> 30 dB",
+    "ok": true,
+    "num": "inf"
+   },
+   {
+    "item": "song09 back 分離 SDR",
+    "value": "inf dB",
+    "limit": "> 30 dB",
+    "ok": true,
+    "num": "inf"
+   },
+   {
+    "item": "song09 inst 分離 SDR",
+    "value": "inf dB",
+    "limit": "> 30 dB",
+    "ok": true,
+    "num": "inf"
+   },
+   {
+    "item": "song09 音高 hop",
+    "value": "0.01 vs 0.01",
+    "limit": "相同",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song09 有聲判斷一致率",
+    "value": "0.9989",
+    "limit": ">= 0.98",
+    "ok": true,
+    "num": 0.9988597924822318
+   },
+   {
+    "item": "song09 音高差中位數",
+    "value": "8.00 cents",
+    "limit": "< 10 cents",
+    "ok": true,
+    "num": 7.9999999999998295
+   },
+   {
+    "item": "song09 音符數",
+    "value": "520 vs 512",
+    "limit": "差 <= max(1, 2%)",
+    "ok": true,
+    "num": 8.0
+   },
+   {
+    "item": "song09 沒有配對到的音符",
+    "value": "A 多 22 個、B 多 14 個",
+    "limit": "各 <= max(1, 2%)",
+    "ok": false,
+    "num": 36.0
+   },
+   {
+    "item": "song09 音符起點差中位數",
+    "value": "0.0 ms",
+    "limit": "< 20 ms",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song09 音符結束差中位數",
+    "value": "0.0 ms",
+    "limit": "< 20 ms",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song09 音符音高不同的個數",
+    "value": "31／498",
+    "limit": "<= max(1, 2%)",
+    "ok": false,
+    "num": 31.0
+   },
+   {
+    "item": "song09 meta（separation、vocal_model、karaoke、acapella、language、lyrics_unreliable、harmony）",
+    "value": "相同",
+    "limit": "相同",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song09 歌詞字元錯誤率",
+    "value": "0.000（394 字 vs 394 字）",
+    "limit": "< 0.01",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song09 歌詞起點差中位數",
+    "value": "0 ms",
+    "limit": "< 80 ms",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song10 lead 分離 SDR",
+    "value": "inf dB",
+    "limit": "> 30 dB",
+    "ok": true,
+    "num": "inf"
+   },
+   {
+    "item": "song10 back 分離 SDR",
+    "value": "inf dB",
+    "limit": "> 30 dB",
+    "ok": true,
+    "num": "inf"
+   },
+   {
+    "item": "song10 inst 分離 SDR",
+    "value": "inf dB",
+    "limit": "> 30 dB",
+    "ok": true,
+    "num": "inf"
+   },
+   {
+    "item": "song10 音高 hop",
+    "value": "0.01 vs 0.01",
+    "limit": "相同",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song10 有聲判斷一致率",
+    "value": "0.9981",
+    "limit": ">= 0.98",
+    "ok": true,
+    "num": 0.9980826215792226
+   },
+   {
+    "item": "song10 音高差中位數",
+    "value": "8.00 cents",
+    "limit": "< 10 cents",
+    "ok": true,
+    "num": 7.9999999999998295
+   },
+   {
+    "item": "song10 音符數",
+    "value": "550 vs 546",
+    "limit": "差 <= max(1, 2%)",
+    "ok": true,
+    "num": 4.0
+   },
+   {
+    "item": "song10 沒有配對到的音符",
+    "value": "A 多 22 個、B 多 18 個",
+    "limit": "各 <= max(1, 2%)",
+    "ok": false,
+    "num": 40.0
+   },
+   {
+    "item": "song10 音符起點差中位數",
+    "value": "0.0 ms",
+    "limit": "< 20 ms",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song10 音符結束差中位數",
+    "value": "0.0 ms",
+    "limit": "< 20 ms",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song10 音符音高不同的個數",
+    "value": "37／528",
+    "limit": "<= max(1, 2%)",
+    "ok": false,
+    "num": 37.0
+   },
+   {
+    "item": "song10 meta（separation、vocal_model、karaoke、acapella、language、lyrics_unreliable、harmony）",
+    "value": "相同",
+    "limit": "相同",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song10 歌詞字元錯誤率",
+    "value": "0.000（279 字 vs 279 字）",
+    "limit": "< 0.01",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "song10 歌詞起點差中位數",
+    "value": "0 ms",
+    "limit": "< 80 ms",
+    "ok": true,
+    "num": 0.0
+   },
+   {
     "item": "評分狀態",
     "value": "done vs done",
     "limit": "都是 done",
@@ -856,10 +3807,10 @@
    },
    {
     "item": "評分準確率差",
-    "value": "0.1 分（1.0 vs 0.999）",
+    "value": "0.2 分（0.998 vs 1.0）",
     "limit": "<= 1 分",
     "ok": true,
-    "num": 0.10000000000000009
+    "num": 0.20000000000000018
    },
    {
     "item": "評分影格數差",
@@ -884,10 +3835,10 @@
    },
    {
     "item": "評分 key_hint.share 差",
-    "value": "0.010（0.9 vs 0.91）",
+    "value": "0.000（0.9 vs 0.9）",
     "limit": "<= 0.05",
     "ok": true,
-    "num": 0.010000000000000009
+    "num": 0.0
    },
    {
     "item": "評分 octave",
@@ -898,21 +3849,21 @@
    },
    {
     "item": "評分 mean 差",
-    "value": "0.1 cents（12.1 vs 12.2）",
+    "value": "0.8 cents（12.5 vs 11.7）",
     "limit": "<= 3 cents",
     "ok": true,
-    "num": 0.09999999999999964
+    "num": 0.8000000000000007
    },
    {
     "item": "評分 spread 差",
-    "value": "0.0 cents（12.5 vs 12.5）",
+    "value": "0.8 cents（12.9 vs 12.1）",
     "limit": "<= 3 cents",
     "ok": true,
-    "num": 0.0
+    "num": 0.8000000000000007
    },
    {
     "item": "評分 offset 差",
-    "value": "0.010 秒（-0.21 vs -0.2）",
+    "value": "0.010 秒（-0.2 vs -0.21）",
     "limit": "<= 0.02 秒",
     "ok": true,
     "num": 0.009999999999999981
@@ -926,7 +3877,7 @@
    },
    {
     "item": "評分錄音音高 t0",
-    "value": "-0.21 vs -0.2",
+    "value": "-0.2 vs -0.21",
     "limit": "差 <= 0.02 秒",
     "ok": true,
     "num": 0.009999999999999981
@@ -950,14 +3901,14 @@
     "value": "-2.0 dB",
     "limit": "> 30 dB",
     "ok": false,
-    "num": -1.9641095335526368
+    "num": -1.960859028903229
    },
    {
     "item": "匯出檔 RMS 差",
     "value": "0.003 dB",
     "limit": "<= 0.1 dB",
     "ok": true,
-    "num": 0.003250504649406405
+    "num": 0.0032505046494069267
    }
   ]
  },
@@ -1108,36 +4059,36 @@
   },
   "songspeech01 有聲判斷一致率": {
    "values": [
+    0.9980997624703087,
     0.9957244655581948,
-    0.997624703087886,
-    0.9980997624703087
+    0.997624703087886
    ],
    "limit": ">= 0.98",
    "over": 0
   },
   "songspeech01 音高差中位數": {
    "values": [
-    7.000000000000028,
-    7.000000000000028,
-    7.9999999999998295
+    8.99999999999963,
+    7.9999999999998295,
+    7.000000000000028
    ],
    "limit": "< 10 cents",
    "over": 0
   },
   "songspeech01 音符數": {
    "values": [
-    2.0,
     3.0,
-    1.0
+    0.0,
+    3.0
    ],
    "limit": "差 <= max(1, 2%)",
    "over": 2
   },
   "songspeech01 沒有配對到的音符": {
    "values": [
-    6.0,
     3.0,
-    5.0
+    8.0,
+    7.0
    ],
    "limit": "各 <= max(1, 2%)",
    "over": 3
@@ -1163,8 +4114,8 @@
   "songspeech01 音符音高不同的個數": {
    "values": [
     6.0,
-    5.0,
-    5.0
+    4.0,
+    6.0
    ],
    "limit": "<= max(1, 2%)",
    "over": 3
@@ -1196,6 +4147,1266 @@
    "limit": "< 80 ms",
    "over": 0
   },
+  "song01 lead 分離 SDR": {
+   "values": [
+    "inf",
+    "inf",
+    "inf"
+   ],
+   "limit": "> 30 dB",
+   "over": 0
+  },
+  "song01 back 分離 SDR": {
+   "values": [
+    "inf",
+    "inf",
+    "inf"
+   ],
+   "limit": "> 30 dB",
+   "over": 0
+  },
+  "song01 inst 分離 SDR": {
+   "values": [
+    "inf",
+    "inf",
+    "inf"
+   ],
+   "limit": "> 30 dB",
+   "over": 0
+  },
+  "song01 音高 hop": {
+   "values": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "limit": "相同",
+   "over": 0
+  },
+  "song01 有聲判斷一致率": {
+   "values": [
+    0.9978622789402086,
+    0.9972144846796658,
+    0.9983157349225886
+   ],
+   "limit": ">= 0.98",
+   "over": 0
+  },
+  "song01 音高差中位數": {
+   "values": [
+    7.9999999999998295,
+    7.9999999999998295,
+    7.9999999999998295
+   ],
+   "limit": "< 10 cents",
+   "over": 0
+  },
+  "song01 音符數": {
+   "values": [
+    0.0,
+    8.0,
+    8.0
+   ],
+   "limit": "差 <= max(1, 2%)",
+   "over": 2
+  },
+  "song01 沒有配對到的音符": {
+   "values": [
+    38.0,
+    38.0,
+    40.0
+   ],
+   "limit": "各 <= max(1, 2%)",
+   "over": 3
+  },
+  "song01 音符起點差中位數": {
+   "values": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "limit": "< 20 ms",
+   "over": 0
+  },
+  "song01 音符結束差中位數": {
+   "values": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "limit": "< 20 ms",
+   "over": 0
+  },
+  "song01 音符音高不同的個數": {
+   "values": [
+    28.0,
+    24.0,
+    29.0
+   ],
+   "limit": "<= max(1, 2%)",
+   "over": 3
+  },
+  "song01 meta（separation、vocal_model、karaoke、acapella、language、lyrics_unreliable、harmony）": {
+   "values": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "limit": "相同",
+   "over": 0
+  },
+  "song01 歌詞字元錯誤率": {
+   "values": [
+    0.01488833746898263,
+    0.0,
+    0.01488833746898263
+   ],
+   "limit": "< 0.01",
+   "over": 2
+  },
+  "song01 歌詞起點差中位數": {
+   "values": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "limit": "< 80 ms",
+   "over": 0
+  },
+  "song02 lead 分離 SDR": {
+   "values": [
+    "inf",
+    "inf",
+    "inf"
+   ],
+   "limit": "> 30 dB",
+   "over": 0
+  },
+  "song02 back 分離 SDR": {
+   "values": [
+    "inf",
+    "inf",
+    "inf"
+   ],
+   "limit": "> 30 dB",
+   "over": 0
+  },
+  "song02 inst 分離 SDR": {
+   "values": [
+    "inf",
+    "inf",
+    "inf"
+   ],
+   "limit": "> 30 dB",
+   "over": 0
+  },
+  "song02 音高 hop": {
+   "values": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "limit": "相同",
+   "over": 0
+  },
+  "song02 有聲判斷一致率": {
+   "values": [
+    0.9996455157745481,
+    0.9990940958682895,
+    0.9994485800937414
+   ],
+   "limit": ">= 0.98",
+   "over": 0
+  },
+  "song02 音高差中位數": {
+   "values": [
+    7.9999999999998295,
+    7.9999999999998295,
+    7.9999999999998295
+   ],
+   "limit": "< 10 cents",
+   "over": 0
+  },
+  "song02 音符數": {
+   "values": [
+    1.0,
+    6.0,
+    7.0
+   ],
+   "limit": "差 <= max(1, 2%)",
+   "over": 0
+  },
+  "song02 沒有配對到的音符": {
+   "values": [
+    29.0,
+    30.0,
+    25.0
+   ],
+   "limit": "各 <= max(1, 2%)",
+   "over": 3
+  },
+  "song02 音符起點差中位數": {
+   "values": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "limit": "< 20 ms",
+   "over": 0
+  },
+  "song02 音符結束差中位數": {
+   "values": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "limit": "< 20 ms",
+   "over": 0
+  },
+  "song02 音符音高不同的個數": {
+   "values": [
+    25.0,
+    23.0,
+    25.0
+   ],
+   "limit": "<= max(1, 2%)",
+   "over": 3
+  },
+  "song02 meta（separation、vocal_model、karaoke、acapella、language、lyrics_unreliable、harmony）": {
+   "values": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "limit": "相同",
+   "over": 0
+  },
+  "song02 歌詞字元錯誤率": {
+   "values": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "limit": "< 0.01",
+   "over": 0
+  },
+  "song02 歌詞起點差中位數": {
+   "values": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "limit": "< 80 ms",
+   "over": 0
+  },
+  "song03 lead 分離 SDR": {
+   "values": [
+    "inf",
+    "inf",
+    "inf"
+   ],
+   "limit": "> 30 dB",
+   "over": 0
+  },
+  "song03 back 分離 SDR": {
+   "values": [
+    "inf",
+    "inf",
+    "inf"
+   ],
+   "limit": "> 30 dB",
+   "over": 0
+  },
+  "song03 inst 分離 SDR": {
+   "values": [
+    "inf",
+    "inf",
+    "inf"
+   ],
+   "limit": "> 30 dB",
+   "over": 0
+  },
+  "song03 音高 hop": {
+   "values": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "limit": "相同",
+   "over": 0
+  },
+  "song03 有聲判斷一致率": {
+   "values": [
+    0.9991020437484286,
+    0.9994073488739629,
+    0.9990122481232714
+   ],
+   "limit": ">= 0.98",
+   "over": 0
+  },
+  "song03 音高差中位數": {
+   "values": [
+    7.9999999999998295,
+    7.9999999999998295,
+    7.9999999999998295
+   ],
+   "limit": "< 10 cents",
+   "over": 0
+  },
+  "song03 音符數": {
+   "values": [
+    2.0,
+    10.0,
+    8.0
+   ],
+   "limit": "差 <= max(1, 2%)",
+   "over": 0
+  },
+  "song03 沒有配對到的音符": {
+   "values": [
+    54.0,
+    56.0,
+    46.0
+   ],
+   "limit": "各 <= max(1, 2%)",
+   "over": 3
+  },
+  "song03 音符起點差中位數": {
+   "values": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "limit": "< 20 ms",
+   "over": 0
+  },
+  "song03 音符結束差中位數": {
+   "values": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "limit": "< 20 ms",
+   "over": 0
+  },
+  "song03 音符音高不同的個數": {
+   "values": [
+    56.0,
+    45.0,
+    55.0
+   ],
+   "limit": "<= max(1, 2%)",
+   "over": 3
+  },
+  "song03 meta（separation、vocal_model、karaoke、acapella、language、lyrics_unreliable、harmony）": {
+   "values": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "limit": "相同",
+   "over": 0
+  },
+  "song03 歌詞字元錯誤率": {
+   "values": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "limit": "< 0.01",
+   "over": 3
+  },
+  "song03 歌詞行數": {
+   "values": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "limit": "相同",
+   "over": 3
+  },
+  "song04 lead 分離 SDR": {
+   "values": [
+    "inf",
+    "inf",
+    "inf"
+   ],
+   "limit": "> 30 dB",
+   "over": 0
+  },
+  "song04 back 分離 SDR": {
+   "values": [
+    "inf",
+    "inf",
+    "inf"
+   ],
+   "limit": "> 30 dB",
+   "over": 0
+  },
+  "song04 inst 分離 SDR": {
+   "values": [
+    "inf",
+    "inf",
+    "inf"
+   ],
+   "limit": "> 30 dB",
+   "over": 0
+  },
+  "song04 音高 hop": {
+   "values": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "limit": "相同",
+   "over": 0
+  },
+  "song04 有聲判斷一致率": {
+   "values": [
+    0.9991674375578168,
+    0.9991211840888067,
+    0.9994912118408881
+   ],
+   "limit": ">= 0.98",
+   "over": 0
+  },
+  "song04 音高差中位數": {
+   "values": [
+    7.9999999999998295,
+    7.9999999999998295,
+    7.9999999999998295
+   ],
+   "limit": "< 10 cents",
+   "over": 0
+  },
+  "song04 音符數": {
+   "values": [
+    1.0,
+    15.0,
+    14.0
+   ],
+   "limit": "差 <= max(1, 2%)",
+   "over": 2
+  },
+  "song04 沒有配對到的音符": {
+   "values": [
+    27.0,
+    33.0,
+    26.0
+   ],
+   "limit": "各 <= max(1, 2%)",
+   "over": 3
+  },
+  "song04 音符起點差中位數": {
+   "values": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "limit": "< 20 ms",
+   "over": 0
+  },
+  "song04 音符結束差中位數": {
+   "values": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "limit": "< 20 ms",
+   "over": 0
+  },
+  "song04 音符音高不同的個數": {
+   "values": [
+    16.0,
+    20.0,
+    23.0
+   ],
+   "limit": "<= max(1, 2%)",
+   "over": 3
+  },
+  "song04 meta（separation、vocal_model、karaoke、acapella、language、lyrics_unreliable、harmony）": {
+   "values": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "limit": "相同",
+   "over": 0
+  },
+  "song04 歌詞字元錯誤率": {
+   "values": [
+    0.1378026070763501,
+    0.17690875232774675,
+    0.12450592885375494
+   ],
+   "limit": "< 0.01",
+   "over": 3
+  },
+  "song04 歌詞行數": {
+   "values": [
+    4.0,
+    8.0,
+    4.0
+   ],
+   "limit": "相同",
+   "over": 3
+  },
+  "song05 lead 分離 SDR": {
+   "values": [
+    "inf",
+    "inf",
+    "inf"
+   ],
+   "limit": "> 30 dB",
+   "over": 0
+  },
+  "song05 back 分離 SDR": {
+   "values": [
+    "inf",
+    "inf",
+    "inf"
+   ],
+   "limit": "> 30 dB",
+   "over": 0
+  },
+  "song05 inst 分離 SDR": {
+   "values": [
+    "inf",
+    "inf",
+    "inf"
+   ],
+   "limit": "> 30 dB",
+   "over": 0
+  },
+  "song05 音高 hop": {
+   "values": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "limit": "相同",
+   "over": 0
+  },
+  "song05 有聲判斷一致率": {
+   "values": [
+    0.9981638614550007,
+    0.9988315481986368,
+    0.9983864237028794
+   ],
+   "limit": ">= 0.98",
+   "over": 0
+  },
+  "song05 音高差中位數": {
+   "values": [
+    7.9999999999998295,
+    7.9999999999998295,
+    7.9999999999998295
+   ],
+   "limit": "< 10 cents",
+   "over": 0
+  },
+  "song05 音符數": {
+   "values": [
+    8.0,
+    6.0,
+    2.0
+   ],
+   "limit": "差 <= max(1, 2%)",
+   "over": 0
+  },
+  "song05 沒有配對到的音符": {
+   "values": [
+    36.0,
+    30.0,
+    36.0
+   ],
+   "limit": "各 <= max(1, 2%)",
+   "over": 3
+  },
+  "song05 音符起點差中位數": {
+   "values": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "limit": "< 20 ms",
+   "over": 0
+  },
+  "song05 音符結束差中位數": {
+   "values": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "limit": "< 20 ms",
+   "over": 0
+  },
+  "song05 音符音高不同的個數": {
+   "values": [
+    17.0,
+    23.0,
+    21.0
+   ],
+   "limit": "<= max(1, 2%)",
+   "over": 3
+  },
+  "song05 meta（separation、vocal_model、karaoke、acapella、language、lyrics_unreliable、harmony）": {
+   "values": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "limit": "相同",
+   "over": 0
+  },
+  "song05 歌詞字元錯誤率": {
+   "values": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "limit": "< 0.01",
+   "over": 0
+  },
+  "song05 歌詞起點差中位數": {
+   "values": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "limit": "< 80 ms",
+   "over": 0
+  },
+  "song06 lead 分離 SDR": {
+   "values": [
+    "inf",
+    "inf",
+    "inf"
+   ],
+   "limit": "> 30 dB",
+   "over": 0
+  },
+  "song06 back 分離 SDR": {
+   "values": [
+    "inf",
+    "inf",
+    "inf"
+   ],
+   "limit": "> 30 dB",
+   "over": 0
+  },
+  "song06 inst 分離 SDR": {
+   "values": [
+    "inf",
+    "inf",
+    "inf"
+   ],
+   "limit": "> 30 dB",
+   "over": 0
+  },
+  "song06 音高 hop": {
+   "values": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "limit": "相同",
+   "over": 0
+  },
+  "song06 有聲判斷一致率": {
+   "values": [
+    0.9987365317797354,
+    0.9983153757063138,
+    0.9985259537430246
+   ],
+   "limit": ">= 0.98",
+   "over": 0
+  },
+  "song06 音高差中位數": {
+   "values": [
+    7.9999999999998295,
+    7.9999999999998295,
+    7.9999999999998295
+   ],
+   "limit": "< 10 cents",
+   "over": 0
+  },
+  "song06 音符數": {
+   "values": [
+    9.0,
+    9.0,
+    0.0
+   ],
+   "limit": "差 <= max(1, 2%)",
+   "over": 0
+  },
+  "song06 沒有配對到的音符": {
+   "values": [
+    49.0,
+    53.0,
+    62.0
+   ],
+   "limit": "各 <= max(1, 2%)",
+   "over": 3
+  },
+  "song06 音符起點差中位數": {
+   "values": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "limit": "< 20 ms",
+   "over": 0
+  },
+  "song06 音符結束差中位數": {
+   "values": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "limit": "< 20 ms",
+   "over": 0
+  },
+  "song06 音符音高不同的個數": {
+   "values": [
+    37.0,
+    45.0,
+    40.0
+   ],
+   "limit": "<= max(1, 2%)",
+   "over": 3
+  },
+  "song06 meta（separation、vocal_model、karaoke、acapella、language、lyrics_unreliable、harmony）": {
+   "values": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "limit": "相同",
+   "over": 0
+  },
+  "song06 歌詞字元錯誤率": {
+   "values": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "limit": "< 0.01",
+   "over": 0
+  },
+  "song06 歌詞起點差中位數": {
+   "values": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "limit": "< 80 ms",
+   "over": 0
+  },
+  "song07 lead 分離 SDR": {
+   "values": [
+    "inf",
+    "inf",
+    "inf"
+   ],
+   "limit": "> 30 dB",
+   "over": 0
+  },
+  "song07 back 分離 SDR": {
+   "values": [
+    "inf",
+    "inf",
+    "inf"
+   ],
+   "limit": "> 30 dB",
+   "over": 0
+  },
+  "song07 inst 分離 SDR": {
+   "values": [
+    "inf",
+    "inf",
+    "inf"
+   ],
+   "limit": "> 30 dB",
+   "over": 0
+  },
+  "song07 音高 hop": {
+   "values": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "limit": "相同",
+   "over": 0
+  },
+  "song07 有聲判斷一致率": {
+   "values": [
+    0.9993890269235469,
+    0.9992261007698261,
+    0.9988595169239542
+   ],
+   "limit": ">= 0.98",
+   "over": 0
+  },
+  "song07 音高差中位數": {
+   "values": [
+    7.9999999999998295,
+    7.9999999999998295,
+    7.9999999999998295
+   ],
+   "limit": "< 10 cents",
+   "over": 0
+  },
+  "song07 音符數": {
+   "values": [
+    11.0,
+    5.0,
+    6.0
+   ],
+   "limit": "差 <= max(1, 2%)",
+   "over": 1
+  },
+  "song07 沒有配對到的音符": {
+   "values": [
+    39.0,
+    41.0,
+    28.0
+   ],
+   "limit": "各 <= max(1, 2%)",
+   "over": 3
+  },
+  "song07 音符起點差中位數": {
+   "values": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "limit": "< 20 ms",
+   "over": 0
+  },
+  "song07 音符結束差中位數": {
+   "values": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "limit": "< 20 ms",
+   "over": 0
+  },
+  "song07 音符音高不同的個數": {
+   "values": [
+    27.0,
+    27.0,
+    24.0
+   ],
+   "limit": "<= max(1, 2%)",
+   "over": 3
+  },
+  "song07 meta（separation、vocal_model、karaoke、acapella、language、lyrics_unreliable、harmony）": {
+   "values": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "limit": "相同",
+   "over": 0
+  },
+  "song07 歌詞字元錯誤率": {
+   "values": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "limit": "< 0.01",
+   "over": 0
+  },
+  "song07 歌詞起點差中位數": {
+   "values": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "limit": "< 80 ms",
+   "over": 0
+  },
+  "song08 lead 分離 SDR": {
+   "values": [
+    "inf",
+    "inf",
+    "inf"
+   ],
+   "limit": "> 30 dB",
+   "over": 0
+  },
+  "song08 back 分離 SDR": {
+   "values": [
+    "inf",
+    "inf",
+    "inf"
+   ],
+   "limit": "> 30 dB",
+   "over": 0
+  },
+  "song08 inst 分離 SDR": {
+   "values": [
+    "inf",
+    "inf",
+    "inf"
+   ],
+   "limit": "> 30 dB",
+   "over": 0
+  },
+  "song08 音高 hop": {
+   "values": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "limit": "相同",
+   "over": 0
+  },
+  "song08 有聲判斷一致率": {
+   "values": [
+    0.9982809319158561,
+    0.9981904546482696,
+    0.9973761592399909
+   ],
+   "limit": ">= 0.98",
+   "over": 0
+  },
+  "song08 音高差中位數": {
+   "values": [
+    7.9999999999998295,
+    7.9999999999998295,
+    7.9999999999998295
+   ],
+   "limit": "< 10 cents",
+   "over": 0
+  },
+  "song08 音符數": {
+   "values": [
+    4.0,
+    1.0,
+    3.0
+   ],
+   "limit": "差 <= max(1, 2%)",
+   "over": 0
+  },
+  "song08 沒有配對到的音符": {
+   "values": [
+    42.0,
+    47.0,
+    51.0
+   ],
+   "limit": "各 <= max(1, 2%)",
+   "over": 3
+  },
+  "song08 音符起點差中位數": {
+   "values": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "limit": "< 20 ms",
+   "over": 0
+  },
+  "song08 音符結束差中位數": {
+   "values": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "limit": "< 20 ms",
+   "over": 0
+  },
+  "song08 音符音高不同的個數": {
+   "values": [
+    26.0,
+    27.0,
+    27.0
+   ],
+   "limit": "<= max(1, 2%)",
+   "over": 3
+  },
+  "song08 meta（separation、vocal_model、karaoke、acapella、language、lyrics_unreliable、harmony）": {
+   "values": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "limit": "相同",
+   "over": 0
+  },
+  "song08 歌詞字元錯誤率": {
+   "values": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "limit": "< 0.01",
+   "over": 0
+  },
+  "song08 歌詞起點差中位數": {
+   "values": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "limit": "< 80 ms",
+   "over": 0
+  },
+  "song09 lead 分離 SDR": {
+   "values": [
+    "inf",
+    "inf",
+    "inf"
+   ],
+   "limit": "> 30 dB",
+   "over": 0
+  },
+  "song09 back 分離 SDR": {
+   "values": [
+    "inf",
+    "inf",
+    "inf"
+   ],
+   "limit": "> 30 dB",
+   "over": 0
+  },
+  "song09 inst 分離 SDR": {
+   "values": [
+    "inf",
+    "inf",
+    "inf"
+   ],
+   "limit": "> 30 dB",
+   "over": 0
+  },
+  "song09 音高 hop": {
+   "values": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "limit": "相同",
+   "over": 0
+  },
+  "song09 有聲判斷一致率": {
+   "values": [
+    0.9995819239101517,
+    0.9989738132340086,
+    0.9988597924822318
+   ],
+   "limit": ">= 0.98",
+   "over": 0
+  },
+  "song09 音高差中位數": {
+   "values": [
+    7.9999999999998295,
+    7.9999999999998295,
+    7.9999999999998295
+   ],
+   "limit": "< 10 cents",
+   "over": 0
+  },
+  "song09 音符數": {
+   "values": [
+    1.0,
+    9.0,
+    8.0
+   ],
+   "limit": "差 <= max(1, 2%)",
+   "over": 0
+  },
+  "song09 沒有配對到的音符": {
+   "values": [
+    25.0,
+    37.0,
+    36.0
+   ],
+   "limit": "各 <= max(1, 2%)",
+   "over": 3
+  },
+  "song09 音符起點差中位數": {
+   "values": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "limit": "< 20 ms",
+   "over": 0
+  },
+  "song09 音符結束差中位數": {
+   "values": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "limit": "< 20 ms",
+   "over": 0
+  },
+  "song09 音符音高不同的個數": {
+   "values": [
+    27.0,
+    24.0,
+    31.0
+   ],
+   "limit": "<= max(1, 2%)",
+   "over": 3
+  },
+  "song09 meta（separation、vocal_model、karaoke、acapella、language、lyrics_unreliable、harmony）": {
+   "values": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "limit": "相同",
+   "over": 0
+  },
+  "song09 歌詞字元錯誤率": {
+   "values": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "limit": "< 0.01",
+   "over": 0
+  },
+  "song09 歌詞起點差中位數": {
+   "values": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "limit": "< 80 ms",
+   "over": 0
+  },
+  "song10 lead 分離 SDR": {
+   "values": [
+    "inf",
+    "inf",
+    "inf"
+   ],
+   "limit": "> 30 dB",
+   "over": 0
+  },
+  "song10 back 分離 SDR": {
+   "values": [
+    "inf",
+    "inf",
+    "inf"
+   ],
+   "limit": "> 30 dB",
+   "over": 0
+  },
+  "song10 inst 分離 SDR": {
+   "values": [
+    "inf",
+    "inf",
+    "inf"
+   ],
+   "limit": "> 30 dB",
+   "over": 0
+  },
+  "song10 音高 hop": {
+   "values": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "limit": "相同",
+   "over": 0
+  },
+  "song10 有聲判斷一致率": {
+   "values": [
+    0.9980826215792226,
+    0.9993027714833537,
+    0.9980826215792226
+   ],
+   "limit": ">= 0.98",
+   "over": 0
+  },
+  "song10 音高差中位數": {
+   "values": [
+    7.9999999999998295,
+    7.9999999999998295,
+    7.9999999999998295
+   ],
+   "limit": "< 10 cents",
+   "over": 0
+  },
+  "song10 音符數": {
+   "values": [
+    0.0,
+    4.0,
+    4.0
+   ],
+   "limit": "差 <= max(1, 2%)",
+   "over": 0
+  },
+  "song10 沒有配對到的音符": {
+   "values": [
+    38.0,
+    42.0,
+    40.0
+   ],
+   "limit": "各 <= max(1, 2%)",
+   "over": 3
+  },
+  "song10 音符起點差中位數": {
+   "values": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "limit": "< 20 ms",
+   "over": 0
+  },
+  "song10 音符結束差中位數": {
+   "values": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "limit": "< 20 ms",
+   "over": 0
+  },
+  "song10 音符音高不同的個數": {
+   "values": [
+    44.0,
+    45.0,
+    37.0
+   ],
+   "limit": "<= max(1, 2%)",
+   "over": 3
+  },
+  "song10 meta（separation、vocal_model、karaoke、acapella、language、lyrics_unreliable、harmony）": {
+   "values": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "limit": "相同",
+   "over": 0
+  },
+  "song10 歌詞字元錯誤率": {
+   "values": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "limit": "< 0.01",
+   "over": 0
+  },
+  "song10 歌詞起點差中位數": {
+   "values": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "limit": "< 80 ms",
+   "over": 0
+  },
   "評分狀態": {
    "values": [
     0.0,
@@ -1208,8 +5419,8 @@
   "評分準確率差": {
    "values": [
     0.10000000000000009,
-    0.0,
-    0.10000000000000009
+    0.10000000000000009,
+    0.20000000000000018
    ],
    "limit": "<= 1 分",
    "over": 0
@@ -1243,9 +5454,9 @@
   },
   "評分 key_hint.share 差": {
    "values": [
-    0.010000000000000009,
     0.0,
-    0.010000000000000009
+    0.0,
+    0.0
    ],
    "limit": "<= 0.05",
    "over": 0
@@ -1261,18 +5472,18 @@
   },
   "評分 mean 差": {
    "values": [
-    0.20000000000000107,
-    0.10000000000000142,
-    0.09999999999999964
+    0.3000000000000007,
+    0.5,
+    0.8000000000000007
    ],
    "limit": "<= 3 cents",
    "over": 0
   },
   "評分 spread 差": {
    "values": [
-    0.1999999999999993,
-    0.1999999999999993,
-    0.0
+    0.3000000000000007,
+    0.5,
+    0.8000000000000007
    ],
    "limit": "<= 3 cents",
    "over": 0
@@ -1324,18 +5535,18 @@
   },
   "匯出檔 SDR": {
    "values": [
-    -1.960859028903229,
+    -1.9641095335526368,
     "inf",
-    -1.9641095335526368
+    -1.960859028903229
    ],
    "limit": "> 30 dB",
    "over": 2
   },
   "匯出檔 RMS 差": {
    "values": [
-    0.0032505046494069267,
+    0.003250504649406405,
     0.0,
-    0.003250504649406405
+    0.0032505046494069267
    ],
    "limit": "<= 0.1 dB",
    "over": 0
@@ -1401,7 +5612,100 @@
    },
    {
     "item": "評分偵測到的偏差（答案 +30 cents）",
-    "value": "12.3 cents",
+    "value": "12.2 cents",
+    "limit": "",
+    "ok": null,
+    "num": null
+   },
+   {
+    "item": "評分偵測到的時間差 offset（錄音晚 0.2 秒；正負號依程式定義）",
+    "value": "-0.21 秒",
+    "limit": "",
+    "ok": null,
+    "num": null
+   },
+   {
+    "item": "speech 歌詞和原句的字元錯誤率",
+    "value": "0.000（辨識 53 字／原句 53 字）",
+    "limit": "",
+    "ok": null,
+    "num": null
+   },
+   {
+    "item": "songsing01 處理時間（不是效能基準；執行緒數見執行條件）",
+    "value": "process 46.8 秒、score 1.7 秒",
+    "limit": "",
+    "ok": null,
+    "num": null
+   },
+   {
+    "item": "songspeech01 處理時間（不是效能基準；執行緒數見執行條件）",
+    "value": "process 30.4 秒",
+    "limit": "",
+    "ok": null,
+    "num": null
+   }
+  ],
+  "2": [
+   {
+    "item": "sing lead 和正確音軌的 SDR",
+    "value": "11.5 dB",
+    "limit": "",
+    "ok": null,
+    "num": null
+   },
+   {
+    "item": "sing inst 和正確音軌的 SDR",
+    "value": "8.1 dB",
+    "limit": "",
+    "ok": null,
+    "num": null
+   },
+   {
+    "item": "sing back（應該是空的）RMS",
+    "value": "-32.8 dBFS",
+    "limit": "",
+    "ok": null,
+    "num": null
+   },
+   {
+    "item": "sing 有聲影格找到的比例",
+    "value": "1.0000",
+    "limit": "",
+    "ok": null,
+    "num": null
+   },
+   {
+    "item": "sing 音和音之間判為有聲的比例（程式會把有聲段落往前後延伸最多 0.25 秒，空隙正好 0.25 秒）",
+    "value": "0.3815",
+    "limit": "",
+    "ok": null,
+    "num": null
+   },
+   {
+    "item": "sing 音高誤差中位數",
+    "value": "9.0 cents",
+    "limit": "",
+    "ok": null,
+    "num": null
+   },
+   {
+    "item": "sing 音符數（旋律 20 個音）",
+    "value": 25,
+    "limit": "",
+    "ok": null,
+    "num": null
+   },
+   {
+    "item": "評分狀態／準確率",
+    "value": "done／0.998",
+    "limit": "",
+    "ok": null,
+    "num": null
+   },
+   {
+    "item": "評分偵測到的偏差（答案 +30 cents）",
+    "value": "12.5 cents",
     "limit": "",
     "ok": null,
     "num": null
@@ -1422,20 +5726,20 @@
    },
    {
     "item": "songsing01 處理時間（不是效能基準；執行緒數見執行條件）",
-    "value": "process 36.6 秒、score 2.0 秒",
+    "value": "process 41.1 秒、score 2.1 秒",
     "limit": "",
     "ok": null,
     "num": null
    },
    {
     "item": "songspeech01 處理時間（不是效能基準；執行緒數見執行條件）",
-    "value": "process 28.0 秒",
+    "value": "process 29.5 秒",
     "limit": "",
     "ok": null,
     "num": null
    }
   ],
-  "2": [
+  "3": [
    {
     "item": "sing lead 和正確音軌的 SDR",
     "value": "11.5 dB",
@@ -1494,7 +5798,7 @@
    },
    {
     "item": "評分偵測到的偏差（答案 +30 cents）",
-    "value": "12.1 cents",
+    "value": "11.7 cents",
     "limit": "",
     "ok": null,
     "num": null
@@ -1515,107 +5819,14 @@
    },
    {
     "item": "songsing01 處理時間（不是效能基準；執行緒數見執行條件）",
-    "value": "process 37.9 秒、score 2.1 秒",
+    "value": "process 41.8 秒、score 2.1 秒",
     "limit": "",
     "ok": null,
     "num": null
    },
    {
     "item": "songspeech01 處理時間（不是效能基準；執行緒數見執行條件）",
-    "value": "process 27.7 秒",
-    "limit": "",
-    "ok": null,
-    "num": null
-   }
-  ],
-  "3": [
-   {
-    "item": "sing lead 和正確音軌的 SDR",
-    "value": "11.5 dB",
-    "limit": "",
-    "ok": null,
-    "num": null
-   },
-   {
-    "item": "sing inst 和正確音軌的 SDR",
-    "value": "8.1 dB",
-    "limit": "",
-    "ok": null,
-    "num": null
-   },
-   {
-    "item": "sing back（應該是空的）RMS",
-    "value": "-32.8 dBFS",
-    "limit": "",
-    "ok": null,
-    "num": null
-   },
-   {
-    "item": "sing 有聲影格找到的比例",
-    "value": "1.0000",
-    "limit": "",
-    "ok": null,
-    "num": null
-   },
-   {
-    "item": "sing 音和音之間判為有聲的比例（程式會把有聲段落往前後延伸最多 0.25 秒，空隙正好 0.25 秒）",
-    "value": "0.3815",
-    "limit": "",
-    "ok": null,
-    "num": null
-   },
-   {
-    "item": "sing 音高誤差中位數",
-    "value": "9.0 cents",
-    "limit": "",
-    "ok": null,
-    "num": null
-   },
-   {
-    "item": "sing 音符數（旋律 20 個音）",
-    "value": 25,
-    "limit": "",
-    "ok": null,
-    "num": null
-   },
-   {
-    "item": "評分狀態／準確率",
-    "value": "done／0.999",
-    "limit": "",
-    "ok": null,
-    "num": null
-   },
-   {
-    "item": "評分偵測到的偏差（答案 +30 cents）",
-    "value": "12.2 cents",
-    "limit": "",
-    "ok": null,
-    "num": null
-   },
-   {
-    "item": "評分偵測到的時間差 offset（錄音晚 0.2 秒；正負號依程式定義）",
-    "value": "-0.2 秒",
-    "limit": "",
-    "ok": null,
-    "num": null
-   },
-   {
-    "item": "speech 歌詞和原句的字元錯誤率",
-    "value": "0.000（辨識 53 字／原句 53 字）",
-    "limit": "",
-    "ok": null,
-    "num": null
-   },
-   {
-    "item": "songsing01 處理時間（不是效能基準；執行緒數見執行條件）",
-    "value": "process 37.9 秒、score 2.0 秒",
-    "limit": "",
-    "ok": null,
-    "num": null
-   },
-   {
-    "item": "songspeech01 處理時間（不是效能基準；執行緒數見執行條件）",
-    "value": "process 28.1 秒",
+    "value": "process 26.7 秒",
     "limit": "",
     "ok": null,
     "num": null
@@ -1623,8 +5834,8 @@
   ]
  },
  "wall_seconds": {
-  "1": 70.7,
-  "2": 71.8,
-  "3": 72.1
+  "1": 1754.5,
+  "2": 1679.3,
+  "3": 1866.4
  }
 }
