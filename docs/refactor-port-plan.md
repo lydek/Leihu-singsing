@@ -333,7 +333,12 @@ shim 要補的地方：
   - 和平常使用不同的地方（報告逐項列出）：歌詞用語音辨識（平常預設上網搜尋）；模型資料夾沒有高品質主唱分離模型，顯示卡上 `auto` 會改用標準模型；評分的錄音是歌曲自己分出來的主唱；直播偵測、nvidia-smi 取樣、下載都關掉。
   - 結果（中位數，秒；記憶體是主程式＋子程式的 private bytes 尖峰）：匯入 2.6、分離 85.7（子程式裡人聲 49.0＋主唱 32.5）、音高 7.4、歌詞 15.3、移調 +2 7.9、評分 13.4、匯出 1.3；記憶體尖峰在分離 8420 MB，閒置 1722 MB（子程式閒置 30 秒後結束）。3 次的差距：分離 85.6～86.5、歌詞 14.0～15.5。
   - 合成歌沒有歌詞，語音辨識的時間不具代表性；啟動時間只量 import（pipeline、share 0.14 秒，app 0.19 秒），沒有量伺服器開好要多久。
-- **還沒做**：筆電的顯示卡與 CPU 數值、效能基準（複製 `tests/private/numeric/inputs` 和 `tests/private/models` 過去，`tests/numeric/baseline.py --label=laptop-3060-gpu`、`tests/perf/baseline.py --label=laptop-3060-gpu`；顯示卡路徑兩次不一定逐位元組相同，看兩次差距表決定門檻）、真實歌曲的效能基準（放進 `tests/private/songs/` 後重跑）、相似度基準（真實歌曲）、歌曲清單。`test_contract_snapshot` 需要 `conftest` 和 S28，目前不能用 pytest 跑。
+- **相似度基準（CPU，開發機）已錄**：`tests/numeric/similarity.py v2.3.2 --label=desktop-9900x3d-cpu`，測試工具 `5465c83`，平常條件（`run.py --normal`：執行緒數照平常、torchcrepe 抖動開著、標準模型）跑 3 次、兩兩比較，異常「無」。摘要在 `tests/numeric/baselines/v2.3.2-desktop-9900x3d-cpu-similarity.json`，報告在 `tests/private/upstream/v2.3.2/similarity/desktop-9900x3d-cpu/`。
+  - 每次都相同：分離三軌（SDR inf）、有聲判斷、合成旋律的音符、歌詞。
+  - 平常就會變（第二階段門檻不能比這個嚴）：音高差中位數 8 cents（抖動造成）；語音那首音符數差 3～4 個（3 組有 2 組超過數值基準的 max(1, 2%)）；評分準確率差最多 0.2 分；評分的 `key_hint` 裡 `share` 差 0.01～0.02（`shift`、`suggest`、`octave` 相同，但整個 dict 比較所以 3 組都算不同）。
+  - 匯出檔：這次 3 次的評分 offset 都是 -0.2 秒，匯出檔逐位元組相同；前一次試錄有一次是 -0.19 秒，匯出檔 SDR 只剩 -2 dB 但 RMS 只差 0.002 dB。所以匯出檔用 SDR 比會被 0.01 秒的對齊差異放大，第二階段要改比響度或先對齊。
+  - 真實歌曲：`tests/private/songs/fetch.py`（只在本機，不進 git）把 `urls.txt` 的 YouTube 歌下載成 `<影片 id>.flac`，`index.json` 記 id 和歌名的對照；放進去之後 `similarity.py`、`tests/perf/baseline.py` 會一起跑，摘要只記 sha256、長度。
+- **還沒做**：筆電的顯示卡與 CPU 數值、效能基準（複製 `tests/private/numeric/inputs` 和 `tests/private/models` 過去，`tests/numeric/baseline.py --label=laptop-3060-gpu`、`tests/perf/baseline.py --label=laptop-3060-gpu`；顯示卡路徑兩次不一定逐位元組相同，看兩次差距表決定門檻）、真實歌曲的效能與相似度基準（`fetch.py` 下載後重跑）、筆電上的相似度基準（`--quality=auto` 會用 BS-Roformer）。`test_contract_snapshot` 需要 `conftest` 和 S28，目前不能用 pytest 跑。
 
 ## 4. 要先決定的事
 - 舊分支要留著（唯讀）還是封存成 tag，`claude/original-refactor-behavior-comparison-d469de` 也一樣。在搬完之前不要刪。
