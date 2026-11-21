@@ -221,7 +221,7 @@ def mixdown(sid):
     kname = f"KEY{key:+d}" if key else "原調"
     sname = f"_{int(round(speed * 100))}%" if abs(speed - 1) > 1e-3 else ""
     vname = "伴奏" if gains["lead"] == 0 else "混音"
-    out = P.downloads_dir() / P.APP_NAME / f"{_safe_name(meta.get('title', '歌曲'))[:50]}_{vname}_{kname}{sname}.{fmt}"
+    out = P.unique_path(P.downloads_dir() / P.APP_NAME / f"{_safe_name(meta.get('title', '歌曲'))[:50]}_{vname}_{kname}{sname}.{fmt}")
 
     def run(report):
         report("混音中", 0.2)
@@ -325,7 +325,7 @@ def export_sheet(sid):
     meta = P.read_meta(d)
     body.setdefault("title", meta.get("title", ""))
     layout = "A4" if body.get("layout") == "a4" else "手機"
-    folder = P.downloads_dir() / P.APP_NAME / f"{SS.safe_name(meta.get('title', '旋律譜'))} 旋律譜（{layout}）"
+    folder = P.unique_path(P.downloads_dir() / P.APP_NAME / f"{SS.safe_name(meta.get('title', '旋律譜'))} 旋律譜（{layout}）")
     files, tonic = SS.render(d, body, folder)
     return jsonify(files=[str(f) for f in files], folder=str(folder), tonic=tonic)
 
