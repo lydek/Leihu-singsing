@@ -10,5 +10,8 @@ cp ../static/help.html payload/使用說明.html
 cp ../setup/install.ps1 payload/setup/
 cp license.txt payload/版權與使用聲明.txt
 # -INPUTCHARSET UTF8：leihu.nsi 是不含 BOM 的 UTF-8；Windows 版 makensis 不指定時用系統的 ANSI 編碼讀（Bad text encoding）
-LANG=C.UTF-8 LC_ALL=C.UTF-8 makensis -V2 -INPUTCHARSET UTF8 leihu.nsi
+# LEIHU_TEST=1：建測試版（名稱、安裝位置、登錄檔和正式版分開，見 leihu.nsi 的 TEST_BUILD）
+DEFS=""
+if [ "${LEIHU_TEST:-}" = "1" ]; then DEFS="-DTEST_BUILD"; fi
+LANG=C.UTF-8 LC_ALL=C.UTF-8 makensis -V2 -INPUTCHARSET UTF8 $DEFS leihu.nsi
 ls -la out

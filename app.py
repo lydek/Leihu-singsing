@@ -2079,9 +2079,10 @@ def _ver(s: str) -> tuple:
 
 
 def _installed_copy() -> bool:
-    """是用安裝檔裝的（有內建的 Python 和解除安裝程式）。開發用的原始碼資料夾不做自動更新。"""
+    """是用安裝檔裝的（有內建的 Python 和解除安裝程式）。開發用的原始碼資料夾不做自動更新。
+    測試版（.test-install）也不做：更新會裝上正式版的安裝檔，寫正式版的登錄檔與捷徑。"""
     return sys.platform == "win32" and (P.ROOT / "python" / "pythonw.exe").exists() \
-        and (P.ROOT / "uninstall.exe").exists()
+        and (P.ROOT / "uninstall.exe").exists() and not (P.ROOT / ".test-install").exists()
 
 
 def check_update() -> None:
