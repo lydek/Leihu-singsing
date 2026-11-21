@@ -144,18 +144,21 @@ def leak_check(ref: str, since: str | None) -> list[str]:
 
 
 def export(ref: str) -> tuple[str, Path]:
-    """每次都從 git 重新匯出（不沿用舊的資料夾：解壓中斷、被改過、tag 改指別的 commit 都會測到錯的程式）。
-    先解壓到暫存資料夾再換上去；完整 commit 寫在 <code>/.leihu-commit，報告用 commit_of() 讀。"""
+    """每次都從 git 重新匯出到這個行程自己的資料夾 OUT/<名稱>/exports/<pid>-<時間>（不沿用、不共用：
+    解壓中斷、被改過、tag 改指別的 commit、同時跑的另一個工具刪掉，都不會測到錯的程式），行程結束時刪掉。
+    完整 commit 寫在 <code>/.leihu-commit，報告用 commit_of() 讀。"""
     full = subprocess.run(["git", "rev-parse", f"{ref}^{{commit}}"], cwd=ROOT, capture_output=True, text=True,
                           check=True).stdout.strip()
     tag = subprocess.run(
         ["git", "describe", "--tags", "--exact-match", full], cwd=ROOT, capture_output=True, text=True
     ).stdout.strip()
     name = tag or full[:7]
-    code = OUT / name / "code"
-    fresh = OUT / name / "code.new"
-    shutil.rmtree(fresh, ignore_errors=True)
+    import atexit
+    import time
+
+    fresh = OUT / name / "exports" / f"{os.getpid()}-{time.time_ns()}"
     fresh.mkdir(parents=True)
+    atexit.register(shutil.rmtree, fresh, True)  # 匯出的程式碼裡沒有 junction，可以直接刪
     blob = subprocess.run(["git", "archive", "--format=tar", full], cwd=ROOT, capture_output=True, check=True).stdout
     with tempfile.TemporaryFile() as f:
         f.write(blob)
@@ -163,9 +166,7 @@ def export(ref: str) -> tuple[str, Path]:
         with tarfile.open(fileobj=f) as t:
             t.extractall(fresh, filter="data")
     (fresh / ".leihu-commit").write_text(full, "utf-8")
-    shutil.rmtree(code, ignore_errors=True)
-    fresh.rename(code)
-    return name, code
+    return name, fresh
 
 
 def commit_of(code: Path) -> str:

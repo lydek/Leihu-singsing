@@ -170,17 +170,19 @@ def run_one(code: Path, song: Path, out: Path, quality: str, timeout: float) -> 
         th = threading.Thread(target=gpu_loop, daemon=True)
         th.start()
         t0 = time.time()
+        kill_note = ""
+        timed_out = False
         while p.poll() is None:
             if time.time() - t0 > timeout:
-                kill_tree(p.pid)
-                p.wait()
+                timed_out = True
+                kill_note = kill_tree(p)
                 break
             mems.append(sample(p.pid))
             time.sleep(0.25)
-        timed_out = time.time() - t0 > timeout
         stop.set()
         th.join(timeout=5)
-    return (None if timed_out else p.returncode), mems, gpus, log.read_text("utf-8", errors="replace")
+    text = log.read_text("utf-8", errors="replace") + (f"\n[perf] 結束行程樹：{kill_note}\n" if kill_note else "")
+    return (None if timed_out else p.returncode), mems, gpus, text
 
 
 def per_phase(phases: list[dict], mems: list[dict], gpus: list[dict]) -> dict:
