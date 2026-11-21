@@ -420,7 +420,8 @@ Codex 第 7 次審查後補的（同類問題和繞過路徑）：
 - O12：已經存在的模型設定 JSON、小於 1 MB 的設定檔（yaml）也核對 SHA-256，不符就刪掉重抓；自己下載失敗時停止這次分離，不再交給 audio-separator 從 main 下載。本機現有的檔案都核對過和釘住的值相同。
 - O13：清單沒有檢查碼時停止安裝 PyTorch，不改走 pip（pip 用同一份清單，也沒辦法核對）；其他原因的直接下載失敗仍改走 pip，pip 會核對清單裡的檢查碼。
 - O14：`Get-FileHash` 改用 `-LiteralPath`（暫存路徑含 `[`、`]` 時不會被當成萬用字元）。下載後直接執行的 `get-pip.py`（上游既有）改抓 pypa/get-pip 固定 commit `c7135ee`（pip 26.3）並核對 SHA-256，和當天 `bootstrap.pypa.io` 的檔案相同；新安裝拿到的 pip 版本因此固定。
-- 還沒做：測試工具的問題（`check_snapshot.py` 遇到 `LIANTAI_SNAPSHOT_UPDATE` 會覆寫快照、`run_contract` 沒有固定 `LEIHU_NET_LOG`、`check_snapshot.py` 少了路由涵蓋檢查）和這幾項的回歸測試，等真實歌曲基準跑完再改 `tests/`。
+- 測試工具：`check_snapshot.py` 設了 `LIANTAI_SNAPSHOT_UPDATE`／`REBASE` 就拒絕執行（原本會直接覆寫快照），並補上路由涵蓋檢查（和 `test_contract_snapshot` 共用 `uncovered_routes`）；`run_contract` 不帶入 `LEIHU_NET_LOG`，擋下的連線一定寫在沙盒裡。
+- 測試：`tests/test_security.py` 補上這幾項的回歸測試，installer 改從暫存副本載入（不再寫到 repo 的 `logs/`）；`test_without_env_still_opens_programs` 改成看有沒有新的 `Jobs._run` 執行緒（CPU 很忙時其他執行緒的增減會讓計數不準）。`uv run pytest` 30 個通過；`check_snapshot.py` 141 個案例兩次相同、92 條路由都有案例。
 
 其他項目不是安全或資料遺失，依 3.1 延後：M3（installer 的 probe 把路徑嵌進程式碼字串）、M6（旋律譜切點無限迴圈）、M7（錄音刪除後才寫回的 JSON）、S8（yt-dlp 取消與逾時）、O21（installer 整體逾時）、S19（三份 `safe_name`）。
 

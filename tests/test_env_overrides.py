@@ -62,11 +62,13 @@ def test_without_env_still_opens_programs():
         import app, pipeline as P
         url = app.EXTERNAL_URLS[0]
         app.app.test_client().post("/api/open-url", json={"url": url})
-        n = threading.active_count()
+        before = set(threading.enumerate())
         P.Jobs()
-        print(json.dumps([calls == [url], threading.active_count() - n, (P.DATA / "spawn.log").exists()]))
+        new = [t.name for t in set(threading.enumerate()) - before]
+        print(json.dumps([calls == [url], any(n.endswith("(_run)") for n in new), (P.DATA / "spawn.log").exists()]))
     """)
-    assert _py(code) == [True, 1, False]
+    # 只看有沒有新的 Jobs._run 執行緒：import app 開的其他執行緒可能剛好在這時增減（CPU 很忙時）
+    assert _py(code) == [True, True, False]
 
 
 def test_relative_and_missing_data_dir(tmp_path):
