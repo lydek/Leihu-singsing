@@ -1,0 +1,114 @@
+name: installer
+
+# 建安裝檔（docs/refactor-port-plan.md 3.16）：
+# - refactor 有新 commit、PR 改到會打包的檔案、或手動觸發：建正式版和測試版，存成 artifact
+# - 在 refactor 上打 v<版號> tag：另外建 draft release，附正式版安裝檔與 SHA-256（發佈由人確認）
+on:
+  push:
+    branches: [refactor]
+    tags: ["v*"]
+    paths-ignore:   # tag 不看路徑篩選；分支只改文件時不建
+      - "docs/**"
+      - "README.md"
+  pull_request:
+    branches: [refactor]
+    paths:
+      - "installer/**"
+      - "setup/**"
+      - "static/**"
+      - "*.py"
+      - "VERSION"
+      - "requirements-win.txt"
+      - ".gitattributes"
+      - ".github/workflows/installer.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    strategy:
+      matrix:
+        variant: [release, test]
+    steps:
+      # action 釘 commit SHA（tag 可以被改）；版本在註解。都是 Node.js 24 的版本
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
+        with:
+          persist-credentials: false
+      - name: NSIS
+        shell: pwsh
+        run: |
+          $nsis = "${env:ProgramFiles(x86)}\NSIS"
+          if (-not (Test-Path "$nsis\makensis.exe")) { choco install nsis -y --no-progress }
+          if (-not (Test-Path "$nsis\makensis.exe")) { throw "找不到 makensis.exe" }
+          Add-Content $env:GITHUB_PATH $nsis
+          & "$nsis\makensis.exe" -VERSION
+      - name: 建安裝檔
+        shell: bash
+        env:
+          LEIHU_TEST: ${{ matrix.variant == 'test' && '1' || '' }}
+        run: sh installer/build.sh
+      - name: 改名並算 SHA-256
+        shell: bash
+        run: |
+          set -eu
+          ver=$(tr -d '\r\n' < VERSION)
+          mkdir dist
+          if [ "${{ matrix.variant }}" = release ]; then
+            src="installer/out/雷虎練唱台${ver}.exe"
+            # 程式內更新只接受 -Setup.exe 結尾的安裝檔（app.check_update）
+            dst="dist/LeihuLiantai-${ver}-Setup.exe"
+          else
+            src="installer/out/雷虎練唱台測試版${ver}.exe"
+            # 測試版不要用 -Setup.exe 結尾：萬一被放進 release，程式內更新也不會選到它
+            dst="dist/LeihuLiantai-Test-${ver}.exe"
+          fi
+          cp "$src" "$dst"
+          (cd dist && sha256sum "$(basename "$dst")" > "$(basename "$dst").sha256")
+          ls -la dist
+          cat dist/*.sha256
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9   # v7.0.2
+        with:
+          name: installer-${{ matrix.variant }}
+          path: dist/
+          if-no-files-found: error
+          retention-days: 30
+
+  release:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write   # 只有這個 job 能建 release
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
+        with:
+          fetch-depth: 0   # 要檢查 tag 在不在 refactor 上
+          persist-credentials: false
+      - name: 檢查 tag
+        run: |
+          set -eu
+          ver=$(tr -d '\r\n' < VERSION)
+          if [ "$GITHUB_REF_NAME" != "v$ver" ]; then
+            echo "tag $GITHUB_REF_NAME 和 VERSION（$ver）不符" >&2; exit 1
+          fi
+          git fetch --no-tags origin refactor
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" FETCH_HEAD; then
+            echo "tag $GITHUB_REF_NAME 指到的 commit 不在 refactor 上，不發 release" >&2; exit 1
+          fi
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333   # v8.0.2
+        with:
+          name: installer-release
+          path: dist
+      - name: 建 draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -eu
+          gh release create "$GITHUB_REF_NAME" dist/* --repo "$GITHUB_REPOSITORY" --draft \
+            --title "雷虎練唱台 ${GITHUB_REF_NAME#v}" --verify-tag \
+            --notes "fork 版本，原作：雷虎練唱台／雷虎肯茲 Leihustore（https://github.com/LeihuTW/Leihu-singsing）。安裝檔的 SHA-256 見 .sha256 檔。"

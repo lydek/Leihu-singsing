@@ -1,0 +1,2 @@
+# sh 腳本一律用 LF：Windows 上 core.autocrlf 會轉成 CRLF，sh 執行時 set -e 等指令會因為 \r 失敗
+*.sh text eol=lf
