@@ -5,13 +5,22 @@ ManifestDPIAware true
 !include "x64.nsh"
 !include "LogicLib.nsh"
 
-!define APPNAME "雷虎練唱台"
 !define VERSION "2.3.2"
-!define REGKEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\LeihuLiantai"
+!ifdef TEST_BUILD
+  ; 測試版（LEIHU_TEST=1 sh installer/build.sh）：名稱、安裝位置、登錄檔都和正式版不同，兩個可以裝在同一台電腦
+  !define APPNAME "雷虎練唱台 測試版"
+  !define INSTNAME "LeihuLiantaiTest"
+  !define OUTNAME "雷虎練唱台測試版${VERSION}.exe"
+!else
+  !define APPNAME "雷虎練唱台"
+  !define INSTNAME "LeihuLiantai"
+  !define OUTNAME "雷虎練唱台${VERSION}.exe"
+!endif
+!define REGKEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\${INSTNAME}"
 
 Name "${APPNAME} ${VERSION}"
-OutFile "out\雷虎練唱台2.3.2.exe"
-InstallDir "$LOCALAPPDATA\LeihuLiantai"
+OutFile "out\${OUTNAME}"
+InstallDir "$LOCALAPPDATA\${INSTNAME}"
 InstallDirRegKey HKCU "${REGKEY}" "InstallLocation"
 RequestExecutionLevel user
 SetCompressor /SOLID lzma
@@ -135,6 +144,12 @@ Section "Install"
   WriteRegDWORD HKCU "${REGKEY}" "NoModify" 1
   WriteRegDWORD HKCU "${REGKEY}" "NoRepair" 1
   WriteRegDWORD HKCU "${REGKEY}" "EstimatedSize" 7000000
+!ifdef TEST_BUILD
+  ; 測試版標記：程式看到它就不做程式內更新（更新會裝上正式版的安裝檔，寫正式版的登錄檔與捷徑）
+  FileOpen $0 "$INSTDIR\.test-install" w
+  FileWrite $0 "${APPNAME} ${VERSION}"
+  FileClose $0
+!endif
 
   ; 安靜模式不會顯示完成頁，裝好直接重新開啟程式
   ${If} ${Silent}
@@ -164,6 +179,7 @@ Section "Uninstall"
     Delete "$INSTDIR\*.html"
     Delete "$INSTDIR\VERSION"
     Delete "$INSTDIR\installed.json"
+    Delete "$INSTDIR\.test-install"
     Delete "$INSTDIR\uninstall.exe"
     Goto done
   all:

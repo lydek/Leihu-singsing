@@ -426,6 +426,14 @@ Codex 第 7 次審查後補的（同類問題和繞過路徑）：
 
 其他項目不是安全或資料遺失，依 3.1 延後：M3（installer 的 probe 把路徑嵌進程式碼字串）、M6（旋律譜切點無限迴圈）、M7（錄音刪除後才寫回的 JSON）、S8（yt-dlp 取消與逾時）、O21（installer 整體逾時）、S19（三份 `safe_name`）。
 
+### 3.14 測試版安裝檔（2026-11-21）
+- 為了和上游的正式版裝在同一台電腦測試，`installer/build.sh` 加開關：`LEIHU_TEST=1 sh installer/build.sh` 用 `makensis -DTEST_BUILD` 建測試版。不加開關時，安裝檔的名稱、安裝位置、登錄檔和原本完全相同。
+- 測試版：名稱「雷虎練唱台 測試版」（桌面捷徑、開始功能表資料夾、應用程式清單都用這個名稱）、安裝位置 `%LOCALAPPDATA%\LeihuLiantaiTest`、登錄檔 `HKCU\Software\Microsoft\Windows\CurrentVersion\Uninstall\LeihuLiantaiTest`、輸出檔 `雷虎練唱台測試版2.3.2.exe`。
+- 測試版安裝時寫 `.test-install`，程式看到它就不做程式內更新：更新會下載上游正式版的安裝檔裝進測試資料夾，寫正式版的登錄檔與捷徑。解除安裝（保留歌曲庫）時一併刪掉。
+- 程式本身原本就以安裝資料夾區分：關閉程式只停自己資料夾的 python、共用伺服器前比對 `root`、8765 被占用時改用別的埠；兩個版本的全域快捷鍵會搶同一組按鍵（後開的略過被占用的組合）。
+- 測試：`tests/test_installer_identity.py` 讀 `leihu.nsi` 的定義確認預設值不變、測試版每一項都不同，以及 `.test-install` 關掉程式內更新。
+- 沒驗證：這台電腦沒有 makensis，兩種安裝檔都沒有實際建出來、安裝過。
+
 ## 4. 要先決定的事
 - 舊分支要留著（唯讀）還是封存成 tag，`claude/original-refactor-behavior-comparison-d469de` 也一樣。在搬完之前不要刪。
 - 測試歌曲的清單和授權（3.8）。
