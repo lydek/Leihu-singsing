@@ -272,8 +272,11 @@ class Sandbox:
                 self.junctions.append(self.root / "models" / sub)
         self.models_before = self.model_files()
         self.models_sha = self.model_hashes()  # 模型的指紋：寫進 run.json，兩台電腦、前後兩次可以核對
-        # LIANTAI_DATA 只給 netblock 寫擋下的連線（tmp/net_blocked.log）；上游不認這個變數。子程式會繼承這些設定
-        os.environ.update(LIANTAI_DATA=str(self.tmp), HF_HUB_OFFLINE="1")
+        # netblock 把擋下的連線寫到 tmp/net_blocked.log。不設 LIANTAI_*：上游不認，但有 S28 的版本會把歌曲庫、設定搬過去，
+        # 和上游的 ROOT/library 不同。子程式會繼承這些設定
+        for k in [k for k in os.environ if k.startswith("LIANTAI_")]:  # 殼層留下的 S28 開關也不能影響有 S28 的版本
+            os.environ.pop(k)
+        os.environ.update(LEIHU_NET_LOG=str(self.tmp / "net_blocked.log"), HF_HUB_OFFLINE="1")
         print(f"{tag} 沙盒 {self.root}", flush=True)  # 報告檢查子程式載入的程式都在這個資料夾裡
         self.cond("顯示卡子程式裡裝了 child_hook（記錄實際裝置）：ONNX session 的 run() 多包一層、每次呼叫後讀一次"
                   " get_providers()，在計時範圍內；參數與回傳值不變")
