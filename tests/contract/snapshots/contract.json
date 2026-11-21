@@ -1327,19 +1327,12 @@
  },
  "open_url": {
   "body": {
-   "ok": true
+   "error": "不允許開啟這個網址"
   },
   "content_type": "application/json",
-  "files": {
-   "DATA/~spawn.log": [
-    {
-     "kind": "browser",
-     "target": "https://github.com/LeihuTW/Leihu-singsing"
-    }
-   ]
-  },
+  "files": {},
   "headers": {},
-  "status": 200
+  "status": 400
  },
  "open_url_denied": {
   "body": {
