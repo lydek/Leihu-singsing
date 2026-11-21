@@ -274,7 +274,7 @@ shim 要補的地方：
 
 | 基準 | 內容 | 比對方式 | 用在哪個階段 |
 |---|---|---|---|
-| 功能基準 | 契約快照（3.7）；數值參考輸出：分離三軌、`pitch.json`、評分 JSON、歌詞、`export.wav` | 契約快照：只允許已登記的差異。數值：CPU 路徑、固定執行緒數、關掉 dither，逐位元組相同 | 第一階段 |
+| 功能基準 | 契約快照（3.7）；數值參考輸出：分離三軌、`pitch.json`、評分 JSON、歌詞、`export.wav` | 契約快照：只允許已登記的差異。數值：CPU 路徑、固定執行緒數、關掉 dither，逐位元組相同（`tests/numeric/baseline.py`）；另外記錄和合成素材標準答案的差距 | 第一階段 |
 | 效能基準 | 每個步驟（分離、音高、歌詞辨識、移調）的時間；伺服器和 worker 的尖峰記憶體、閒置記憶體；顯示卡記憶體尖峰；啟動時間 | 同一台電腦、同一組歌曲、同一版套件，每項跑多次取中位數，記下變異 | 第一階段當回歸檢查（不能明顯變慢）；第二階段當改善的依據 |
 | 相似度基準 | 輸出之間的距離：分軌訊號相似度、音高音分差、有聲／無聲一致率、歌詞字錯誤率、評分差 | 先量上游**自己跑多次**的差異當下限，第二階段的門檻不能比這個嚴 | 第二階段 |
 
@@ -307,7 +307,7 @@ shim 要補的地方：
 
 | 層 | 來源 | 放哪裡 | 用在 |
 |---|---|---|---|
-| 1 合成 | 舊分支 `tests/numeric/make_inputs.py` 用程式產生：已知旋律的合成人聲加和弦伴奏、偏高 30 音分且晚 0.2 秒的錄音、Windows 語音合成唸的中文句子 | git 只放產生程式，產生的檔案放 `tests/private/` | 功能基準的數值比對（逐位元組）；音高有標準答案 |
+| 1 合成 | `tests/numeric/make_inputs.py`（從舊分支搬來） 用程式產生：已知旋律的合成人聲加和弦伴奏、偏高 30 音分且晚 0.2 秒的錄音、Windows 語音合成唸的中文句子 | git 只放產生程式，產生的檔案放 `tests/private/` | 功能基準的數值比對（逐位元組）；音高有標準答案 |
 | 2 真實歌曲 | 自己擁有的音檔：自己錄的歌、自己買的音樂轉檔 | 只放 `tests/private/songs/`，**不進 git** | 效能基準、相似度基準（真實長度、合音、對唱） |
 | 3 開放授權（可選） | 允許再散布的有人聲歌曲（CC0、CC BY；CC BY-NC 只限非商業） | 不放音檔，git 放下載網址、授權、sha256 | 讓別人也能重現第 2 層的結果 |
 
@@ -315,13 +315,20 @@ shim 要補的地方：
 - 每次錄基準都核對 sha256，兩台電腦必須用同一批檔案；不同就寫進紀錄。
 - 從 YouTube 下載的歌只能自己留著測試，不能放進 repo 或分享。
 
-### 3.9 D 組進度（`test/upstream-baseline`，未 commit）
-- **契約基準已錄**：`compare_upstream.py v2.3.2 --record --twice`，141 個案例兩次完全相同，92 條路由都有案例，異常「無」。快照在 `tests/contract/snapshots/contract.json`，報告在 `tests/private/upstream/v2.3.2/contract-report.md`。
+### 3.9 D 組進度（`test/upstream-baseline`）
+- **契約基準已錄**（`72aee1d`）：`compare_upstream.py v2.3.2 --record --twice`，141 個案例兩次完全相同，92 條路由都有案例，異常「無」。快照在 `tests/contract/snapshots/contract.json`，報告在 `tests/private/upstream/v2.3.2/contract-report.md`。
 - **安全網驗證**：把原版的 `/api/categories` 故意改成多回一個分類，用 `--code=` 比對，抓到 1 個未預期差異，exit 1。
 - 契約快照固定「沒有可用的顯示卡」，所以只代表 CPU 這一側的 API 行為；顯示卡的差異由數值和效能基準處理。
-- 工具的改動：`RULES`、`NOT_PORTED`、`OWN_CHANGES` 清空；`--record`（先比對、全部登記才寫入）、`--twice`；報告一定有「異常」「案例本身造成的訊息」「沙盒替換」三節；沙盒補關 `lead_fix_sweep`、`clear_false_recheck`、`_sample_gpu_load`，固定顯示卡探測結果，找不到的替換目標會列為異常；寫出路由清單檢查涵蓋率；`spawn.log` 只記每個請求新增的行；`run_contract` 排除 `ANTHROPIC_API_KEY`。`serve.py` 要 S28 才能用，先不搬。
+- 工具的改動：`RULES`、`NOT_PORTED`、`OWN_CHANGES` 清空；`--record`（先比對、全部登記才寫入）、`--twice`；報告一定有「異常」「案例本身造成的訊息」「沙盒替換」三節；沙盒補關 `lead_fix_sweep`、`clear_false_recheck`、`_sample_gpu_load`，固定顯示卡探測結果，找不到的替換目標會列為異常；寫出路由清單檢查涵蓋率；`spawn.log` 只記每個請求新增的行；`run_contract` 排除 `ANTHROPIC_API_KEY`。`serve.py` 要 S28 才能用，先不搬。舊的 `--numeric`（依賴 2.0.0 重構版的 ml-worker 和 `tests/test_numeric.py`）拿掉，改用 `tests/numeric/baseline.py`。
 - 用安裝版的內嵌 Python（`%LOCALAPPDATA%\LeihuLiantai\python\python.exe`，`PYTHONUTF8=1`）執行；它的 `._pth` 不會自動加入腳本所在資料夾，`serve_upstream.py` 已自己加。
-- **還沒做**：數值基準（要先把 `tests/numeric/` 改成配合 `gpu_worker`）、效能基準、相似度基準、歌曲清單。`test_contract_snapshot` 需要 `conftest` 和 S28，目前不能用 pytest 跑。
+- **數值基準（CPU，開發機）已錄**：`tests/numeric/baseline.py v2.3.2 --label=desktop-9900x3d-cpu`，測試工具 `790ec0a`。合成素材跑兩次，比對的 23 項全部逐位元組相同（SDR 為 inf、差距 0），異常「無」。摘要在 `tests/numeric/baselines/v2.3.2-desktop-9900x3d-cpu.json`，報告和輸出在 `tests/private/upstream/v2.3.2/numeric/desktop-9900x3d-cpu/`。
+  - 工具：`make_inputs.py`（合成素材；沒有 zh-TW 語音就失敗；寫 `manifest.json` 的 sha256）、`run.py`（處理一次）、`compare.py`（兩次輸出的差距，門檻沿用舊分支；和標準答案的差距）、`baseline.py`（匯出版本、跑 N 次、寫報告與摘要）。
+  - 配合 `gpu_worker` 的做法：程式碼複製到暫存資料夾當 ROOT，`ROOT/models/uvr`、`whisper` 用 junction 指到 `tests/private/models`；子程式的啟動命令前面插入 `sys.path`（**內嵌 Python 的 `._pth` 含 `..`，不插的話子程式會 import 已安裝的 2.1.0**）、netblock、關掉 dither，並印出載入的 `gpu_worker` 路徑，報告檢查它在暫存資料夾裡。
+  - 和標準答案比（CPU，第 1、2 次相同）：lead SDR 11.5 dB、inst 8.1 dB、合音軌（應該是空的）-32.8 dBFS；音高誤差中位數 6.0 cents（torchcrepe tiny）、音符 25 個（旋律 20 個音）；評分偵測到偏差 +21.1 cents（答案 +30）、offset -0.21 秒（錄音晚 0.2 秒）；語音歌詞字元錯誤率 0.000。
+  - Whisper 在 CPU 上把 float16 模型自動轉成 float32（ctranslate2 的 warning），列在報告「實際使用的裝置與模型」。
+  - 比對工具自我檢查：把一份輸出的音高調高 20 cents、改一個歌詞字，兩項都超過門檻，exit 1。
+  - 這裡的處理時間是單執行緒（為了可重現），不是效能基準。
+- **還沒做**：筆電的顯示卡與 CPU 數值基準（複製 `tests/private/numeric/inputs` 和 `tests/private/models` 過去，`baseline.py --label=laptop-3060-gpu`；顯示卡路徑兩次不一定逐位元組相同，看兩次差距表決定門檻）、效能基準（正常執行緒數、真實歌曲、多次取中位數、記憶體）、相似度基準（真實歌曲）、歌曲清單。`test_contract_snapshot` 需要 `conftest` 和 S28，目前不能用 pytest 跑。
 
 ## 4. 要先決定的事
 - 舊分支要留著（唯讀）還是封存成 tag，`claude/original-refactor-behavior-comparison-d469de` 也一樣。在搬完之前不要刪。
