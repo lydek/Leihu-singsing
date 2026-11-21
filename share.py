@@ -640,6 +640,12 @@ def safe_name(s: str) -> str:
     return (s[:60] or "我的演唱").rstrip(". ")
 
 
+def out_path(base: Path, suffix: str) -> Path:
+    """匯出檔的路徑。不能用 with_suffix：歌名有「.」時（例如 S.H.E）會把後面整段當副檔名換掉，
+    不同錄音、不同歌會匯出成同一個檔名、互相覆寫（M4）。"""
+    return base.with_name(base.name + suffix)
+
+
 def export_take(d: Path, tid: str, opts: dict, out_base: Path, report) -> list[str]:
     """依 opts["formats"]（mp3／wav／mp4）匯出，回傳檔案路徑。"""
     set_font_family(P.load_config().get("font"))
@@ -650,7 +656,7 @@ def export_take(d: Path, tid: str, opts: dict, out_base: Path, report) -> list[s
     paths = []
     if "png" in fmts:
         report("製作成績卡", 0.03)
-        paths.append(str(export_scorecard(d, info, title, out_base.with_name(out_base.name + "_成績卡.png"))))
+        paths.append(str(export_scorecard(d, info, title, out_path(out_base, "_成績卡.png"))))
         if fmts == ["png"]:
             report("完成", 1.0)
             return paths
@@ -658,13 +664,13 @@ def export_take(d: Path, tid: str, opts: dict, out_base: Path, report) -> list[s
     y, sr, timing = mix_take(d, tid, opts)
     for f in ("wav", "mp3"):
         if f in fmts:
-            paths.append(str(export_audio(y, sr, out_base.with_suffix("." + f))))
+            paths.append(str(export_audio(y, sr, out_path(out_base, "." + f))))
     if "mp4" in fmts:
         report("準備影片", 0.15)
-        tmp = out_base.with_suffix(".mix.wav")
+        tmp = out_path(out_base, ".mix.wav")
         P.write_wav(tmp, y, sr)
         try:
-            paths.append(str(export_video(d, info, timing, title, tmp, out_base.with_suffix(".mp4"), report)))
+            paths.append(str(export_video(d, info, timing, title, tmp, out_path(out_base, ".mp4"), report)))
         finally:
             tmp.unlink(missing_ok=True)
     report("完成", 1.0)

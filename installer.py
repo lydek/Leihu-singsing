@@ -344,7 +344,9 @@ def _wheel_links(tag: str) -> list[tuple[str, str, str]]:
         m = re.search(r'href="([^"]*' + re.escape(fname) + r')(?:#sha256=([0-9a-f]{64}))?"', html)
         if not m:
             raise RuntimeError(f"清單裡找不到 {fname}")
-        out.append((urllib.parse.urljoin(index, m.group(1)), urllib.parse.unquote(fname), m.group(2) or ""))
+        if not m.group(2):   # 沒有檢查碼就不直接下載（下載完沒辦法核對），由呼叫端改走 pip（O13）
+            raise RuntimeError(f"清單裡的 {fname} 沒有檢查碼")
+        out.append((urllib.parse.urljoin(index, m.group(1)), urllib.parse.unquote(fname), m.group(2)))
     return out
 
 

@@ -43,10 +43,15 @@ def price_for(model: str, input_tokens: int):
 
 
 def _load() -> dict:
+    """檔案不存在回空紀錄；內容壞掉丟 ValueError；讀檔失敗（OSError）照常往上丟。
+    不能把所有例外都當成空紀錄：record 會接著用一筆資料覆寫，最多 2000 筆紀錄就沒了（M5）。"""
     try:
-        return json.loads(USAGE_PATH.read_text("utf-8"))
-    except Exception:
+        data = json.loads(USAGE_PATH.read_text("utf-8"))   # JSONDecodeError、UnicodeDecodeError 都是 ValueError
+    except FileNotFoundError:
         return {"calls": []}
+    if not isinstance(data, dict) or not isinstance(data.get("calls"), list):
+        raise ValueError('usage.json 的內容不是 {"calls": [...]}')
+    return data
 
 
 def record(model: str, usage, purpose: str, song: str) -> dict:
@@ -57,7 +62,18 @@ def record(model: str, usage, purpose: str, song: str) -> dict:
     entry = {"time": time.time(), "model": model, "purpose": purpose, "song": song,
              "input_tokens": tin, "output_tokens": tout, "cost_usd": cost}
     with _lock:
-        data = _load()
+        try:
+            data = _load()
+        except ValueError as e:
+            # M5：壞掉的舊檔改名保留，不覆寫
+            from datetime import datetime
+            USAGE_PATH.replace(USAGE_PATH.with_name(f"usage.json.{datetime.now():%Y%m%d-%H%M%S-%f}.bad"))
+            P.log_error("usage.json 內容壞掉，已改名保留", e)
+            data = {"calls": []}
+        except OSError as e:
+            # 讀不到（例如檔案正被其他程式鎖住）：這次不記，也不覆寫；Claude 已經回覆、已經計費，回覆照常交給使用者
+            P.log_error("usage.json 讀取失敗，這次的用量沒有記錄", e)
+            return entry
         data["calls"].append(entry)
         data["calls"] = data["calls"][-2000:]
         tmp = USAGE_PATH.with_name(USAGE_PATH.name + ".tmp")   # 已經在 _lock 裡，同一時間只有一個人寫
@@ -78,7 +94,10 @@ def _sum(calls) -> dict:
 
 def summary() -> dict:
     cfg = P.load_config()
-    calls = _load()["calls"]
+    try:
+        calls = _load()["calls"]
+    except (ValueError, OSError):
+        calls = []   # 唯讀：/api/status 每秒呼叫，壞檔或讀不到時和原本一樣當成沒有紀錄，不改名
     out = {
         "last": calls[-1] if calls else None,
         "session": _sum([c for c in calls if c["time"] >= SESSION_START]),

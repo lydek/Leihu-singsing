@@ -1059,8 +1059,8 @@ def take_export(sid, tid):
     SH.load_take(d, tid)
     title = P.read_meta(d).get("title", "我的演唱")
     base = P.downloads_dir() / P.APP_NAME / f"{_safe_name(title)[:50]}_我的演唱_{tid[:13]}"
-    files = ([str(base.with_name(base.name + "_成績卡.png"))] if "png" in opts["formats"] else []) + \
-        [str(base.with_suffix("." + f)) for f in ("wav", "mp3", "mp4") if f in opts["formats"]]
+    files = ([str(SH.out_path(base, "_成績卡.png"))] if "png" in opts["formats"] else []) + \
+        [str(SH.out_path(base, "." + f)) for f in ("wav", "mp3", "mp4") if f in opts["formats"]]
     jid = jobs.submit("export", sid, lambda report: SH.export_take(d, tid, opts, base, report), label=tid)
     return jsonify(job=jid, files=files)
 
