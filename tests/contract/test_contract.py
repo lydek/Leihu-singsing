@@ -529,6 +529,8 @@ def run_contract(tmp: Path, cases=None, env_extra=None, serve_args=(), setup=Non
         PYTHONIOENCODING="utf-8",
     )
     env.pop("ANTHROPIC_API_KEY", None)  # 開發機有設的話 claude_ready、has_key 會不同（app.py 讀環境變數）
+    # 數值沙盒用的 LEIHU_NET_LOG 不能帶進來：擋下的連線要寫在 DATA/net_blocked.log，才會出現在檔案差異裡
+    env.pop("LEIHU_NET_LOG", None)
     env.update(env_extra or {})
     env = {k: v for k, v in env.items() if v is not None}  # env_extra 裡值為 None 的變數拿掉
     log = open(tmp / "server.log", "w", encoding="utf-8")  # noqa: SIM115  伺服器整段期間都在寫
@@ -591,13 +593,11 @@ def _json(x) -> str:
     return json.dumps(x, ensure_ascii=False, sort_keys=True, indent=1)
 
 
-def test_contract_snapshot(tmp_path, app_module):
-    result = run_contract(tmp_path)
-
-    blocked = {k: v for rec in result.values() for k, v in rec["files"].items() if "net_blocked" in k}
-    assert not blocked, f"有案例對外連線（步驟 0 的快照不能連網）：{blocked}"
-
-    # 全部路由都要涵蓋（2.1.0 加了 /api/live/override、/api/upgrade-separation；2.2.0 加了 /api/jobs/pause-all、/top、/prioritize）
+def uncovered_routes(app_module) -> tuple[set[str], int]:
+    """沒有案例的路由（endpoint＋方法）和路由總數。test_contract_snapshot、check_snapshot.py 共用。"""
+    # 2.1.0 加了 /api/live/override、/api/upgrade-separation；2.2.0 加了 /api/jobs/pause-all、/api/jobs/<jid>/top、
+    # /api/songs/<sid>/prioritize；2.3.0 加了 /api/storage/location、move、adopt、delete-old，/api/setlist/history，
+    # /api/export/setlist、songlist，/api/setlist/remove、delete；2.3.1 加了 /api/yt-unlock（共 92 條）
     adapter = app_module.app.url_map.bind(f"127.0.0.1:{app_module.PORT}")
     ids = {
         "new": F.NEW,
@@ -617,10 +617,18 @@ def test_contract_snapshot(tmp_path, app_module):
         if r.endpoint not in ("static", "debug_stacks", "system.debug_stacks")  # 扁平結構、步驟 1 拆 Blueprint 之後
         for m in r.methods - {"HEAD", "OPTIONS"}
     }
-    assert rules - hit == set(), f"沒有案例的路由：{sorted(rules - hit)}"
-    # 2.2.0 加了 /api/jobs/pause-all、/api/jobs/<jid>/top、/api/songs/<sid>/prioritize；
-    # 2.3.0 加了 /api/storage/location、move、adopt、delete-old，/api/setlist/history，/api/export/setlist、songlist，/api/setlist/remove、delete；2.3.1 加了 /api/yt-unlock
-    assert len(rules) == 92
+    return rules - hit, len(rules)
+
+
+def test_contract_snapshot(tmp_path, app_module):
+    result = run_contract(tmp_path)
+
+    blocked = {k: v for rec in result.values() for k, v in rec["files"].items() if "net_blocked" in k}
+    assert not blocked, f"有案例對外連線（步驟 0 的快照不能連網）：{blocked}"
+
+    missing, n = uncovered_routes(app_module)
+    assert not missing, f"沒有案例的路由：{sorted(missing)}"
+    assert n == 92
 
     compare_snapshot(result, SNAPSHOT)
 
