@@ -25,23 +25,88 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 NETBLOCK_DIR = HERE.parent / "contract"
+PREFIX = "leihu-numeric-"
+_REPARSE = 0x400  # FILE_ATTRIBUTE_REPARSE_POINT：junction、符號連結
+
+
+def remove_tree(d: Path) -> str:
+    """刪掉暫存資料夾：先把裡面所有 junction／符號連結只拆連結（不跟進去），全部拆掉才 rmtree，
+    不可能刪到模型資料夾。回傳空字串＝刪乾淨；否則是沒刪掉的原因。"""
+    if not d.exists():
+        return ""
+    stack = [d]
+    while stack:
+        cur = stack.pop()
+        try:
+            entries = list(os.scandir(cur))
+        except OSError:
+            continue
+        for e in entries:
+            st = e.stat(follow_symlinks=False)
+            if getattr(st, "st_file_attributes", 0) & _REPARSE:
+                try:
+                    try:
+                        os.rmdir(e.path)  # 目錄 junction／目錄連結：只拆連結
+                    except NotADirectoryError:
+                        os.unlink(e.path)  # 檔案連結
+                except OSError as err:
+                    return f"連結 {e.path} 拆不掉（{err}），整個資料夾保留不刪"
+            elif e.is_dir(follow_symlinks=False):
+                stack.append(Path(e.path))
+    for _ in range(20):  # 子程式被結束後要一點時間才放掉檔案
+        shutil.rmtree(d, ignore_errors=True)
+        if not d.exists():
+            return ""
+        time.sleep(0.5)
+    return "刪不掉（可能還有行程在用）"
+
+
+def _alive(pid: int) -> bool:
+    import ctypes
+
+    k = ctypes.windll.kernel32
+    h = k.OpenProcess(0x00100000, False, pid)  # SYNCHRONIZE
+    if not h:
+        return False
+    try:
+        return k.WaitForSingleObject(h, 0) != 0  # 0＝已結束
+    finally:
+        k.CloseHandle(h)
+
+
+def clean_stale() -> list[str]:
+    """上一次被強制結束（工作管理員、逾時）留下的暫存資料夾：建立它的行程已經不在就刪掉。回傳做了什麼（寫進報告）。"""
+    out = []
+    for d in sorted(Path(tempfile.gettempdir()).glob(PREFIX + "*")):
+        owner = d / "owner.pid"
+        try:
+            pid = int(owner.read_text("utf-8"))
+        except (OSError, ValueError):
+            pid = None
+        if pid is not None and _alive(pid):
+            continue  # 還在跑（例如另一個基準），不要動
+        why = remove_tree(d)
+        out.append(f"清掉上一次留下的暫存資料夾 {d.name}" + (f"：沒刪成功，{why}" if why else ""))
+    return out
 
 
 class Sandbox:
     def __init__(self, code: Path, models: Path, tag: str, deterministic: bool):
         self.models, self.tag = models, tag
-        self.tmp = Path(tempfile.mkdtemp(prefix="leihu-numeric-"))
-        self.root = self.tmp / "app"
         self.conditions: list[str] = []
+        self.stale = clean_stale()  # 先清上一次被強制結束留下的（problems() 會列出來）
+        self.tmp = Path(tempfile.mkdtemp(prefix=PREFIX))
+        (self.tmp / "owner.pid").write_text(str(os.getpid()), "utf-8")
+        self.root = self.tmp / "app"
         self.junctions: list[Path] = []
         self.spawns = 0
+        atexit.register(self.cleanup)  # 建好暫存資料夾就登記：複製到一半失敗也會清
         shutil.copytree(
             code, self.root,
             # config.json 是使用者設定：library_dir、models_dir 會把資料導到沙盒外，不複製（用預設值）
             ignore=shutil.ignore_patterns("library", "models", "logs", "tests", "__pycache__", ".git", "config.json"),
         )
         (self.root / "models").mkdir()
-        atexit.register(self.cleanup)  # 中途失敗也要清
         import _winapi  # Windows 的目錄 junction（一般使用者就能建，不需要開發人員模式）
 
         for sub in ("uvr", "whisper"):
@@ -158,6 +223,7 @@ class Sandbox:
                 bad += [f"被測程式記錄的錯誤（logs/{f.name}）：{x[:200]}" for x in lines[:5]]
                 if len(lines) > 5:
                     bad.append(f"logs/{f.name} 還有 {len(lines) - 5} 行，見 {out / 'app-logs'}")
+        bad += self.stale  # 上一次被強制結束留下的暫存資料夾（這次開始前清掉的）
         if self.spawns == 0:
             bad.append("沒有開過顯示卡子程式：分離、音高、語音辨識可能都在主程式裡做")
         return bad
@@ -191,15 +257,8 @@ class Sandbox:
                 pool and pool.shutdown()
             except Exception as e:  # noqa: BLE001
                 print(f"{self.tag} 關閉子程式失敗：{e}", flush=True)
-        for j in self.junctions:
-            if j.exists():
-                os.rmdir(j)
         self.junctions = []
         os.chdir(HERE)  # 這個行程的 cwd 在 ROOT：不先離開的話 ROOT 刪不掉
-        for _ in range(20):  # 子程式被結束後要一點時間才放掉檔案
-            shutil.rmtree(self.tmp, ignore_errors=True)
-            if not self.tmp.exists():
-                break
-            time.sleep(0.5)
-        else:
-            print(f"{self.tag} 暫存資料夾刪不掉：{self.tmp}", flush=True)
+        why = remove_tree(self.tmp)
+        if why:  # 報告的異常規則會抓「暫存資料夾刪不掉」
+            print(f"{self.tag} 暫存資料夾刪不掉：{self.tmp}：{why}", flush=True)

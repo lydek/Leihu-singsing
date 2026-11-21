@@ -23,6 +23,7 @@ r"""上游（基準）與目前這一邊的契約比對（docs/refactor-port-pla
 from __future__ import annotations
 
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -63,6 +64,7 @@ LOG_ALERTS = [
     ("卡住", "偵測到卡住"),
     ("逾時", "逾時"),
     ("out of memory", "記憶體不足"),
+    ("暫存資料夾刪不掉", "測試工具的暫存資料夾沒有刪乾淨"),
 ]
 # 案例本身故意造成的 log 訊息：(訊息片段, 原因)。報告照樣列出，但不算異常
 LOG_EXPECTED = [
@@ -81,6 +83,22 @@ _NAME_PATTERNS = (
 # 測試工具有沒有未 commit 的修改：不算錄出來的結果（快照、摘要），不然先錄的那份會讓後面每份都標成有修改
 TOOL_PATHS = ("--", "tests", ":!tests/contract/snapshots", ":!tests/numeric/baselines", ":!tests/perf/baselines",
               ":!tests/private")
+
+
+def scrub(x):
+    """要進 git 的摘要：把 repo、暫存資料夾、使用者資料夾的絕對路徑換成 <repo>、<tmp>、<home>（含使用者名稱）。
+    報告（tests/private/）保留完整路徑。"""
+    if isinstance(x, dict):
+        return {scrub(k): scrub(v) for k, v in x.items()}
+    if isinstance(x, list):
+        return [scrub(v) for v in x]
+    if not isinstance(x, str):
+        return x
+    places = [(str(ROOT), "<repo>"), (tempfile.gettempdir(), "<tmp>"), (os.path.expanduser("~"), "<home>")]
+    for p, tag in sorted(places, key=lambda t: -len(t[0])):  # 長的先換（repo 可能在 home 底下）
+        for form in {p, p.replace("\\", "/"), p.replace("\\", "\\\\")}:
+            x = re.sub(re.escape(form), tag, x, flags=re.IGNORECASE)
+    return x
 
 
 def tools_dirty() -> bool:

@@ -13,6 +13,7 @@ r"""錄一個版本在這台電腦上的效能基準（docs/refactor-port-plan.m
 
 用法（repo 根目錄，用已安裝版本的內嵌 Python）：
   <python> tests/perf/baseline.py [git 參照，預設 v2.3.2] [--label=<這台電腦的名稱>] [--runs=3] [--quality=auto|standard]
+  [--timeout=<每次執行的秒數上限，預設 7200>]
 有異常時結束代碼是 1。
 """
 
@@ -36,8 +37,8 @@ HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[1]
 sys.path[:0] = [str(ROOT / "tests" / "numeric"), str(ROOT / "tests" / "contract")]
 
-from baseline import device_lines, log_alerts, machine  # noqa: E402  tests/numeric/baseline.py
-from compare_upstream import tools_dirty, OUT, _git, commit_of, export  # noqa: E402
+from baseline import TIMEOUT, device_lines, kill_tree, log_alerts, machine  # noqa: E402  tests/numeric/baseline.py
+from compare_upstream import scrub, tools_dirty, OUT, _git, commit_of, export  # noqa: E402
 
 PRIVATE = ROOT / "tests" / "private"
 MODELS = PRIVATE / "models"
@@ -79,7 +80,7 @@ class _Entry(ctypes.Structure):  # PROCESSENTRY32W
 
 
 def mem(pid: int) -> dict | None:
-    """一個行程的記憶體（MB）；行程已經結束、打不開就是 None。"""
+    """一個行程的記憶體（MiB，2^20 位元組；欄位名稱沿用 _mb）；行程已經結束、打不開就是 None。"""
     k = ctypes.windll.kernel32
     k.OpenProcess.restype = wintypes.HANDLE
     h = k.OpenProcess(0x1000 | 0x0010, False, pid)  # PROCESS_QUERY_LIMITED_INFORMATION | PROCESS_VM_READ
@@ -148,7 +149,8 @@ def synth_song() -> Path:
     return dst
 
 
-def run_one(code: Path, song: Path, out: Path, quality: str) -> tuple[int, list[dict], list[dict], str]:
+def run_one(code: Path, song: Path, out: Path, quality: str, timeout: float) -> tuple[int | None, list[dict], list[dict], str]:
+    """跑一次 run_perf.py 並取樣；超過 timeout 秒就結束整個行程樹，結束代碼回傳 None。"""
     log = out.with_suffix(".log")
     with open(log, "w", encoding="utf-8") as f:
         p = subprocess.Popen(
@@ -167,12 +169,18 @@ def run_one(code: Path, song: Path, out: Path, quality: str) -> tuple[int, list[
 
         th = threading.Thread(target=gpu_loop, daemon=True)
         th.start()
+        t0 = time.time()
         while p.poll() is None:
+            if time.time() - t0 > timeout:
+                kill_tree(p.pid)
+                p.wait()
+                break
             mems.append(sample(p.pid))
             time.sleep(0.25)
+        timed_out = time.time() - t0 > timeout
         stop.set()
         th.join(timeout=5)
-    return p.returncode, mems, gpus, log.read_text("utf-8", errors="replace")
+    return (None if timed_out else p.returncode), mems, gpus, log.read_text("utf-8", errors="replace")
 
 
 def per_phase(phases: list[dict], mems: list[dict], gpus: list[dict]) -> dict:
@@ -240,7 +248,12 @@ def main() -> int:  # noqa: C901
 
                 shutil.rmtree(out)
             print(f"{sid} 第 {i} 次 → {out}", flush=True)
-            rc, mems, gpus, log = run_one(code, song, out, quality)
+            rc, mems, gpus, log = run_one(code, song, out, quality, float(opt.get("timeout", TIMEOUT)))
+            if rc is None:
+                from sandbox import clean_stale
+
+                problems += [f"{sid} 第 {i} 次超過 {opt.get('timeout', TIMEOUT)} 秒沒有結束，已結束整個行程樹，結果不完整",
+                             *clean_stale()]
             all_logs.append(log)
             label_i = f"{sid} 第 {i} 次"
             if rc:
@@ -272,7 +285,7 @@ def main() -> int:  # noqa: C901
         f"- 電腦：{mach['cpu']}（{mach['logical_cpus']} 個邏輯處理器）；{mach['ram_gb']} GB RAM；{mach['os']}",
         f"- 顯示卡：{mach['gpus']}；nvidia-smi：{mach['nvidia_smi']}",
         f"- 每首歌跑 {runs} 次；分離品質：{quality}；時間：{time.strftime('%Y-%m-%d %H:%M:%S')}",
-        "- 數字是中位數（括號是最小～最大）。時間單位秒、記憶體 MB；記憶體是各階段裡取樣到的最大值"
+        "- 數字是中位數（括號是最小～最大）。時間單位秒、記憶體 MiB（2^20 位元組；顯示卡記憶體是 nvidia-smi 的 MiB、使用率 %）；記憶體是各階段裡取樣到的最大值"
         "（每 0.25 秒取樣，working set／private bytes）。main＝被測程式的主程式，children＝它底下所有子程式",
         "",
         "## 異常",
@@ -339,6 +352,7 @@ def main() -> int:  # noqa: C901
         "models": (first_run or {}).get("models"),
         "conditions": (first_run or {}).get("conditions"),
         "quality": quality,
+        "units": {"*_mb": "MiB（2^20 位元組）", "gpu_mem_mb": "MiB（nvidia-smi）", "gpu_util": "%", "seconds": "秒"},
         "runs_per_song": runs,
         "problems": problems,
         "songs": {sid: {"sha256": rec["sha256"], "source": rec["source"],
@@ -348,7 +362,7 @@ def main() -> int:  # noqa: C901
                   for sid, rec in results.items()},
     }
     out_json = SUMMARY / f"{name}-{label}.json"
-    out_json.write_text(json.dumps(summary, ensure_ascii=False, indent=1), "utf-8")
+    out_json.write_text(json.dumps(scrub(summary), ensure_ascii=False, indent=1), "utf-8")
     print("\n".join(rep))
     print(f"報告：{base / 'perf-report.md'}；摘要：{out_json}")
     return 1 if problems else 0
