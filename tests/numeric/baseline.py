@@ -13,6 +13,7 @@ r"""錄一個版本在這台電腦上的數值基準（docs/refactor-port-plan.m
 
 用法（repo 根目錄，用已安裝版本的內嵌 Python）：
   <python> tests/numeric/baseline.py [git 參照，預設 v2.3.2] [--label=<這台電腦的名稱，例如 desktop-cpu>] [--runs=2] [--songs]
+  [--timeout=<每次執行的秒數上限，預設 7200>]
 --songs：tests/private/songs/ 的真實歌曲也一起跑（run.py --songs；單執行緒，一首 3～4 分鐘的歌每次要幾分鐘）。
 有異常時結束代碼是 1。
 """
@@ -33,7 +34,7 @@ ROOT = HERE.parents[1]
 sys.path[:0] = [str(HERE), str(ROOT / "tests" / "contract")]
 
 import compare as C  # noqa: E402
-from compare_upstream import tools_dirty, LOG_ALERTS, OUT, _git, commit_of, export  # noqa: E402
+from compare_upstream import scrub, tools_dirty, LOG_ALERTS, OUT, _git, commit_of, export  # noqa: E402
 
 INPUTS = ROOT / "tests" / "private" / "numeric" / "inputs"
 MODELS = ROOT / "tests" / "private" / "models"
@@ -59,6 +60,29 @@ def machine() -> dict:
     except Exception as e:  # noqa: BLE001
         info["nvidia_smi"] = f"沒有 nvidia-smi（{type(e).__name__}）"
     return info
+
+
+TIMEOUT = 7200  # 秒：每一次執行的上限（--timeout 可改）；推論卡住時不會一直等下去
+
+
+def kill_tree(pid: int) -> None:
+    subprocess.run(["taskkill", "/T", "/F", "/PID", str(pid)], capture_output=True)
+
+
+def run_logged(cmd: list[str], log: Path, timeout: float) -> tuple[int | None, list[str]]:
+    """執行並把輸出寫進 log；超過 timeout 秒就結束整個行程樹（含顯示卡子程式），清掉它留下的暫存資料夾。
+    回傳 (結束代碼，逾時時是 None；要寫進報告的問題)。"""
+    from sandbox import clean_stale
+
+    with open(log, "w", encoding="utf-8") as f:
+        p = subprocess.Popen(cmd, stdout=f, stderr=subprocess.STDOUT,
+                             env=dict(os.environ, PYTHONUTF8="1", PYTHONDONTWRITEBYTECODE="1"))
+        try:
+            return p.wait(timeout=timeout), []
+        except subprocess.TimeoutExpired:
+            kill_tree(p.pid)
+            p.wait()
+    return None, [f"超過 {timeout:g} 秒沒有結束，已結束整個行程樹，這次結果不完整（log：{log}）", *clean_stale()]
 
 
 def log_alerts(log: str, label: str) -> list[str]:
@@ -143,22 +167,23 @@ def main() -> int:  # noqa: C901
             shutil.rmtree(out)
         print(f"第 {i} 次：{name} → {out}", flush=True)
         t0 = time.time()
-        with open(base / f"run{i}.log", "w", encoding="utf-8") as f:
-            r = subprocess.run(
-                [sys.executable, "-I", str(HERE / "run.py"), str(code), str(INPUTS), str(MODELS), str(out)]
-                + ([f"--songs={SONGS}"] if "songs" in opt else []),
-                stdout=f, stderr=subprocess.STDOUT, env=dict(os.environ, PYTHONUTF8="1", PYTHONDONTWRITEBYTECODE="1"),
-            )
+        rc, late = run_logged(
+            [sys.executable, "-I", str(HERE / "run.py"), str(code), str(INPUTS), str(MODELS), str(out)]
+            + ([f"--songs={SONGS}"] if "songs" in opt else []),
+            base / f"run{i}.log", float(opt.get("timeout", TIMEOUT)),
+        )
         wall[i] = round(time.time() - t0, 1)
         logs[i] = (base / f"run{i}.log").read_text("utf-8", errors="replace")
-        if r.returncode:
-            problems.append(f"第 {i} 次 run.py 結束代碼 {r.returncode}（log：{base / f'run{i}.log'}）")
+        problems += [f"第 {i} 次：{p}" for p in late]
+        if rc:
+            problems.append(f"第 {i} 次 run.py 結束代碼 {rc}（log：{base / f'run{i}.log'}）")
         if (out / "run.json").exists():
             problems += [f"第 {i} 次：{p}" for p in json.loads((out / "run.json").read_text("utf-8"))["problems"]]
         else:
             problems.append(f"第 {i} 次沒有產生 run.json，結果不完整")
         problems += log_alerts(logs[i], f"第 {i} 次")
-    ok_runs = [i for i in logs if (base / f"run{i}" / "run.json").exists()]
+    ok_runs = [i for i in logs if (base / f"run{i}" / "run.json").exists()
+               and not json.loads((base / f"run{i}" / "run.json").read_text("utf-8")).get("incomplete")]
     # 穩定性：第 2 次起每一次都和第 1 次逐檔核對（CPU、固定條件下要完全相同）；差距表只是參考
     exact = {i: C.exact(base / "run1", base / f"run{i}") for i in ok_runs if i != 1 and 1 in ok_runs}
     for i, rows in exact.items():
@@ -229,7 +254,7 @@ def main() -> int:  # noqa: C901
         "wall_seconds": wall,
     }
     out_json = SUMMARY / f"{name}-{label}.json"
-    out_json.write_text(json.dumps(summary, ensure_ascii=False, indent=1), "utf-8")
+    out_json.write_text(json.dumps(scrub(summary), ensure_ascii=False, indent=1), "utf-8")
     print("\n".join(rep))
     print(f"報告：{base / 'numeric-report.md'}；摘要：{out_json}")
     return 1 if problems else 0

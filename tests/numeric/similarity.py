@@ -14,6 +14,7 @@ r"""錄一個版本在這台電腦上的相似度基準（docs/refactor-port-pla
 
 用法（repo 根目錄，用已安裝版本的內嵌 Python）：
   <python> tests/numeric/similarity.py [git 參照，預設 v2.3.2] [--label=<這台電腦的名稱>] [--runs=3] [--quality=standard|auto]
+  [--timeout=<每次執行的秒數上限，預設 7200>]
 有異常時結束代碼是 1。
 """
 
@@ -21,11 +22,9 @@ from __future__ import annotations
 
 import itertools
 import json
-import os
 import platform
 import re
 import statistics
-import subprocess
 import sys
 import time
 from pathlib import Path
@@ -35,8 +34,8 @@ ROOT = HERE.parents[1]
 sys.path[:0] = [str(HERE), str(ROOT / "tests" / "contract")]
 
 import compare as C  # noqa: E402
-from baseline import INPUTS, MODELS, SUMMARY, log_alerts, machine, used  # noqa: E402
-from compare_upstream import tools_dirty, OUT, _git, commit_of, export  # noqa: E402
+from baseline import INPUTS, MODELS, SUMMARY, TIMEOUT, log_alerts, machine, run_logged, used  # noqa: E402
+from compare_upstream import scrub, tools_dirty, OUT, _git, commit_of, export  # noqa: E402
 
 SONGS = ROOT / "tests" / "private" / "songs"
 
@@ -93,19 +92,19 @@ def main() -> int:  # noqa: C901
         cmd = [sys.executable, "-I", str(HERE / "run.py"), str(code), str(INPUTS), str(MODELS), str(out), "--normal",
                f"--quality={quality}"] + ([f"--songs={SONGS}"] if has_songs else [])
         t0 = time.time()
-        with open(base / f"run{i}.log", "w", encoding="utf-8") as f:
-            r = subprocess.run(cmd, stdout=f, stderr=subprocess.STDOUT,
-                               env=dict(os.environ, PYTHONUTF8="1", PYTHONDONTWRITEBYTECODE="1"))
+        rc, late = run_logged(cmd, base / f"run{i}.log", float(opt.get("timeout", TIMEOUT)))
         wall[i] = round(time.time() - t0, 1)
         logs[i] = (base / f"run{i}.log").read_text("utf-8", errors="replace")
-        if r.returncode:
-            problems.append(f"第 {i} 次 run.py 結束代碼 {r.returncode}（log：{base / f'run{i}.log'}）")
+        problems += [f"第 {i} 次：{p}" for p in late]
+        if rc:
+            problems.append(f"第 {i} 次 run.py 結束代碼 {rc}（log：{base / f'run{i}.log'}）")
         if (out / "run.json").exists():
             problems += [f"第 {i} 次：{p}" for p in json.loads((out / "run.json").read_text("utf-8"))["problems"]]
         else:
             problems.append(f"第 {i} 次沒有產生 run.json，結果不完整")
         problems += log_alerts(logs[i], f"第 {i} 次")
-    ok_runs = [i for i in logs if (base / f"run{i}" / "run.json").exists()]
+    ok_runs = [i for i in logs if (base / f"run{i}" / "run.json").exists()
+               and not json.loads((base / f"run{i}" / "run.json").read_text("utf-8")).get("incomplete")]
     if len(ok_runs) < 2:
         problems.append("少於兩次成功的執行，沒有相似度可以算")
     pairs = {f"{i}-{j}": C.pair(base / f"run{i}", base / f"run{j}") for i, j in itertools.combinations(ok_runs, 2)}
@@ -198,7 +197,7 @@ def main() -> int:  # noqa: C901
         "wall_seconds": wall,
     }
     out_json = SUMMARY / f"{name}-{label}-similarity.json"
-    out_json.write_text(json.dumps(summary, ensure_ascii=False, indent=1, default=str), "utf-8")
+    out_json.write_text(json.dumps(scrub(summary), ensure_ascii=False, indent=1, default=str), "utf-8")
     print("\n".join(rep))
     print(f"報告：{base / 'similarity-report.md'}；摘要：{out_json}")
     return 1 if problems else 0

@@ -147,4 +147,22 @@ def main() -> None:
     print("完成：", out, flush=True)
 
 
-main()
+
+def write_aborted(e: BaseException) -> None:
+    """中途丟例外：照樣寫 run.json（標 incomplete），把例外和沙盒查到的問題、被測程式的 logs/ 留下來給報告。"""
+    out.mkdir(parents=True, exist_ok=True)
+    (out / "run.json").write_text(
+        json.dumps(
+            {"code": str(code), "incomplete": True, "conditions": BOX.conditions,
+             "problems": [f"執行中斷：{type(e).__name__}: {e}"[:300]] + BOX.problems(out),
+             "worker_spawns": BOX.spawns, "environment": BOX.environment(), "models": BOX.models_sha},
+            ensure_ascii=False, indent=1),
+        "utf-8",
+    )
+
+
+try:
+    main()
+except BaseException as e:
+    write_aborted(e)
+    raise
