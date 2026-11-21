@@ -68,12 +68,16 @@ def machine() -> dict:
 TIMEOUT = 7200  # 秒：每一次執行的上限（--timeout 可改）；推論卡住時不會一直等下去
 
 
+KILL: dict = {"tree": None}  # 最後一次 kill_tree 記下的行程樹（沒確認停止時寫進 keep.json）
+
+
 def kill_tree(p: subprocess.Popen) -> tuple[bool, str]:
     """結束整個行程樹：先記下所有子孫（PID＋建立時間），taskkill 和等待都有期限，最後逐一確認都停了。
     回傳 (確認全部停止, 說明)；說明要寫進報告。"""
     from sandbox import still_alive, tree_with_start
 
     tree = tree_with_start(p.pid)
+    KILL["tree"] = tree
     try:
         r = subprocess.run(["taskkill", "/T", "/F", "/PID", str(p.pid)], capture_output=True, text=True,
                            encoding="utf-8", errors="replace", timeout=60)
@@ -84,32 +88,35 @@ def kill_tree(p: subprocess.Popen) -> tuple[bool, str]:
         p.wait(timeout=60)
     except subprocess.TimeoutExpired:
         pass
+    if tree is None:
+        return False, f"行程快照建不起來，無法確認子孫行程都停了（{note or 'taskkill 回報成功'}），沙盒保留不刪"
     for _ in range(20):
         left = still_alive(tree)
         if not left:
             return True, note
         time.sleep(0.5)
-    return False, f"未確認全部停止：PID {left} 還在跑（{note or 'taskkill 回報成功'}），沙盒保留不刪"
+    return False, f"未確認全部停止：PID {left} 還在跑或查不到狀態（{note or 'taskkill 回報成功'}），沙盒保留不刪"
 
 
-def run_logged(cmd: list[str], log: Path, timeout: float) -> tuple[int | None, list[str]]:
+def run_logged(cmd: list[str], log: Path, timeout: float) -> tuple[int | None, list[str], bool]:
     """執行並把輸出寫進 log；超過 timeout 秒就結束整個行程樹（含顯示卡子程式），清掉它留下的暫存資料夾。
-    回傳 (結束代碼，逾時時是 None；要寫進報告的問題)。"""
-    from sandbox import clean_stale
+    回傳 (結束代碼，逾時時是 None；要寫進報告的問題；確認行程都停了)。沒確認停止時呼叫端要停止後面的執行。"""
+    from sandbox import clean_stale, mark_keep
 
     with open(log, "w", encoding="utf-8") as f:
         p = subprocess.Popen(cmd, stdout=f, stderr=subprocess.STDOUT,
                              env=dict(os.environ, PYTHONUTF8="1", PYTHONDONTWRITEBYTECODE="1"))
         try:
-            return p.wait(timeout=timeout), []
+            return p.wait(timeout=timeout), [], True
         except subprocess.TimeoutExpired:
             stopped, note = kill_tree(p)
     head = (f"超過 {timeout:g} 秒沒有結束，" + ("已結束整個行程樹" if stopped else "嘗試結束行程樹")
             + f"，這次結果不完整（log：{log}）")
     with open(log, "a", encoding="utf-8") as f:  # 也寫回 log，事後看 log 就知道
         f.write(f"\n[baseline] {head}{'；' + note if note else ''}\n")
-    # 沒確認全部停止時不清理：子孫可能還在用沙盒（clean_stale 只看建立者，看不到孫行程）
-    return None, [head, *([note] if note else []), *(clean_stale() if stopped else [])]
+    # 沒確認全部停止時不清理，並在沙盒裡留 keep.json：子孫可能還在用沙盒（clean_stale 只看建立者，看不到孫行程）
+    keep = [] if stopped else [mark_keep(log.read_text("utf-8", errors="replace"), KILL["tree"], note)]
+    return None, [head, *([note] if note else []), *keep, *(clean_stale() if stopped else [])], stopped
 
 
 def log_alerts(log: str, label: str) -> list[str]:
@@ -267,7 +274,7 @@ def main() -> int:  # noqa: C901
             shutil.rmtree(out)
         print(f"第 {i} 次：{name} → {out}", flush=True)
         t0 = time.time()
-        rc, late = run_logged(
+        rc, late, stopped = run_logged(
             [sys.executable, "-I", str(HERE / "run.py"), str(code), str(INPUTS), str(MODELS), str(out)]
             + ([f"--songs={SONGS}"] if "songs" in opt else []) + [f"--device={opt.get('device', 'auto')}"],
             base / f"run{i}.log", float(opt.get("timeout", TIMEOUT)),
@@ -284,6 +291,9 @@ def main() -> int:  # noqa: C901
         problems += log_alerts(logs[i], f"第 {i} 次")
         if (out / "run.json").exists():
             problems += [f"第 {i} 次輸出不完整：{p}" for p in C.required(out)]
+        if not stopped:  # 殘留的行程可能還在用沙盒、吃 CPU／顯示卡：後面的執行不能信
+            problems.append(f"第 {i} 次逾時後沒確認行程都停了，後面的執行取消")
+            break
     ok_runs = valid_runs(base, logs)
     # 穩定性：第 2 次起每一次都和第 1 次比。全部在 CPU 上要逐檔完全相同；有用到顯示卡改看差距表的門檻
     on_gpu = gpu_used({f"第 {i} 次": logs[i] for i in ok_runs})
