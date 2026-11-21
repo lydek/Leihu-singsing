@@ -1,7 +1,7 @@
 {
  "version": "v2.3.2",
  "label": "desktop-9900x3d-cpu",
- "tool_commit": "5465c83",
+ "tool_commit": "33bca48",
  "machine": {
   "os": "Windows-10-10.0.26200-SP0",
   "cpu": "AMD Ryzen 9 9900X3D 12-Core Processor",
@@ -41,6 +41,7 @@
   "分離固定用標準模型（vocal_quality、karaoke_quality＝standard）；歌詞用語音辨識（auto_recognize_lyrics）"
  ],
  "quality": "standard",
+ "commit": "5ddd04619e74ee56154a9966b6f54ff327614793",
  "inputs": {
   "tts_voice": "Microsoft Hanhan Desktop",
   "sha256": {
@@ -48,6 +49,23 @@
    "sing_take.wav": "4f07b3e103e4a3237eae2448502676a0382a36eeddb534c56a801d76a8d72068",
    "speech.flac": "15fc4a27455fba5ee486488b5361351272d3ced04c08676828526019c7480cfb"
   }
+ },
+ "models": {
+  "uvr/download_checks.json": "d3622e1fa19c161d3cf704927711b453d593a3f1eb0f2e0838c3136907935151",
+  "uvr/mdx_model_data.json": "1aca8f9bcc57233bc714029663a9ec2345d9c7721f91e5e08f46392a879c6a9a",
+  "uvr/model_bs_roformer_ep_317_sdr_12.9755.ckpt": "5b84f37e8d444c8cb30c79d77f613a41c05868ff9c9ac6c7049c00aefae115aa",
+  "uvr/model_bs_roformer_ep_317_sdr_12.9755.yaml": "2bfdd16c656bd9519aba757cc4f8834b7ede675eb1e00ec4772d74ae1c41af7f",
+  "uvr/UVR-MDX-NET-Inst_HQ_3.onnx": "317554b07fe1ea5279a77f2b1520a41ea4b93432560c4ffd08792c30fddf9adc",
+  "uvr/UVR_MDXNET_KARA_2.onnx": "bf32e15105a09c0f7dddd2b67346146334d6f3ecb399ed7638eba2ab07cbf5f4",
+  "uvr/vr_model_data.json": "6a2021b9aa355c10f845b68c73944d47bd9e1fdf37b8a584b14ce8f88b09bb2f",
+  "whisper/CACHEDIR.TAG": "e8893e2dcb3f4545ef67a0a5b7b769113d38eef1aa61c7c7ba14659b02af955f",
+  "whisper/models--mobiuslabsgmbh--faster-whisper-large-v3-turbo/refs/main": "a51a4d3dbd7708ff138ea428d7018c9295bd8f05a2e35d5866df2548c5ada64b",
+  "whisper/models--mobiuslabsgmbh--faster-whisper-large-v3-turbo/snapshots/0a363e9161cbc7ed1431c9597a8ceaf0c4f78fcf/config.json": "b0253ea6c0d3bea6b1e19e91a02acfd3b53f4467362efcb5a3e6b16c9b3a9b7e",
+  "whisper/models--mobiuslabsgmbh--faster-whisper-large-v3-turbo/snapshots/0a363e9161cbc7ed1431c9597a8ceaf0c4f78fcf/model.bin": "e76620f83d5f5b69efd3d87e3dc180c1bd21df9fbebacfd4335e5e1efcc018da",
+  "whisper/models--mobiuslabsgmbh--faster-whisper-large-v3-turbo/snapshots/0a363e9161cbc7ed1431c9597a8ceaf0c4f78fcf/preprocessor_config.json": "7ccc62c6f2765af1f3b46c00c9b5894426835a05021c8b9c01eecb6dfb542711",
+  "whisper/models--mobiuslabsgmbh--faster-whisper-large-v3-turbo/snapshots/0a363e9161cbc7ed1431c9597a8ceaf0c4f78fcf/tokenizer.json": "297b13372ac43916285644fb9687add3cc62ee2a1adb60da3dc25cc94c1871fd",
+  "whisper/models--mobiuslabsgmbh--faster-whisper-large-v3-turbo/snapshots/0a363e9161cbc7ed1431c9597a8ceaf0c4f78fcf/vocabulary.json": "c69260f2ab26d659b7c398f9a2b2b48ed0df16c3b47d7326782fd9cba71690c1",
+  "whisper/models--mobiuslabsgmbh--faster-whisper-large-v3-turbo/trees/0a363e9161cbc7ed1431c9597a8ceaf0c4f78fcf.json": "7d08abef5876605d66d3fc4f95b3bb53a0a73aca8b03faa15c57a9282275e988"
  },
  "songs": {},
  "problems": [],
@@ -57,139 +75,246 @@
     "item": "songsing01 lead 分離 SDR",
     "value": "inf dB",
     "limit": "> 30 dB",
-    "ok": true
+    "ok": true,
+    "num": "inf"
    },
    {
     "item": "songsing01 back 分離 SDR",
     "value": "inf dB",
     "limit": "> 30 dB",
-    "ok": true
+    "ok": true,
+    "num": "inf"
    },
    {
     "item": "songsing01 inst 分離 SDR",
     "value": "inf dB",
     "limit": "> 30 dB",
-    "ok": true
+    "ok": true,
+    "num": "inf"
+   },
+   {
+    "item": "songsing01 音高 hop",
+    "value": "0.01 vs 0.01",
+    "limit": "相同",
+    "ok": true,
+    "num": null
    },
    {
     "item": "songsing01 有聲判斷一致率",
     "value": "1.0000",
     "limit": ">= 0.98",
-    "ok": true
+    "ok": true,
+    "num": 1.0
    },
    {
     "item": "songsing01 音高差中位數",
     "value": "8.00 cents",
     "limit": "< 10 cents",
-    "ok": true
+    "ok": true,
+    "num": 7.9999999999998295
    },
    {
     "item": "songsing01 音符數",
     "value": "25 vs 25",
     "limit": "差 <= max(1, 2%)",
-    "ok": true
+    "ok": true,
+    "num": 0.0
    },
    {
     "item": "songsing01 音符起點差中位數",
     "value": "0.0 ms",
     "limit": "< 20 ms",
-    "ok": true
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "songsing01 音符結束差中位數",
+    "value": "0.0 ms",
+    "limit": "< 20 ms",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "songsing01 音符音高不同的個數",
+    "value": "0／25",
+    "limit": "<= max(1, 2%)",
+    "ok": true,
+    "num": 0.0
    },
    {
     "item": "songsing01 meta（separation、vocal_model、karaoke、acapella、language、lyrics_unreliable、harmony）",
     "value": "相同",
     "limit": "相同",
-    "ok": true
+    "ok": true,
+    "num": 0.0
    },
    {
     "item": "songspeech01 lead 分離 SDR",
     "value": "inf dB",
     "limit": "> 30 dB",
-    "ok": true
+    "ok": true,
+    "num": "inf"
    },
    {
     "item": "songspeech01 back 分離 SDR",
     "value": "inf dB",
     "limit": "> 30 dB",
-    "ok": true
+    "ok": true,
+    "num": "inf"
    },
    {
     "item": "songspeech01 inst 分離 SDR",
     "value": "inf dB",
     "limit": "> 30 dB",
-    "ok": true
+    "ok": true,
+    "num": "inf"
+   },
+   {
+    "item": "songspeech01 音高 hop",
+    "value": "0.01 vs 0.01",
+    "limit": "相同",
+    "ok": true,
+    "num": null
    },
    {
     "item": "songspeech01 有聲判斷一致率",
     "value": "1.0000",
     "limit": ">= 0.98",
-    "ok": true
+    "ok": true,
+    "num": 1.0
    },
    {
     "item": "songspeech01 音高差中位數",
-    "value": "8.00 cents",
+    "value": "7.00 cents",
     "limit": "< 10 cents",
-    "ok": true
+    "ok": true,
+    "num": 7.000000000000028
    },
    {
     "item": "songspeech01 音符數",
-    "value": "41 vs 44",
+    "value": "44 vs 43",
     "limit": "差 <= max(1, 2%)",
-    "ok": false
+    "ok": true,
+    "num": 1.0
    },
    {
     "item": "songspeech01 音符起點差中位數",
     "value": "0.0 ms",
     "limit": "< 20 ms",
-    "ok": true
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "songspeech01 音符結束差中位數",
+    "value": "0.0 ms",
+    "limit": "< 20 ms",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "songspeech01 音符音高不同的個數",
+    "value": "5／44",
+    "limit": "<= max(1, 2%)",
+    "ok": false,
+    "num": 5.0
    },
    {
     "item": "songspeech01 meta（separation、vocal_model、karaoke、acapella、language、lyrics_unreliable、harmony）",
     "value": "相同",
     "limit": "相同",
-    "ok": true
+    "ok": true,
+    "num": 0.0
    },
    {
     "item": "songspeech01 歌詞字元錯誤率",
     "value": "0.000（53 字 vs 53 字）",
     "limit": "< 0.01",
-    "ok": true
+    "ok": true,
+    "num": 0.0
    },
    {
     "item": "songspeech01 歌詞起點差中位數",
     "value": "0 ms",
     "limit": "< 80 ms",
-    "ok": true
+    "ok": true,
+    "num": 0.0
    },
    {
     "item": "評分狀態",
     "value": "done vs done",
     "limit": "都是 done",
-    "ok": true
+    "ok": true,
+    "num": null
    },
    {
     "item": "評分準確率差",
-    "value": "0.2 分（1.0 vs 0.998）",
+    "value": "0.0 分（1.0 vs 1.0）",
     "limit": "<= 1 分",
-    "ok": true
+    "ok": true,
+    "num": 0.0
    },
    {
-    "item": "評分 key_hint、octave",
-    "value": "{'shift': 0, 'share': 0.91, 'suggest': 0}/0 vs {'shift': 0, 'share': 0.9, 'suggest': 0}/0",
+    "item": "評分 key_hint.shift",
+    "value": "0 vs 0",
     "limit": "相同",
-    "ok": false
+    "ok": true,
+    "num": null
+   },
+   {
+    "item": "評分 key_hint.suggest",
+    "value": "0 vs 0",
+    "limit": "相同",
+    "ok": true,
+    "num": null
+   },
+   {
+    "item": "評分 key_hint.share 差",
+    "value": "0.010（0.91 vs 0.9）",
+    "limit": "<= 0.05",
+    "ok": true,
+    "num": 0.010000000000000009
+   },
+   {
+    "item": "評分 octave",
+    "value": "0 vs 0",
+    "limit": "相同",
+    "ok": true,
+    "num": null
+   },
+   {
+    "item": "評分 mean 差",
+    "value": "0.5 cents（11.9 vs 12.4）",
+    "limit": "<= 3 cents",
+    "ok": true,
+    "num": 0.5
+   },
+   {
+    "item": "評分 spread 差",
+    "value": "0.4 cents（12.4 vs 12.8）",
+    "limit": "<= 3 cents",
+    "ok": true,
+    "num": 0.40000000000000036
+   },
+   {
+    "item": "評分 offset 差",
+    "value": "0.010 秒（-0.2 vs -0.21）",
+    "limit": "<= 0.02 秒",
+    "ok": true,
+    "num": 0.009999999999999981
    },
    {
     "item": "匯出檔 SDR",
-    "value": "inf dB",
+    "value": "-2.0 dB",
     "limit": "> 30 dB",
-    "ok": true
+    "ok": false,
+    "num": -1.960859028903229
    },
    {
     "item": "匯出檔 RMS 差",
-    "value": "0.000 dB",
+    "value": "0.003 dB",
     "limit": "<= 0.1 dB",
-    "ok": true
+    "ok": true,
+    "num": 0.0032505046494069267
    }
   ],
   "1-3": [
@@ -197,139 +322,246 @@
     "item": "songsing01 lead 分離 SDR",
     "value": "inf dB",
     "limit": "> 30 dB",
-    "ok": true
+    "ok": true,
+    "num": "inf"
    },
    {
     "item": "songsing01 back 分離 SDR",
     "value": "inf dB",
     "limit": "> 30 dB",
-    "ok": true
+    "ok": true,
+    "num": "inf"
    },
    {
     "item": "songsing01 inst 分離 SDR",
     "value": "inf dB",
     "limit": "> 30 dB",
-    "ok": true
+    "ok": true,
+    "num": "inf"
+   },
+   {
+    "item": "songsing01 音高 hop",
+    "value": "0.01 vs 0.01",
+    "limit": "相同",
+    "ok": true,
+    "num": null
    },
    {
     "item": "songsing01 有聲判斷一致率",
     "value": "1.0000",
     "limit": ">= 0.98",
-    "ok": true
+    "ok": true,
+    "num": 1.0
    },
    {
     "item": "songsing01 音高差中位數",
     "value": "8.00 cents",
     "limit": "< 10 cents",
-    "ok": true
+    "ok": true,
+    "num": 7.9999999999998295
    },
    {
     "item": "songsing01 音符數",
     "value": "25 vs 25",
     "limit": "差 <= max(1, 2%)",
-    "ok": true
+    "ok": true,
+    "num": 0.0
    },
    {
     "item": "songsing01 音符起點差中位數",
     "value": "0.0 ms",
     "limit": "< 20 ms",
-    "ok": true
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "songsing01 音符結束差中位數",
+    "value": "0.0 ms",
+    "limit": "< 20 ms",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "songsing01 音符音高不同的個數",
+    "value": "0／25",
+    "limit": "<= max(1, 2%)",
+    "ok": true,
+    "num": 0.0
    },
    {
     "item": "songsing01 meta（separation、vocal_model、karaoke、acapella、language、lyrics_unreliable、harmony）",
     "value": "相同",
     "limit": "相同",
-    "ok": true
+    "ok": true,
+    "num": 0.0
    },
    {
     "item": "songspeech01 lead 分離 SDR",
     "value": "inf dB",
     "limit": "> 30 dB",
-    "ok": true
+    "ok": true,
+    "num": "inf"
    },
    {
     "item": "songspeech01 back 分離 SDR",
     "value": "inf dB",
     "limit": "> 30 dB",
-    "ok": true
+    "ok": true,
+    "num": "inf"
    },
    {
     "item": "songspeech01 inst 分離 SDR",
     "value": "inf dB",
     "limit": "> 30 dB",
-    "ok": true
+    "ok": true,
+    "num": "inf"
+   },
+   {
+    "item": "songspeech01 音高 hop",
+    "value": "0.01 vs 0.01",
+    "limit": "相同",
+    "ok": true,
+    "num": null
    },
    {
     "item": "songspeech01 有聲判斷一致率",
     "value": "1.0000",
     "limit": ">= 0.98",
-    "ok": true
+    "ok": true,
+    "num": 1.0
    },
    {
     "item": "songspeech01 音高差中位數",
     "value": "8.00 cents",
     "limit": "< 10 cents",
-    "ok": true
+    "ok": true,
+    "num": 7.9999999999998295
    },
    {
     "item": "songspeech01 音符數",
-    "value": "41 vs 40",
+    "value": "44 vs 42",
     "limit": "差 <= max(1, 2%)",
-    "ok": true
+    "ok": false,
+    "num": 2.0
    },
    {
     "item": "songspeech01 音符起點差中位數",
     "value": "0.0 ms",
     "limit": "< 20 ms",
-    "ok": true
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "songspeech01 音符結束差中位數",
+    "value": "0.0 ms",
+    "limit": "< 20 ms",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "songspeech01 音符音高不同的個數",
+    "value": "5／44",
+    "limit": "<= max(1, 2%)",
+    "ok": false,
+    "num": 5.0
    },
    {
     "item": "songspeech01 meta（separation、vocal_model、karaoke、acapella、language、lyrics_unreliable、harmony）",
     "value": "相同",
     "limit": "相同",
-    "ok": true
+    "ok": true,
+    "num": 0.0
    },
    {
     "item": "songspeech01 歌詞字元錯誤率",
     "value": "0.000（53 字 vs 53 字）",
     "limit": "< 0.01",
-    "ok": true
+    "ok": true,
+    "num": 0.0
    },
    {
     "item": "songspeech01 歌詞起點差中位數",
     "value": "0 ms",
     "limit": "< 80 ms",
-    "ok": true
+    "ok": true,
+    "num": 0.0
    },
    {
     "item": "評分狀態",
     "value": "done vs done",
     "limit": "都是 done",
-    "ok": true
+    "ok": true,
+    "num": null
    },
    {
     "item": "評分準確率差",
     "value": "0.1 分（1.0 vs 0.999）",
     "limit": "<= 1 分",
-    "ok": true
+    "ok": true,
+    "num": 0.10000000000000009
    },
    {
-    "item": "評分 key_hint、octave",
-    "value": "{'shift': 0, 'share': 0.91, 'suggest': 0}/0 vs {'shift': 0, 'share': 0.92, 'suggest': 0}/0",
+    "item": "評分 key_hint.shift",
+    "value": "0 vs 0",
     "limit": "相同",
-    "ok": false
+    "ok": true,
+    "num": null
+   },
+   {
+    "item": "評分 key_hint.suggest",
+    "value": "0 vs 0",
+    "limit": "相同",
+    "ok": true,
+    "num": null
+   },
+   {
+    "item": "評分 key_hint.share 差",
+    "value": "0.010（0.91 vs 0.92）",
+    "limit": "<= 0.05",
+    "ok": true,
+    "num": 0.010000000000000009
+   },
+   {
+    "item": "評分 octave",
+    "value": "0 vs 0",
+    "limit": "相同",
+    "ok": true,
+    "num": null
+   },
+   {
+    "item": "評分 mean 差",
+    "value": "0.3 cents（11.9 vs 12.2）",
+    "limit": "<= 3 cents",
+    "ok": true,
+    "num": 0.29999999999999893
+   },
+   {
+    "item": "評分 spread 差",
+    "value": "0.2 cents（12.4 vs 12.6）",
+    "limit": "<= 3 cents",
+    "ok": true,
+    "num": 0.1999999999999993
+   },
+   {
+    "item": "評分 offset 差",
+    "value": "0.000 秒（-0.2 vs -0.2）",
+    "limit": "<= 0.02 秒",
+    "ok": true,
+    "num": 0.0
    },
    {
     "item": "匯出檔 SDR",
     "value": "inf dB",
     "limit": "> 30 dB",
-    "ok": true
+    "ok": true,
+    "num": "inf"
    },
    {
     "item": "匯出檔 RMS 差",
     "value": "0.000 dB",
     "limit": "<= 0.1 dB",
-    "ok": true
+    "ok": true,
+    "num": 0.0
    }
   ],
   "2-3": [
@@ -337,139 +569,246 @@
     "item": "songsing01 lead 分離 SDR",
     "value": "inf dB",
     "limit": "> 30 dB",
-    "ok": true
+    "ok": true,
+    "num": "inf"
    },
    {
     "item": "songsing01 back 分離 SDR",
     "value": "inf dB",
     "limit": "> 30 dB",
-    "ok": true
+    "ok": true,
+    "num": "inf"
    },
    {
     "item": "songsing01 inst 分離 SDR",
     "value": "inf dB",
     "limit": "> 30 dB",
-    "ok": true
+    "ok": true,
+    "num": "inf"
+   },
+   {
+    "item": "songsing01 音高 hop",
+    "value": "0.01 vs 0.01",
+    "limit": "相同",
+    "ok": true,
+    "num": null
    },
    {
     "item": "songsing01 有聲判斷一致率",
     "value": "1.0000",
     "limit": ">= 0.98",
-    "ok": true
+    "ok": true,
+    "num": 1.0
    },
    {
     "item": "songsing01 音高差中位數",
     "value": "8.00 cents",
     "limit": "< 10 cents",
-    "ok": true
+    "ok": true,
+    "num": 7.9999999999998295
    },
    {
     "item": "songsing01 音符數",
     "value": "25 vs 25",
     "limit": "差 <= max(1, 2%)",
-    "ok": true
+    "ok": true,
+    "num": 0.0
    },
    {
     "item": "songsing01 音符起點差中位數",
     "value": "0.0 ms",
     "limit": "< 20 ms",
-    "ok": true
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "songsing01 音符結束差中位數",
+    "value": "0.0 ms",
+    "limit": "< 20 ms",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "songsing01 音符音高不同的個數",
+    "value": "0／25",
+    "limit": "<= max(1, 2%)",
+    "ok": true,
+    "num": 0.0
    },
    {
     "item": "songsing01 meta（separation、vocal_model、karaoke、acapella、language、lyrics_unreliable、harmony）",
     "value": "相同",
     "limit": "相同",
-    "ok": true
+    "ok": true,
+    "num": 0.0
    },
    {
     "item": "songspeech01 lead 分離 SDR",
     "value": "inf dB",
     "limit": "> 30 dB",
-    "ok": true
+    "ok": true,
+    "num": "inf"
    },
    {
     "item": "songspeech01 back 分離 SDR",
     "value": "inf dB",
     "limit": "> 30 dB",
-    "ok": true
+    "ok": true,
+    "num": "inf"
    },
    {
     "item": "songspeech01 inst 分離 SDR",
     "value": "inf dB",
     "limit": "> 30 dB",
-    "ok": true
+    "ok": true,
+    "num": "inf"
+   },
+   {
+    "item": "songspeech01 音高 hop",
+    "value": "0.01 vs 0.01",
+    "limit": "相同",
+    "ok": true,
+    "num": null
    },
    {
     "item": "songspeech01 有聲判斷一致率",
     "value": "1.0000",
     "limit": ">= 0.98",
-    "ok": true
+    "ok": true,
+    "num": 1.0
    },
    {
     "item": "songspeech01 音高差中位數",
-    "value": "8.00 cents",
+    "value": "7.00 cents",
     "limit": "< 10 cents",
-    "ok": true
+    "ok": true,
+    "num": 7.000000000000028
    },
    {
     "item": "songspeech01 音符數",
-    "value": "44 vs 40",
+    "value": "43 vs 42",
     "limit": "差 <= max(1, 2%)",
-    "ok": false
+    "ok": true,
+    "num": 1.0
    },
    {
     "item": "songspeech01 音符起點差中位數",
     "value": "0.0 ms",
     "limit": "< 20 ms",
-    "ok": true
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "songspeech01 音符結束差中位數",
+    "value": "0.0 ms",
+    "limit": "< 20 ms",
+    "ok": true,
+    "num": 0.0
+   },
+   {
+    "item": "songspeech01 音符音高不同的個數",
+    "value": "5／43",
+    "limit": "<= max(1, 2%)",
+    "ok": false,
+    "num": 5.0
    },
    {
     "item": "songspeech01 meta（separation、vocal_model、karaoke、acapella、language、lyrics_unreliable、harmony）",
     "value": "相同",
     "limit": "相同",
-    "ok": true
+    "ok": true,
+    "num": 0.0
    },
    {
     "item": "songspeech01 歌詞字元錯誤率",
     "value": "0.000（53 字 vs 53 字）",
     "limit": "< 0.01",
-    "ok": true
+    "ok": true,
+    "num": 0.0
    },
    {
     "item": "songspeech01 歌詞起點差中位數",
     "value": "0 ms",
     "limit": "< 80 ms",
-    "ok": true
+    "ok": true,
+    "num": 0.0
    },
    {
     "item": "評分狀態",
     "value": "done vs done",
     "limit": "都是 done",
-    "ok": true
+    "ok": true,
+    "num": null
    },
    {
     "item": "評分準確率差",
-    "value": "0.1 分（0.998 vs 0.999）",
+    "value": "0.1 分（1.0 vs 0.999）",
     "limit": "<= 1 分",
-    "ok": true
+    "ok": true,
+    "num": 0.10000000000000009
    },
    {
-    "item": "評分 key_hint、octave",
-    "value": "{'shift': 0, 'share': 0.9, 'suggest': 0}/0 vs {'shift': 0, 'share': 0.92, 'suggest': 0}/0",
+    "item": "評分 key_hint.shift",
+    "value": "0 vs 0",
     "limit": "相同",
-    "ok": false
+    "ok": true,
+    "num": null
+   },
+   {
+    "item": "評分 key_hint.suggest",
+    "value": "0 vs 0",
+    "limit": "相同",
+    "ok": true,
+    "num": null
+   },
+   {
+    "item": "評分 key_hint.share 差",
+    "value": "0.020（0.9 vs 0.92）",
+    "limit": "<= 0.05",
+    "ok": true,
+    "num": 0.020000000000000018
+   },
+   {
+    "item": "評分 octave",
+    "value": "0 vs 0",
+    "limit": "相同",
+    "ok": true,
+    "num": null
+   },
+   {
+    "item": "評分 mean 差",
+    "value": "0.2 cents（12.4 vs 12.2）",
+    "limit": "<= 3 cents",
+    "ok": true,
+    "num": 0.20000000000000107
+   },
+   {
+    "item": "評分 spread 差",
+    "value": "0.2 cents（12.8 vs 12.6）",
+    "limit": "<= 3 cents",
+    "ok": true,
+    "num": 0.20000000000000107
+   },
+   {
+    "item": "評分 offset 差",
+    "value": "0.010 秒（-0.21 vs -0.2）",
+    "limit": "<= 0.02 秒",
+    "ok": true,
+    "num": 0.009999999999999981
    },
    {
     "item": "匯出檔 SDR",
-    "value": "inf dB",
+    "value": "-2.0 dB",
     "limit": "> 30 dB",
-    "ok": true
+    "ok": false,
+    "num": -1.9641095335526368
    },
    {
     "item": "匯出檔 RMS 差",
-    "value": "0.000 dB",
+    "value": "0.003 dB",
     "limit": "<= 0.1 dB",
-    "ok": true
+    "ok": true,
+    "num": 0.003250504649406405
    }
   ]
  },
@@ -501,6 +840,15 @@
    "limit": "> 30 dB",
    "over": 0
   },
+  "songsing01 音高 hop": {
+   "values": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "limit": "相同",
+   "over": 0
+  },
   "songsing01 有聲判斷一致率": {
    "values": [
     1.0,
@@ -512,9 +860,9 @@
   },
   "songsing01 音高差中位數": {
    "values": [
-    8.0,
-    8.0,
-    8.0
+    7.9999999999998295,
+    7.9999999999998295,
+    7.9999999999998295
    ],
    "limit": "< 10 cents",
    "over": 0
@@ -535,6 +883,24 @@
     0.0
    ],
    "limit": "< 20 ms",
+   "over": 0
+  },
+  "songsing01 音符結束差中位數": {
+   "values": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "limit": "< 20 ms",
+   "over": 0
+  },
+  "songsing01 音符音高不同的個數": {
+   "values": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "limit": "<= max(1, 2%)",
    "over": 0
   },
   "songsing01 meta（separation、vocal_model、karaoke、acapella、language、lyrics_unreliable、harmony）": {
@@ -573,6 +939,15 @@
    "limit": "> 30 dB",
    "over": 0
   },
+  "songspeech01 音高 hop": {
+   "values": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "limit": "相同",
+   "over": 0
+  },
   "songspeech01 有聲判斷一致率": {
    "values": [
     1.0,
@@ -584,21 +959,21 @@
   },
   "songspeech01 音高差中位數": {
    "values": [
-    8.0,
-    8.0,
-    8.0
+    7.000000000000028,
+    7.9999999999998295,
+    7.000000000000028
    ],
    "limit": "< 10 cents",
    "over": 0
   },
   "songspeech01 音符數": {
    "values": [
-    3.0,
     1.0,
-    4.0
+    2.0,
+    1.0
    ],
    "limit": "差 <= max(1, 2%)",
-   "over": 2
+   "over": 1
   },
   "songspeech01 音符起點差中位數": {
    "values": [
@@ -608,6 +983,24 @@
    ],
    "limit": "< 20 ms",
    "over": 0
+  },
+  "songspeech01 音符結束差中位數": {
+   "values": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "limit": "< 20 ms",
+   "over": 0
+  },
+  "songspeech01 音符音高不同的個數": {
+   "values": [
+    5.0,
+    5.0,
+    5.0
+   ],
+   "limit": "<= max(1, 2%)",
+   "over": 3
   },
   "songspeech01 meta（separation、vocal_model、karaoke、acapella、language、lyrics_unreliable、harmony）": {
    "values": [
@@ -638,45 +1031,99 @@
   },
   "評分狀態": {
    "values": [
-    null,
-    null,
-    null
+    0.0,
+    0.0,
+    0.0
    ],
    "limit": "都是 done",
    "over": 0
   },
   "評分準確率差": {
    "values": [
-    0.2,
-    0.1,
-    0.1
+    0.0,
+    0.10000000000000009,
+    0.10000000000000009
    ],
    "limit": "<= 1 分",
    "over": 0
   },
-  "評分 key_hint、octave": {
-   "values": [
-    null,
-    null,
-    null
-   ],
-   "limit": "相同",
-   "over": 3
-  },
-  "匯出檔 SDR": {
-   "values": [
-    "inf",
-    "inf",
-    "inf"
-   ],
-   "limit": "> 30 dB",
-   "over": 0
-  },
-  "匯出檔 RMS 差": {
+  "評分 key_hint.shift": {
    "values": [
     0.0,
     0.0,
     0.0
+   ],
+   "limit": "相同",
+   "over": 0
+  },
+  "評分 key_hint.suggest": {
+   "values": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "limit": "相同",
+   "over": 0
+  },
+  "評分 key_hint.share 差": {
+   "values": [
+    0.010000000000000009,
+    0.010000000000000009,
+    0.020000000000000018
+   ],
+   "limit": "<= 0.05",
+   "over": 0
+  },
+  "評分 octave": {
+   "values": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "limit": "相同",
+   "over": 0
+  },
+  "評分 mean 差": {
+   "values": [
+    0.5,
+    0.29999999999999893,
+    0.20000000000000107
+   ],
+   "limit": "<= 3 cents",
+   "over": 0
+  },
+  "評分 spread 差": {
+   "values": [
+    0.40000000000000036,
+    0.1999999999999993,
+    0.20000000000000107
+   ],
+   "limit": "<= 3 cents",
+   "over": 0
+  },
+  "評分 offset 差": {
+   "values": [
+    0.009999999999999981,
+    0.0,
+    0.009999999999999981
+   ],
+   "limit": "<= 0.02 秒",
+   "over": 0
+  },
+  "匯出檔 SDR": {
+   "values": [
+    -1.960859028903229,
+    "inf",
+    -1.9641095335526368
+   ],
+   "limit": "> 30 dB",
+   "over": 2
+  },
+  "匯出檔 RMS 差": {
+   "values": [
+    0.0032505046494069267,
+    0.0,
+    0.003250504649406405
    ],
    "limit": "<= 0.1 dB",
    "over": 0
@@ -688,79 +1135,92 @@
     "item": "sing lead 和正確音軌的 SDR",
     "value": "11.5 dB",
     "limit": "",
-    "ok": null
+    "ok": null,
+    "num": null
    },
    {
     "item": "sing inst 和正確音軌的 SDR",
     "value": "8.1 dB",
     "limit": "",
-    "ok": null
+    "ok": null,
+    "num": null
    },
    {
     "item": "sing back（應該是空的）RMS",
     "value": "-32.8 dBFS",
     "limit": "",
-    "ok": null
+    "ok": null,
+    "num": null
    },
    {
     "item": "sing 有聲影格找到的比例",
     "value": "1.0000",
     "limit": "",
-    "ok": null
+    "ok": null,
+    "num": null
    },
    {
     "item": "sing 音和音之間判為有聲的比例（程式會把有聲段落往前後延伸最多 0.25 秒，空隙正好 0.25 秒）",
     "value": "0.3815",
     "limit": "",
-    "ok": null
+    "ok": null,
+    "num": null
    },
    {
     "item": "sing 音高誤差中位數",
     "value": "9.0 cents",
     "limit": "",
-    "ok": null
+    "ok": null,
+    "num": null
    },
    {
     "item": "sing 音符數（旋律 20 個音）",
     "value": 25,
     "limit": "",
-    "ok": null
+    "ok": null,
+    "num": null
    },
    {
     "item": "評分狀態／準確率",
     "value": "done／1.0",
     "limit": "",
-    "ok": null
+    "ok": null,
+    "num": null
    },
    {
     "item": "評分偵測到的偏差（答案 +30 cents）",
-    "value": "12.3 cents",
+    "value": "11.9 cents",
     "limit": "",
-    "ok": null
+    "ok": null,
+    "num": null
    },
    {
     "item": "評分偵測到的時間差 offset（錄音晚 0.2 秒；正負號依程式定義）",
     "value": "-0.2 秒",
     "limit": "",
-    "ok": null
+    "ok": null,
+    "num": null
    },
    {
     "item": "speech 歌詞和原句的字元錯誤率",
     "value": "0.000（辨識 53 字／原句 53 字）",
     "limit": "",
-    "ok": null
+    "ok": null,
+    "num": null
    },
    {
     "item": "songsing01 處理時間（不是效能基準；執行緒數見執行條件）",
-    "value": "process 34.5 秒、score 1.6 秒",
+    "value": "process 43.3 秒、score 2.1 秒",
     "limit": "",
-    "ok": null
+    "ok": null,
+    "num": null
    },
    {
     "item": "songspeech01 處理時間（不是效能基準；執行緒數見執行條件）",
-    "value": "process 23.8 秒",
+    "value": "process 29.6 秒",
     "limit": "",
-    "ok": null
+    "ok": null,
+    "num": null
    }
   ],
   "2": [
@@ -768,79 +1228,92 @@
     "item": "sing lead 和正確音軌的 SDR",
     "value": "11.5 dB",
     "limit": "",
-    "ok": null
+    "ok": null,
+    "num": null
    },
    {
     "item": "sing inst 和正確音軌的 SDR",
     "value": "8.1 dB",
     "limit": "",
-    "ok": null
+    "ok": null,
+    "num": null
    },
    {
     "item": "sing back（應該是空的）RMS",
     "value": "-32.8 dBFS",
     "limit": "",
-    "ok": null
+    "ok": null,
+    "num": null
    },
    {
     "item": "sing 有聲影格找到的比例",
     "value": "1.0000",
     "limit": "",
-    "ok": null
+    "ok": null,
+    "num": null
    },
    {
     "item": "sing 音和音之間判為有聲的比例（程式會把有聲段落往前後延伸最多 0.25 秒，空隙正好 0.25 秒）",
     "value": "0.3815",
     "limit": "",
-    "ok": null
+    "ok": null,
+    "num": null
    },
    {
     "item": "sing 音高誤差中位數",
     "value": "9.0 cents",
     "limit": "",
-    "ok": null
+    "ok": null,
+    "num": null
    },
    {
     "item": "sing 音符數（旋律 20 個音）",
     "value": 25,
     "limit": "",
-    "ok": null
+    "ok": null,
+    "num": null
    },
    {
     "item": "評分狀態／準確率",
-    "value": "done／0.998",
+    "value": "done／1.0",
     "limit": "",
-    "ok": null
+    "ok": null,
+    "num": null
    },
    {
     "item": "評分偵測到的偏差（答案 +30 cents）",
-    "value": "12.3 cents",
+    "value": "12.4 cents",
     "limit": "",
-    "ok": null
+    "ok": null,
+    "num": null
    },
    {
     "item": "評分偵測到的時間差 offset（錄音晚 0.2 秒；正負號依程式定義）",
-    "value": "-0.2 秒",
+    "value": "-0.21 秒",
     "limit": "",
-    "ok": null
+    "ok": null,
+    "num": null
    },
    {
     "item": "speech 歌詞和原句的字元錯誤率",
     "value": "0.000（辨識 53 字／原句 53 字）",
     "limit": "",
-    "ok": null
+    "ok": null,
+    "num": null
    },
    {
     "item": "songsing01 處理時間（不是效能基準；執行緒數見執行條件）",
-    "value": "process 31.4 秒、score 1.6 秒",
+    "value": "process 39.5 秒、score 2.1 秒",
     "limit": "",
-    "ok": null
+    "ok": null,
+    "num": null
    },
    {
     "item": "songspeech01 處理時間（不是效能基準；執行緒數見執行條件）",
-    "value": "process 22.6 秒",
+    "value": "process 29.0 秒",
     "limit": "",
-    "ok": null
+    "ok": null,
+    "num": null
    }
   ],
   "3": [
@@ -848,85 +1321,98 @@
     "item": "sing lead 和正確音軌的 SDR",
     "value": "11.5 dB",
     "limit": "",
-    "ok": null
+    "ok": null,
+    "num": null
    },
    {
     "item": "sing inst 和正確音軌的 SDR",
     "value": "8.1 dB",
     "limit": "",
-    "ok": null
+    "ok": null,
+    "num": null
    },
    {
     "item": "sing back（應該是空的）RMS",
     "value": "-32.8 dBFS",
     "limit": "",
-    "ok": null
+    "ok": null,
+    "num": null
    },
    {
     "item": "sing 有聲影格找到的比例",
     "value": "1.0000",
     "limit": "",
-    "ok": null
+    "ok": null,
+    "num": null
    },
    {
     "item": "sing 音和音之間判為有聲的比例（程式會把有聲段落往前後延伸最多 0.25 秒，空隙正好 0.25 秒）",
     "value": "0.3815",
     "limit": "",
-    "ok": null
+    "ok": null,
+    "num": null
    },
    {
     "item": "sing 音高誤差中位數",
-    "value": "10.0 cents",
+    "value": "9.0 cents",
     "limit": "",
-    "ok": null
+    "ok": null,
+    "num": null
    },
    {
     "item": "sing 音符數（旋律 20 個音）",
     "value": 25,
     "limit": "",
-    "ok": null
+    "ok": null,
+    "num": null
    },
    {
     "item": "評分狀態／準確率",
     "value": "done／0.999",
     "limit": "",
-    "ok": null
+    "ok": null,
+    "num": null
    },
    {
     "item": "評分偵測到的偏差（答案 +30 cents）",
-    "value": "11.7 cents",
+    "value": "12.2 cents",
     "limit": "",
-    "ok": null
+    "ok": null,
+    "num": null
    },
    {
     "item": "評分偵測到的時間差 offset（錄音晚 0.2 秒；正負號依程式定義）",
     "value": "-0.2 秒",
     "limit": "",
-    "ok": null
+    "ok": null,
+    "num": null
    },
    {
     "item": "speech 歌詞和原句的字元錯誤率",
     "value": "0.000（辨識 53 字／原句 53 字）",
     "limit": "",
-    "ok": null
+    "ok": null,
+    "num": null
    },
    {
     "item": "songsing01 處理時間（不是效能基準；執行緒數見執行條件）",
-    "value": "process 30.9 秒、score 1.6 秒",
+    "value": "process 39.1 秒、score 2.0 秒",
     "limit": "",
-    "ok": null
+    "ok": null,
+    "num": null
    },
    {
     "item": "songspeech01 處理時間（不是效能基準；執行緒數見執行條件）",
-    "value": "process 22.9 秒",
+    "value": "process 27.8 秒",
     "limit": "",
-    "ok": null
+    "ok": null,
+    "num": null
    }
   ]
  },
  "wall_seconds": {
-  "1": 61.3,
-  "2": 56.8,
-  "3": 56.7
+  "1": 78.0,
+  "2": 73.4,
+  "3": 71.7
  }
 }

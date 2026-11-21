@@ -338,6 +338,13 @@ shim 要補的地方：
   - 平常就會變（第二階段門檻不能比這個嚴）：音高差中位數 8 cents（抖動造成）；語音那首音符數差 3～4 個（3 組有 2 組超過數值基準的 max(1, 2%)）；評分準確率差最多 0.2 分；評分的 `key_hint` 裡 `share` 差 0.01～0.02（`shift`、`suggest`、`octave` 相同，但整個 dict 比較所以 3 組都算不同）。
   - 匯出檔：這次 3 次的評分 offset 都是 -0.2 秒，匯出檔逐位元組相同；前一次試錄有一次是 -0.19 秒，匯出檔 SDR 只剩 -2 dB 但 RMS 只差 0.002 dB。所以匯出檔用 SDR 比會被 0.01 秒的對齊差異放大，第二階段要改比響度或先對齊。
   - 真實歌曲：`tests/private/songs/fetch.py`（只在本機，不進 git）把 `urls.txt` 的 YouTube 歌下載成 `<影片 id>.flac`，`index.json` 記 id 和歌名的對照；放進去之後 `similarity.py`、`tests/perf/baseline.py` 會一起跑，摘要只記 sha256、長度。
+- **Codex CLI 審查後的修正與重錄（2026-11-21）**：審查報告在 `tests/private/reviews/codex-test-review-2026-11-21.md`（不進 git），22 項裡修了第一、二批 18 項（`a80f3c5`、`1493613`、`33bca48`），上面各基準的數字以這次重錄為準：
+  - 會假通過的地方：數值基準改成逐檔核對（`compare.exact`：音檔比格式與每個取樣，JSON 連型別比並排除 `combo_lufs_sig`，其他比位元組，檔案清單要相同），第 2 次起都和第 1 次比；音訊比對不再截齊長度、忽略取樣率；補比 pitch `hop`、音符結束與音高、評分 `mean`／`spread`／`offset`／逐句，`key_hint` 拆欄位比；契約比對連型別（`True` 和 `1` 不同）。
+  - 報告：「改用標準模型」和被測程式 `logs/` 的錯誤列為異常；每一步實際用的裝置由子程式回報（`tests/numeric/child_hook.py` 的 `[device]`），不再從顯示卡探測推定；子程式的 `pipeline` 來源也回報並檢查。
+  - 契約快照格式改變（用 `--rebase` 重建）：只有執行當下 3 天內的數字才當動態時間（fixture 固定時間保留），音檔記 RMS、峰值與 16 段 RMS，圖片記像素雜湊，其他二進位記 sha256。和舊快照差的 29 個案例全部是這些格式改變。
+  - 其他：`export()` 每次從 git 重新匯出並記完整 commit；模型記 sha256；沙盒不複製 `config.json`，檢查 `pipeline`、`share`、`app` 從沙盒載入；`--songs` 沒有音檔時失敗；執行次數下限；效能每次清空輸出、只統計成功的幾次；`tools_dirty()` 不把快照、摘要算成工具修改。
+  - 重錄結果（契約 `1493613`，其他 `33bca48`，異常都是「無」）：契約 141 個案例兩次相同；數值第 2 次 14／14 個檔案完全相同；子程式回報四步都在 CPU（MDX 兩個模型 `CPUExecutionProvider`、torchcrepe tiny、Whisper float32）。效能（中位數，秒／private 尖峰 MB）：匯入 2.7／2140、分離 89.1／8395、音高 7.4／3988、歌詞 15.5／7461、移調 8.4／6055、評分 13.4／4176、匯出 1.3／4838、閒置 1719 MB。相似度下限：語音那首音符數差最多 2 個、音符音高不同 5 個（3 組都超過數值基準門檻）；匯出檔 SDR 在 offset 差 0.01 秒時約 -2 dB（3 組有 2 組）。
+  - 還沒修（第三批）：#19 中途失敗或被強制結束時暫存資料夾殘留且報告不知道（這次停掉重錄時就留下一個，已手動只拆 junction 再刪）、#20 外層沒有整體逾時、#21 異常訊息裡的絕對路徑可能進摘要、#22 記憶體單位其實是 MiB。
 - **還沒做**：筆電的顯示卡與 CPU 數值、效能基準（複製 `tests/private/numeric/inputs` 和 `tests/private/models` 過去，`tests/numeric/baseline.py --label=laptop-3060-gpu`、`tests/perf/baseline.py --label=laptop-3060-gpu`；顯示卡路徑兩次不一定逐位元組相同，看兩次差距表決定門檻）、真實歌曲的效能與相似度基準（`fetch.py` 下載後重跑）、筆電上的相似度基準（`--quality=auto` 會用 BS-Roformer）。`test_contract_snapshot` 需要 `conftest` 和 S28，目前不能用 pytest 跑。
 
 ## 4. 要先決定的事
