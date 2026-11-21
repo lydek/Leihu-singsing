@@ -78,6 +78,15 @@ _NAME_PATTERNS = (
 )
 
 
+# 測試工具有沒有未 commit 的修改：不算錄出來的結果（快照、摘要），不然先錄的那份會讓後面每份都標成有修改
+TOOL_PATHS = ("--", "tests", ":!tests/contract/snapshots", ":!tests/numeric/baselines", ":!tests/perf/baselines",
+              ":!tests/private")
+
+
+def tools_dirty() -> bool:
+    return bool(_git("status", "--porcelain", *TOOL_PATHS).strip())
+
+
 def _git(*args: str) -> str:
     return subprocess.run(
         ["git", *args], cwd=ROOT, capture_output=True, text=True, encoding="utf-8", errors="replace", check=True
@@ -300,7 +309,7 @@ def meta(name: str, code: Path, runs: int) -> list[str]:
     import platform
 
     tool = _git("rev-parse", "--short", "HEAD").strip()
-    dirty = _git("status", "--porcelain", "--", "tests").strip()
+    dirty = tools_dirty()
     return [
         f"- 被測程式：`{name}`（commit {commit_of(code)}；{code}）",
         f"- 測試工具：commit `{tool}`" + ("，`tests/` 有未 commit 的修改" if dirty else ""),

@@ -33,7 +33,7 @@ ROOT = HERE.parents[1]
 sys.path[:0] = [str(HERE), str(ROOT / "tests" / "contract")]
 
 import compare as C  # noqa: E402
-from compare_upstream import LOG_ALERTS, OUT, _git, commit_of, export  # noqa: E402
+from compare_upstream import tools_dirty, LOG_ALERTS, OUT, _git, commit_of, export  # noqa: E402
 
 INPUTS = ROOT / "tests" / "private" / "numeric" / "inputs"
 MODELS = ROOT / "tests" / "private" / "models"
@@ -64,6 +64,8 @@ def machine() -> dict:
 def log_alerts(log: str, label: str) -> list[str]:
     out = []
     for line in log.splitlines():
+        if re.match(r"\[(?:numeric|perf)\] 條件：", line):  # 工具自己印的執行條件（報告另列），不是被測程式的訊息
+            continue
         for needle, what in LOG_ALERTS:
             if needle in line:
                 out.append(f"{label} log（{what}）：{line.strip()[:200]}")
@@ -168,7 +170,7 @@ def main() -> int:  # noqa: C901
     rj = json.loads((base / f"run{ok_runs[0]}" / "run.json").read_text("utf-8")) if ok_runs else {}
     mach = machine()
     tool = _git("rev-parse", "--short", "HEAD").strip()
-    dirty = bool(_git("status", "--porcelain", "--", "tests").strip())
+    dirty = tools_dirty()
 
     rep = [
         f"# 數值基準：{name}（{label}）",

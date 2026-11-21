@@ -36,7 +36,7 @@ sys.path[:0] = [str(HERE), str(ROOT / "tests" / "contract")]
 
 import compare as C  # noqa: E402
 from baseline import INPUTS, MODELS, SUMMARY, log_alerts, machine, used  # noqa: E402
-from compare_upstream import OUT, _git, commit_of, export  # noqa: E402
+from compare_upstream import tools_dirty, OUT, _git, commit_of, export  # noqa: E402
 
 SONGS = ROOT / "tests" / "private" / "songs"
 
@@ -120,7 +120,7 @@ def main() -> int:  # noqa: C901
     rj = json.loads((base / f"run{ok_runs[0]}" / "run.json").read_text("utf-8")) if ok_runs else {}
     mach = machine()
     tool = _git("rev-parse", "--short", "HEAD").strip()
-    dirty = bool(_git("status", "--porcelain", "--", "tests").strip())
+    dirty = tools_dirty()
 
     def fmt(x: float | None) -> str:
         return "—" if x is None else ("inf" if x == float("inf") else f"{x:g}")
