@@ -10,7 +10,12 @@
 - 分離固定用標準模型（vocal_quality、karaoke_quality＝standard），兩台電腦、有沒有顯示卡都用同一組模型；
 - 直播軟體偵測固定回傳沒有、不跑 nvidia-smi、不搜尋線上歌詞、不下載模型。
 
-用法：<python> tests/numeric/run.py <程式碼資料夾> <素材資料夾> <模型資料夾> <輸出資料夾>
+相似度基準（similarity.py）另外用：
+- --normal：執行緒數、torchcrepe 隨機抖動都照平常（deterministic=False），量「上游自己跑多次」的自然差異；
+- --quality=auto：分離品質照平常的 auto（顯示卡上會用高品質模型）；預設 standard；
+- --songs=<資料夾>：另外處理裡面的音檔（真實歌曲，走匯入→分離→音高→歌詞），輸出在 song01、song02…（依檔名排序）。
+
+用法：<python> tests/numeric/run.py <程式碼資料夾> <素材資料夾> <模型資料夾> <輸出資料夾> [--normal] [--quality=auto] [--songs=<資料夾>]
 """
 
 from __future__ import annotations
@@ -27,16 +32,24 @@ sys.stderr.reconfigure(encoding="utf-8")
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from sandbox import Sandbox  # noqa: E402
 
-code, inputs, models, out = (Path(a).resolve() for a in sys.argv[1:5])
-BOX = Sandbox(code, models, "[numeric]", deterministic=True)
+args = [a for a in sys.argv[1:] if not a.startswith("--")]
+opt = dict(a[2:].split("=", 1) if "=" in a else (a[2:], "1") for a in sys.argv[1:] if a.startswith("--"))
+code, inputs, models, out = (Path(a).resolve() for a in args[:4])
+BOX = Sandbox(code, models, "[numeric]", deterministic="normal" not in opt)
 P, SH = BOX.P, BOX.SH
 cond = BOX.cond
 
 import numpy as np  # noqa: E402
 import soundfile as sf  # noqa: E402
 
-CFG = {"auto_recognize_lyrics": True, "karaoke_quality": "standard", "vocal_quality": "standard", "lyrics_language": ""}
-cond("分離固定用標準模型（vocal_quality、karaoke_quality＝standard）；歌詞用語音辨識（auto_recognize_lyrics）")
+QUALITY = opt.get("quality", "standard")
+CFG = {"auto_recognize_lyrics": True, "karaoke_quality": QUALITY, "vocal_quality": QUALITY, "lyrics_language": ""}
+if QUALITY == "standard":
+    cond("分離固定用標準模型（vocal_quality、karaoke_quality＝standard）；歌詞用語音辨識（auto_recognize_lyrics）")
+else:
+    cond(f"分離品質 {QUALITY}；歌詞用語音辨識（auto_recognize_lyrics）")
+AUDIO = (".flac", ".wav", ".mp3", ".m4a", ".ogg")
+SONG_FILES = sorted(x for x in Path(opt["songs"]).glob("*") if x.suffix.lower() in AUDIO) if opt.get("songs") else []
 OPTS = {
     "vocal_db": 0.0,
     "back_db": 0.0,
@@ -129,6 +142,20 @@ def main() -> None:
                 subtype="FLOAT",
             )
         keep(d, sid, timing)
+    for i, src in enumerate(SONG_FILES, 1):
+        sid = f"song{i:02d}"
+        print(sid, flush=True)
+        d = P.LIB / sid
+        d.mkdir(parents=True)
+        shutil.copy2(src, d / f"original{src.suffix.lower()}")
+        (d / "meta.json").write_text(
+            json.dumps({"id": sid, "title": sid, "created": 1577836800.0, "notes": [],
+                        "steps": {"import": False, "separate": False, "pitch": False, "lyrics": False}}),
+            "utf-8",
+        )
+        t0 = time.time()
+        P.process_song(sid, ["import", "separate", "pitch", "lyrics"], CFG)(report)
+        keep(d, sid, {"process": round(time.time() - t0, 1)})
     problems += BOX.problems(out)
     (out / "run.json").write_text(
         json.dumps(
@@ -137,6 +164,7 @@ def main() -> None:
                 "conditions": BOX.conditions,
                 "problems": problems,
                 "worker_spawns": BOX.spawns,
+                "songs": {f"song{i:02d}": hashlib.sha256(f.read_bytes()).hexdigest() for i, f in enumerate(SONG_FILES, 1)},
                 "environment": BOX.environment(),
                 "inputs": json.loads((inputs / "manifest.json").read_text("utf-8"))
                 if (inputs / "manifest.json").exists()
