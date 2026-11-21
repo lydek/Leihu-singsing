@@ -3,7 +3,13 @@ name: test
 on:
   push:
     branches: [main]   # 其他分支開 PR 時由 pull_request 跑，不重複跑兩次
+    paths-ignore:   # 只改文件不跑（LICENSE.md 不在內：tests/test_fork_update.py 會讀）
+      - "docs/**"
+      - "README.md"
   pull_request:
+    paths-ignore:
+      - "docs/**"
+      - "README.md"
 
 permissions:
   contents: read   # 只跑測試，不需要寫入權限
