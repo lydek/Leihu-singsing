@@ -8,6 +8,8 @@ r"""上游（基準）與目前這一邊的契約比對（docs/refactor-port-pla
 --record：錄 contract.json。用 serve_upstream.py 跑指定的已 commit 參照，得到候選結果；
   快照已經存在時，再現場跑 --base=<參照>（預設 v2.3.2）比對，所有差異都符合 RULES 才覆寫，否則 exit 1、保留原快照。
   快照還不存在時（第一次建立基準）直接寫入。只能用在步驟 1 之前（serve_upstream.py 要改得到 app 的背景函式）。
+--rebase：和 --record 一起用，重建基準本身（參照就是 --base，例如測試工具改了快照格式）：和舊快照的差異列在報告裡，
+  不擋寫入。沒有 --rebase 時，重錄基準本身遇到未登記的差異一樣不寫入。
 --twice：同一個版本連跑兩次，結果要完全相同（穩定性檢查）；不同就列為異常，--record 也不寫入。
 報告一定有「異常與沙盒條件」一節：伺服器 log 的 Traceback、顯示卡退回／改用 CPU 的訊息、沙盒替換了什麼、
 哪些替換目標在這個版本找不到、對外連線、沒有案例的路由、兩次結果不同的案例。沒有就寫「無」。
@@ -115,23 +117,34 @@ def leak_check(ref: str, since: str | None) -> list[str]:
 
 
 def export(ref: str) -> tuple[str, Path]:
-    sha = subprocess.run(
-        ["git", "rev-parse", "--short", ref], cwd=ROOT, capture_output=True, text=True, check=True
-    ).stdout.strip()
+    """每次都從 git 重新匯出（不沿用舊的資料夾：解壓中斷、被改過、tag 改指別的 commit 都會測到錯的程式）。
+    先解壓到暫存資料夾再換上去；完整 commit 寫在 <code>/.leihu-commit，報告用 commit_of() 讀。"""
+    full = subprocess.run(["git", "rev-parse", f"{ref}^{{commit}}"], cwd=ROOT, capture_output=True, text=True,
+                          check=True).stdout.strip()
     tag = subprocess.run(
-        ["git", "describe", "--tags", "--exact-match", sha], cwd=ROOT, capture_output=True, text=True
+        ["git", "describe", "--tags", "--exact-match", full], cwd=ROOT, capture_output=True, text=True
     ).stdout.strip()
-    name = tag or sha
+    name = tag or full[:7]
     code = OUT / name / "code"
-    if not (code / "app.py").exists():
-        code.mkdir(parents=True, exist_ok=True)
-        blob = subprocess.run(["git", "archive", "--format=tar", sha], cwd=ROOT, capture_output=True, check=True).stdout
-        with tempfile.TemporaryFile() as f:
-            f.write(blob)
-            f.seek(0)
-            with tarfile.open(fileobj=f) as t:
-                t.extractall(code, filter="data")
+    fresh = OUT / name / "code.new"
+    shutil.rmtree(fresh, ignore_errors=True)
+    fresh.mkdir(parents=True)
+    blob = subprocess.run(["git", "archive", "--format=tar", full], cwd=ROOT, capture_output=True, check=True).stdout
+    with tempfile.TemporaryFile() as f:
+        f.write(blob)
+        f.seek(0)
+        with tarfile.open(fileobj=f) as t:
+            t.extractall(fresh, filter="data")
+    (fresh / ".leihu-commit").write_text(full, "utf-8")
+    shutil.rmtree(code, ignore_errors=True)
+    fresh.rename(code)
     return name, code
+
+
+def commit_of(code: Path) -> str:
+    """export() 匯出的完整 commit；--code 指定的資料夾沒有這個檔，回傳說明。"""
+    f = code / ".leihu-commit"
+    return f.read_text("utf-8").strip() if f.exists() else "（不是 export() 匯出的，commit 不明）"
 
 
 def diff(old, new, path: str, out: list[str]) -> None:
@@ -188,7 +201,8 @@ def run_once(name: str, code: Path, tag: str) -> dict:
                 "LEIHU_ROUTES_OUT": str(routes),
             },
             server=[sys.executable, str(HERE / "serve_upstream.py")],
-            setup=lambda data: shutil.copytree(code, data, dirs_exist_ok=True),
+            # 不複製使用者設定：config.json 的 library_dir、models_dir 會把資料導到沙盒外（fixture 已經寫好測試設定）
+            setup=lambda data: shutil.copytree(code, data, dirs_exist_ok=True, ignore=shutil.ignore_patterns("config.json")),
         )
         log = (tmp / "server.log").read_text("utf-8", errors="replace")
         notes = [json.loads(x) for x in shim.read_text("utf-8").splitlines() if x] if shim.exists() else []
@@ -246,6 +260,21 @@ def alerts(run: dict, label: str, known: list[str]) -> list[str]:
     return out
 
 
+def raw_diff(a: dict, b: dict) -> dict[str, list[str]]:
+    """兩份結果逐案例的差異，不套用 RULES（同一版跑兩次的穩定性檢查用）。"""
+    a, b = (json.loads(json.dumps(x, ensure_ascii=False)) for x in (a, b))
+    out: dict[str, list[str]] = {}
+    for case in sorted(a.keys() | b.keys()):
+        if case not in a or case not in b:
+            out[case] = ["只有一次有這個案例"]
+            continue
+        d: list[str] = []
+        diff(a[case], b[case], "", d)
+        if d:
+            out[case] = d
+    return out
+
+
 def compare(snap: dict, result: dict) -> tuple[list[str], dict, dict]:
     """snap＝目前這一邊、result＝基準。回傳（完全相同的案例、預期差異、未預期差異）。案例集合不同也算未預期。"""
     same, expected, unexpected = [], {}, {}
@@ -273,7 +302,7 @@ def meta(name: str, code: Path, runs: int) -> list[str]:
     tool = _git("rev-parse", "--short", "HEAD").strip()
     dirty = _git("status", "--porcelain", "--", "tests").strip()
     return [
-        f"- 被測程式：`{name}`（{code}）",
+        f"- 被測程式：`{name}`（commit {commit_of(code)}；{code}）",
         f"- 測試工具：commit `{tool}`" + ("，`tests/` 有未 commit 的修改" if dirty else ""),
         f"- Python：{sys.version.split()[0]}（{sys.executable}）",
         f"- 電腦：{platform.platform()}；{platform.processor() or '（CPU 型號讀不到）'}",
@@ -300,8 +329,8 @@ def main() -> int:  # noqa: C901
     problems = alerts(runs[0], "第 1 次", known)
     if len(runs) > 1:
         problems += alerts(runs[1], "第 2 次", known)
-        _, _, unstable = compare(runs[1]["result"], result)
-        problems += [f"兩次結果不同的案例 {c}：{ds[0][:200]}" for c, ds in unstable.items()]
+        for c, ds in raw_diff(runs[1]["result"], result).items():  # 同一版：不套用 RULES，要完全相同
+            problems.append(f"兩次結果不同的案例 {c}：{ds[0][:200]}")
     stubs = [n["msg"] for n in runs[0]["notes"] if n["kind"] in ("stub", "forced")]
 
     recording = "--record" in opt
@@ -359,8 +388,10 @@ def main() -> int:  # noqa: C901
             ]
     lines += ["## 沙盒替換", "", *[f"- {s}" for s in stubs], ""]
 
-    # 重錄基準本身（--record 的參照就是 --base）時，和舊快照的差異只供參考：工具改了快照本來就會變
-    rebase = recording and SNAPSHOT.exists() and (opt.get("--base") or BASE) == name
+    # 重錄基準本身（--record 的參照就是 --base）而且明確加了 --rebase：和舊快照的差異只供參考（工具改了快照格式）
+    rebase = recording and "--rebase" in opt and SNAPSHOT.exists() and (opt.get("--base") or BASE) == name
+    if recording and "--rebase" in opt and not rebase:
+        problems.append("--rebase 只能用在重錄基準本身（參照要等於 --base），這次沒有效果")
     blocking = bool(problems) or (bool(unexpected) and not rebase)
     if recording:
         if blocking:

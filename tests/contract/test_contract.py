@@ -288,6 +288,7 @@ CASES = [
 HEADERS = ("Cache-Control", "Accept-Ranges", "Content-Range", "Allow")
 TEXT_SUFFIXES = {".json", ".lrc", ".log", ".csv", ".srt", ".txt"}
 VOLATILE_KEYS = {"root", "version", "session_cost", "update"}  # 4.5 第 5 點
+TIME_WINDOW = 3 * 86400  # 秒：離執行當下這麼近的數字才當作動態時間
 
 
 class Normalizer:
@@ -301,6 +302,8 @@ class Normalizer:
         self.paths.sort(key=lambda x: -len(x[0]))
         self.port = str(port)
         self.ids: dict[str, str] = {}
+        # 只有執行當下附近產生的時間才換成 <time>／<ns>；fixture 裡固定的時間（2017、2020 年）原樣保留，改錯才看得出來
+        self.t0 = time.time()
 
     def _id(self, kind: str, value: str) -> str:
         return self.ids.setdefault(value, f"<{kind}{sum(v.startswith('<' + kind) for v in self.ids.values()) + 1}>")
@@ -326,9 +329,9 @@ class Normalizer:
         if isinstance(x, bool) or x is None:
             return x
         if isinstance(x, (int, float)):
-            if 1.5e9 <= x <= 4e9:
+            if abs(x - self.t0) < TIME_WINDOW:
                 return "<time>"
-            if x > 1e15:
+            if x > 1e15 and abs(x / 1e9 - self.t0) < TIME_WINDOW:
                 return "<ns>"
             return round(x, 4) if isinstance(x, float) else x
         if isinstance(x, str):
@@ -344,9 +347,45 @@ def _files(base: Path) -> dict[str, str]:
     return out
 
 
+def audio_summary(src) -> dict:
+    """音訊的格式、長度，加上整體與 16 段的 RMS（dB，取到 0.1）：同格式同長度的靜音或另一段音訊也分得出來。
+    不比位元組：FLAC 編碼和混音的浮點運算在不同 CPU 上位元組可能不同，行為卻一樣。"""
+    info = sf.info(src)
+    if hasattr(src, "seek"):
+        src.seek(0)
+    y = sf.read(src, dtype="float64", always_2d=True)[0]
+
+    def db(x):
+        return round(float(20 * np.log10(np.sqrt(np.mean(x**2)) + 1e-9)), 1) if x.size else None
+
+    return {
+        "format": info.format,
+        "subtype": info.subtype,
+        "frames": info.frames,
+        "samplerate": info.samplerate,
+        "channels": info.channels,
+        "rms_db": db(y),
+        "peak_db": round(float(20 * np.log10(np.max(np.abs(y)) + 1e-9)), 1) if y.size else None,
+        "rms_db_16": [db(b) for b in np.array_split(y, 16)] if len(y) >= 16 else [],
+    }
+
+
+def image_summary(p: Path) -> dict:
+    """圖片的尺寸、色彩模式和像素的雜湊（同一台電腦上旋律譜等圖片要完全相同）。"""
+    from PIL import Image
+
+    with Image.open(p) as im:
+        return {"size": list(im.size), "mode": im.mode,
+                "pixels_sha256": hashlib.sha256(im.tobytes()).hexdigest()[:16]}
+
+
 def _content(p: Path, n: Normalizer):
     if p.suffix not in TEXT_SUFFIXES:
-        return "<binary>"
+        if p.suffix.lower() in (".wav", ".flac"):
+            return {"audio": audio_summary(str(p))}
+        if p.suffix.lower() in (".png", ".jpg", ".jpeg"):
+            return {"image": image_summary(p)}
+        return {"sha256": hashlib.sha256(p.read_bytes()).hexdigest()[:16]}
     text = p.read_text("utf-8-sig", errors="replace")
     try:
         if p.suffix == ".json":
@@ -436,14 +475,7 @@ def _record(r: Resp, n: Normalizer, raw: bool, volatile=frozenset()) -> dict:
         # 不比位元組：FLAC 編碼和混音的浮點運算在不同 CPU 上位元組可能不同，行為卻一樣。
         # 完整檔案比解碼後的格式與長度；Range 請求比回傳的長度（總長度在 Content-Range 裡，已正規化）
         if r.status_code == 200:
-            info = sf.info(io.BytesIO(r.content))
-            rec["audio"] = {
-                "format": info.format,
-                "subtype": info.subtype,
-                "frames": info.frames,
-                "samplerate": info.samplerate,
-                "channels": info.channels,
-            }
+            rec["audio"] = audio_summary(io.BytesIO(r.content))
         else:
             rec["bytes"] = len(r.content)
     else:
@@ -593,7 +625,9 @@ def test_contract_snapshot(tmp_path, app_module):
 
 
 def compare_snapshot(result: dict, path: Path) -> None:
-    if os.environ.get("LIANTAI_SNAPSHOT_UPDATE") == "1":
+    # 快照已經存在時，LIANTAI_SNAPSHOT_UPDATE 不會覆寫：要重建基準得另外設 LIANTAI_SNAPSHOT_REBASE=1（明確的另一個動作）
+    rebuild = not path.exists() or os.environ.get("LIANTAI_SNAPSHOT_REBASE") == "1"
+    if os.environ.get("LIANTAI_SNAPSHOT_UPDATE") == "1" and rebuild:
         path.parent.mkdir(exist_ok=True)
         with open(path, "w", encoding="utf-8", newline="\n") as f:
             f.write(_json(result) + "\n")

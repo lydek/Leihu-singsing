@@ -37,7 +37,7 @@ ROOT = HERE.parents[1]
 sys.path[:0] = [str(ROOT / "tests" / "numeric"), str(ROOT / "tests" / "contract")]
 
 from baseline import device_lines, log_alerts, machine  # noqa: E402  tests/numeric/baseline.py
-from compare_upstream import OUT, _git, export  # noqa: E402
+from compare_upstream import OUT, _git, commit_of, export  # noqa: E402
 
 PRIVATE = ROOT / "tests" / "private"
 MODELS = PRIVATE / "models"
@@ -213,6 +213,9 @@ def main() -> int:  # noqa: C901
     ref = args[0] if args else "v2.3.2"
     label = opt.get("label") or platform.node().lower()
     runs = int(opt.get("runs", 3))
+    if runs < 1:
+        print("--runs 至少要 1")
+        return 2
     quality = opt.get("quality", "auto")
     if not (PRIVATE / "numeric" / "inputs" / "sing.flac").exists() or not MODELS.exists():
         print("找不到 tests/private/numeric/inputs/sing.flac 或 tests/private/models（見計畫 3.8）")
@@ -232,6 +235,10 @@ def main() -> int:  # noqa: C901
         rec = {"sha256": sha, "source": "合成（sing.flac × 7）" if sid == "synth" else "tests/private/songs", "runs": []}
         for i in range(1, runs + 1):
             out = base / f"{sid}-run{i}"
+            if out.exists():  # 不能讀到上一次留下的 run.json、phases.json
+                import shutil
+
+                shutil.rmtree(out)
             print(f"{sid} 第 {i} 次 → {out}", flush=True)
             rc, mems, gpus, log = run_one(code, song, out, quality)
             all_logs.append(log)
@@ -259,7 +266,7 @@ def main() -> int:  # noqa: C901
     rep = [
         f"# 效能基準：{name}（{label}）",
         "",
-        f"- 被測程式：`{name}`（{code}）",
+        f"- 被測程式：`{name}`（commit {commit_of(code)}；{code}）",
         f"- 測試工具：commit `{tool}`" + ("，`tests/` 有未 commit 的修改" if dirty else ""),
         f"- Python：{sys.version.split()[0]}（{sys.executable}）",
         f"- 電腦：{mach['cpu']}（{mach['logical_cpus']} 個邏輯處理器）；{mach['ram_gb']} GB RAM；{mach['os']}",
@@ -306,9 +313,14 @@ def main() -> int:  # noqa: C901
                 "| 階段 | 時間 | main ws | main private | children ws | children private | total private | 顯示卡記憶體 | 顯示卡使用率 |",
                 "|---|---|---|---|---|---|---|---|---|"]
         for ph in order:
-            vals = [r["phases"].get(ph) for r in rec["runs"] if r["phases"].get(ph)]
+            # 只算成功的那幾次：結束代碼 0、有 run.json、這個階段沒有丟例外
+            vals = [r["phases"][ph] for r in rec["runs"]
+                    if r["rc"] == 0 and r["run"] and ph in r["phases"] and r["phases"][ph]["ok"]]
             if not vals:
+                rep.append(f"| {ph} | 沒有成功的資料 | | | | | | | |")
                 continue
+            if len(vals) < len(rec["runs"]):
+                ph = f"{ph}（{len(vals)}／{len(rec['runs'])} 次成功）"
             col = lambda k: stats([v[k] for v in vals])  # noqa: E731
             rep.append(f"| {ph} | {col('seconds')} | {col('main_ws_mb')} | {col('main_private_mb')} | "
                        f"{col('children_ws_mb')} | {col('children_private_mb')} | {col('total_private_mb')} | "
@@ -323,6 +335,8 @@ def main() -> int:  # noqa: C901
         "tool_commit": tool + ("+dirty" if dirty else ""),
         "machine": mach,
         "environment": {k: v for k, v in env.items() if k != "executable"},  # 不放含使用者名稱的路徑
+        "commit": commit_of(code),
+        "models": (first_run or {}).get("models"),
         "conditions": (first_run or {}).get("conditions"),
         "quality": quality,
         "runs_per_song": runs,

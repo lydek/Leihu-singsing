@@ -14,8 +14,16 @@ def _say(msg: str) -> None:
     print(f"[device] {msg}", flush=True)
 
 
+def _source(P) -> None:
+    """第一個工作時印出子程式載入的 pipeline 路徑（報告檢查它在沙盒裡）。"""
+    if not getattr(P, "_leihu_source", False):
+        print(f"[source] pipeline {P.__file__}", flush=True)
+        P._leihu_source = True
+
+
 def _separate(orig):
     def run(P, progress, model, *a, **k):
+        _source(P)
         from audio_separator.separator import Separator
 
         if not getattr(Separator, "_leihu_hooked", False):
@@ -36,6 +44,7 @@ def _separate(orig):
 
 def _pitch(orig):
     def run(P, progress, *a, **k):
+        _source(P)
         import torchcrepe
 
         if not getattr(torchcrepe, "_leihu_hooked", False):
@@ -55,6 +64,7 @@ def _pitch(orig):
 
 def _whisper(orig):
     def run(P, progress, *a, **k):
+        _source(P)
         if not getattr(P, "_leihu_hooked", False):
             load = P._whisper_model
 
