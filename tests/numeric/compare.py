@@ -120,11 +120,38 @@ def required(d: Path) -> list[str]:
                 continue
             try:
                 if p.suffix == ".json":
-                    json.loads(p.read_text("utf-8"))
+                    j = json.loads(p.read_text("utf-8"))
+                    shape = {"pitch.json": pitch_shape, "take_take01.json": take_shape}.get(f, _dict_shape)(j)
+                    bad += [f"{sid}/{f} 格式不對：{x}" for x in shape[:5]]
                 elif p.suffix in (".flac", ".wav"):
                     sf.info(str(p))
             except Exception as e:  # noqa: BLE001
                 bad.append(f"{sid}/{f} 讀不了：{type(e).__name__}: {e}"[:200])
+    return bad
+
+
+def _dict_shape(j) -> list[str]:
+    return [] if isinstance(j, dict) else [f"不是物件（{type(j).__name__}）"]
+
+
+def _finite(v) -> bool:
+    return isinstance(v, (int, float)) and not isinstance(v, bool) and bool(np.isfinite(v))
+
+
+def pitch_shape(j) -> list[str]:
+    """pitch.json：hop 是有限數字；midi 是非空的清單，每格是有限數字或 null；notes 是 [起點, 結束, 音高] 的清單。"""
+    if not isinstance(j, dict):
+        return [f"不是物件（{type(j).__name__}）"]
+    bad = [] if _finite(j.get("hop")) else [f"hop 是 {j.get('hop')!r}"]
+    midi = j.get("midi")
+    if not isinstance(midi, list) or not midi:
+        bad.append("midi 不是非空的清單")
+    elif not all(v is None or _finite(v) for v in midi):
+        bad.append("midi 有不是數字也不是 null 的值")
+    notes = j.get("notes")
+    if not isinstance(notes, list) or not all(isinstance(n, list) and len(n) == 3 and all(_finite(x) for x in n)
+                                               for n in notes):
+        bad.append("notes 不是 [起點, 結束, 音高] 的清單")
     return bad
 
 
@@ -244,8 +271,12 @@ def take_shape(k: dict) -> list[str]:
         return v if ok else None
 
     for key in ("acc", "mean", "spread", "offset", "frames"):
-        need(k, key, (int, float), "")
-    hint = need(k, "key_hint", dict, "")
+        if need(k, key, (int, float), "") is not None and not _finite(k[key]):
+            bad.append(f"{key} 不是有限數字")
+    # key_hint 可以是 null：上游有效音高少於 150 格時 suggest_key() 回傳 None（評分照樣是 done）
+    if "key_hint" not in k:
+        bad.append("key_hint 不存在")
+    hint = need(k, "key_hint", dict, "") if k.get("key_hint") is not None else None
     if hint is not None:
         need(hint, "share", (int, float), "key_hint.")
         for key in ("shift", "suggest"):
@@ -261,7 +292,9 @@ def take_shape(k: dict) -> list[str]:
     if pitch is not None:
         need(pitch, "hop", (int, float), "pitch.")
         need(pitch, "t0", (int, float), "pitch.")
-        need(pitch, "midi", list, "pitch.")
+        midi = need(pitch, "midi", list, "pitch.")
+        if midi is not None and not all(v is None or _finite(v) for v in midi):
+            bad.append("pitch.midi 有不是數字也不是 null 的值")
     return bad
 
 
@@ -290,19 +323,20 @@ def pair(a: Path, b: Path) -> list[dict]:  # noqa: C901
             rows.append(row(f"{sid} 音高", "pitch.json 不存在", "", False))
         else:
             ha, hb = (json.loads(p.read_text("utf-8")).get("hop") for p in (pa, pb))
-            rows.append(row(f"{sid} 音高 hop", f"{ha} vs {hb}", "相同", ha == hb))
+            rows.append(row(f"{sid} 音高 hop", f"{ha} vs {hb}", "相同", ha == hb,
+                            abs(ha - hb) if _finite(ha) and _finite(hb) else None))
             ma, mb = _midi(pa), _midi(pb)
             if len(ma) != len(mb):
                 rows.append(row(f"{sid} 音高影格數", f"{len(ma)} vs {len(mb)}", "相同", False))
             else:
-                if not len(ma):  # 空的曲線算不出一致率（不能變成 NaN 當成自然差異）
+                if not len(ma):  # 空的曲線算不出一致率：只記失敗，不留假的一致率、差距（required() 也會擋下這種輸出）
                     rows.append(row(f"{sid} 音高影格", "兩邊都沒有音高影格", "有音高", False))
-                    ma = mb = np.array([np.nan])  # 這一項已經記失敗；讓下面照常往下比（音符、meta、歌詞）
-                agree = float(np.mean(np.isnan(ma) == np.isnan(mb)))
-                both = ~np.isnan(ma) & ~np.isnan(mb)
-                cents = float(np.median(np.abs(ma[both] - mb[both])) * 100) if both.any() else 0.0
-                rows.append(row(f"{sid} 有聲判斷一致率", f"{agree:.4f}", ">= 0.98", agree >= 0.98, agree))
-                rows.append(row(f"{sid} 音高差中位數", f"{cents:.2f} cents", "< 10 cents", cents < 10, cents))
+                else:
+                    agree = float(np.mean(np.isnan(ma) == np.isnan(mb)))
+                    both = ~np.isnan(ma) & ~np.isnan(mb)
+                    cents = float(np.median(np.abs(ma[both] - mb[both])) * 100) if both.any() else 0.0
+                    rows.append(row(f"{sid} 有聲判斷一致率", f"{agree:.4f}", ">= 0.98", agree >= 0.98, agree))
+                    rows.append(row(f"{sid} 音高差中位數", f"{cents:.2f} cents", "< 10 cents", cents < 10, cents))
             na, nb = (json.loads(p.read_text("utf-8"))["notes"] for p in (pa, pb))
             ok = abs(len(na) - len(nb)) <= max(1, 0.02 * len(na))
             rows.append(row(f"{sid} 音符數", f"{len(na)} vs {len(nb)}", "差 <= max(1, 2%)", ok, abs(len(na) - len(nb))))
@@ -346,14 +380,18 @@ def pair(a: Path, b: Path) -> list[dict]:  # noqa: C901
             rows.append(row("評分影格數差", f"{d}（{ka['frames']} vs {kb['frames']}）", "<= 2%",
                             d <= 0.02 * max(ka["frames"], kb["frames"], 1), d))
             # key_hint 拆開比：shift、suggest 要相同，share（比例）允許小差距；octave 要相同
-            ha, hb = ka.get("key_hint") or {}, kb.get("key_hint") or {}
-            for k in ("shift", "suggest"):
+            ha, hb = ka.get("key_hint"), kb.get("key_hint")
+            if ha is None or hb is None:  # 上游合法的 null（有效音高不夠）：兩邊要一樣是 null
+                rows.append(row("評分 key_hint", f"{ha} vs {hb}", "相同", ha is None and hb is None))
+                ha = hb = None
+            for k in ("shift", "suggest") if ha is not None else ():
                 rows.append(row(f"評分 key_hint.{k}", f"{ha.get(k)} vs {hb.get(k)}", "相同",
                                 _canon(ha.get(k)) == _canon(hb.get(k))))
-            d = abs(ha["share"] - hb["share"])  # take_shape 已確認是數字（null 不再當成 0）
-            rows.append(row("評分 key_hint.share 差", f"{d:.3f}（{ha.get('share')} vs {hb.get('share')}）", "<= 0.05",
-                            d <= 0.05, d))
-            other = sorted((ha.keys() | hb.keys()) - {"shift", "suggest", "share"})
+            if ha is not None:
+                d = abs(ha["share"] - hb["share"])  # take_shape 已確認是數字（null 不再當成 0）
+                rows.append(row("評分 key_hint.share 差", f"{d:.3f}（{ha.get('share')} vs {hb.get('share')}）", "<= 0.05",
+                                d <= 0.05, d))
+            other = sorted((ha.keys() | hb.keys()) - {"shift", "suggest", "share"}) if ha is not None else []
             if other:
                 rows.append(row("評分 key_hint 其他欄位", "、".join(other), "沒有其他欄位（新欄位要補比對）", False))
             rows.append(row("評分 octave", f"{ka.get('octave')} vs {kb.get('octave')}", "相同",
@@ -396,7 +434,8 @@ def _take_pitch_rows(pa, pb) -> list[dict]:
     for k, lim in (("hop", 0.0), ("t0", 0.02)):
         x, y = _num(pa, k), _num(pb, k)
         ok = x is not None and y is not None and abs(x - y) <= lim
-        rows.append(row(f"評分錄音音高 {k}", f"{x} vs {y}", "相同" if lim == 0 else f"差 <= {lim:g} 秒", ok))
+        rows.append(row(f"評分錄音音高 {k}", f"{x} vs {y}", "相同" if lim == 0 else f"差 <= {lim:g} 秒", ok,
+                        abs(x - y) if x is not None and y is not None else None))
     ma, mb = (np.array([np.nan if v is None else v for v in p["midi"]], dtype=float) for p in (pa, pb))
     if len(ma) != len(mb):
         return rows + [row("評分錄音音高影格數", f"{len(ma)} vs {len(mb)}", "相同", False, abs(len(ma) - len(mb)))]
