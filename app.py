@@ -24,7 +24,7 @@ import score_sheet as SS   # 1.7：旋律譜匯出
 import exporter as EX      # 2.3.0：匯出歌單、直播歌單回顧
 import hotkeys as HK   # 2.0：自訂全域快捷鍵
 
-VERSION = "2.3.2"
+VERSION = "2.3.2.1"   # fork：上游版本＋第 4 段 fork 序號
 HOST, PORT = "127.0.0.1", int(os.environ.get("LIANTAI_PORT", "8765"))
 app = Flask(__name__, static_folder=str(P.ROOT / "static"), static_url_path="/static")
 app.config["MAX_CONTENT_LENGTH"] = 1024 * 1024 * 1024
@@ -1343,8 +1343,8 @@ def export_lyrics(sid):
     return jsonify(path=str(path))
 
 
-RELEASES_URL = "https://github.com/LeihuTW/Leihu-singsing/releases/latest"
-EXTERNAL_URLS = ("https://www.twitch.tv/leihustore", "https://github.com/LeihuTW/Leihu-singsing", RELEASES_URL,
+RELEASES_URL = "https://github.com/lydek/Leihu-singsing/releases/latest"   # fork：更新與下載頁都指向 fork（授權要求的原作來源見 LICENSE.md）
+EXTERNAL_URLS = ("https://www.twitch.tv/leihustore", "https://github.com/lydek/Leihu-singsing", RELEASES_URL,
                  # 分享錄音：各平台的發文／上傳頁
                  "https://www.facebook.com", "https://www.instagram.com", "https://x.com/compose/post",
                  "https://www.threads.com")
@@ -2071,11 +2071,12 @@ def loudness_backfill() -> None:
 UPDATE = {"latest": None, "url": RELEASES_URL, "can_install": False, "state": "", "progress": 0.0, "error": ""}
 _UPDATE_ASSET: dict = {}   # 新版安裝檔：name、url、size、digest
 _update_lock = threading.Lock()
-ASSET_PREFIX = "https://github.com/LeihuTW/Leihu-singsing/releases/download/"
+ASSET_PREFIX = "https://github.com/lydek/Leihu-singsing/releases/download/"
 
 
 def _ver(s: str) -> tuple:
-    return tuple(int(x) for x in re.findall(r"\d+", s)[:3])
+    # fork 的版號有 4 段（2.3.2.1）：只看前 3 段的話 fork 的新版會被當成和 2.3.2 一樣
+    return tuple(int(x) for x in re.findall(r"\d+", s)[:4])
 
 
 def _installed_copy() -> bool:
@@ -2089,7 +2090,7 @@ def check_update() -> None:
     """啟動時到 GitHub 查一次最新版本，有新版就在畫面上方提示。沒網路或查不到就什麼都不顯示。"""
     time.sleep(5)
     try:
-        r = P._http_json("https://api.github.com/repos/LeihuTW/Leihu-singsing/releases/latest",
+        r = P._http_json("https://api.github.com/repos/lydek/Leihu-singsing/releases/latest",
                          {"Accept": "application/vnd.github+json"})
         tag = str(r.get("tag_name") or "")
         if _ver(tag) <= _ver(VERSION):
