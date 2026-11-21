@@ -66,6 +66,8 @@ LOG_ALERTS = [
     ("out of memory", "記憶體不足"),
     ("暫存資料夾刪不掉", "測試工具的暫存資料夾沒有刪乾淨"),
     ("could not activate requested provider", "ONNX 沒有啟用要求的執行裝置（例如顯示卡），改用別的"),
+    ("Falling back to", "onnxruntime 執行失敗，改用別的執行裝置重試"),
+    ("執行中改用", "ONNX session 執行中改用別的執行裝置"),
 ]
 # 案例本身故意造成的 log 訊息：(訊息片段, 原因)。報告照樣列出，但不算異常
 LOG_EXPECTED = [
@@ -103,9 +105,13 @@ def scrub(x):
 
 
 def user_leaks(text: str) -> list[str]:
-    """scrub 之後還看得到使用者名稱的地方（例如路徑寫法沒想到的形式）。"""
-    user = os.path.basename(os.path.expanduser("~"))
-    return [m.group(0) for m in re.finditer(rf"(?i).{{0,30}}\b{re.escape(user)}\b.{{0,30}}", text)] if user else []
+    """scrub 之後還看得到的使用者資料夾路徑（任何帳號：C:\\Users\\<名稱>、/Users/<名稱>、/home/<名稱>，
+    分隔符號混用、多層跳脫都算）。不用使用者名稱當單字比對：名稱是 cpu 之類的常見字時會誤擋。"""
+    rx = r"(?i)(?:[a-z]:)?[\\/]+(?:users|home)[\\/]+(?!public\b)[^\\/\s\"'<>:]+"
+    return [m.group(0) for m in re.finditer(rx, text)]
+
+
+assert user_leaks("x C:\\\\Users\\\\alice\\\\y") and user_leaks("/home/bob/x") and not user_leaks("desktop-9900x3d-cpu <home>\\a")
 
 
 def write_summary(path: Path, summary: dict) -> str:
