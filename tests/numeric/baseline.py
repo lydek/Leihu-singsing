@@ -193,6 +193,8 @@ def main() -> int:  # noqa: C901
         else:
             problems.append(f"第 {i} 次沒有產生 run.json，結果不完整")
         problems += log_alerts(logs[i], f"第 {i} 次")
+        if (out / "run.json").exists():
+            problems += [f"第 {i} 次輸出不完整：{p}" for p in C.required(out)]
     ok_runs = [i for i in logs if (base / f"run{i}" / "run.json").exists()
                and not json.loads((base / f"run{i}" / "run.json").read_text("utf-8")).get("incomplete")]
     # 穩定性：第 2 次起每一次都和第 1 次逐檔核對（CPU、固定條件下要完全相同）；差距表只是參考
@@ -265,7 +267,7 @@ def main() -> int:  # noqa: C901
         "wall_seconds": wall,
     }
     out_json = SUMMARY / f"{name}-{label}.json"
-    out_json.write_text(json.dumps(scrub(summary), ensure_ascii=False, indent=1), "utf-8")
+    out_json.write_text(json.dumps(scrub(summary), ensure_ascii=False, allow_nan=False, indent=1), "utf-8")
     print("\n".join(rep))
     print(f"報告：{base / 'numeric-report.md'}；摘要：{out_json}")
     return 1 if problems else 0

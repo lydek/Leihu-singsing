@@ -342,6 +342,15 @@ def meta(name: str, code: Path, runs: int) -> list[str]:
 def main() -> int:  # noqa: C901
     args = [a for a in sys.argv[1:] if not a.startswith("--")]
     opt = {a.split("=", 1)[0]: (a.split("=", 1)[1] if "=" in a else "") for a in sys.argv[1:] if a.startswith("--")}
+    if "--rebase" in opt:  # 參數錯誤先擋下，不要等到報告寫了「異常：無」之後才加
+        if "--code" in opt or "--record" not in opt:
+            print("--rebase 只能和 --record 一起用在 git 參照上（--code 的資料夾無法確認是哪個 commit）")
+            return 2
+        ref_full, base_full = (_git("rev-parse", f"{r}^{{commit}}").strip() for r in (args[0] if args else BASE,
+                                                                                    opt.get("--base") or BASE))
+        if ref_full != base_full:
+            print(f"--rebase 只能重建基準本身：參照 {ref_full[:12]} 和 --base {base_full[:12]} 不是同一個 commit")
+            return 2
     if "--code" in opt:
         code = Path(opt["--code"]).resolve()
         name = code.name
@@ -364,7 +373,7 @@ def main() -> int:  # noqa: C901
     recording = "--record" in opt
     if recording and SNAPSHOT.exists():
         base_name, base_code = export(opt.get("--base") or BASE)
-        if base_name == name:
+        if commit_of(base_code) == commit_of(code):  # 同一個 commit 才算重錄基準本身（不看資料夾名稱）
             snap, base_result = json.loads(SNAPSHOT.read_text("utf-8")), result  # 重錄基準本身：和舊快照比
         else:
             base_run = run_once(base_name, base_code, "base")
@@ -416,10 +425,8 @@ def main() -> int:  # noqa: C901
             ]
     lines += ["## 沙盒替換", "", *[f"- {s}" for s in stubs], ""]
 
-    # 重錄基準本身（--record 的參照就是 --base）而且明確加了 --rebase：和舊快照的差異只供參考（工具改了快照格式）
-    rebase = recording and "--rebase" in opt and SNAPSHOT.exists() and (opt.get("--base") or BASE) == name
-    if recording and "--rebase" in opt and not rebase:
-        problems.append("--rebase 只能用在重錄基準本身（參照要等於 --base），這次沒有效果")
+    # 重錄基準本身而且明確加了 --rebase（上面已確認參照和 --base 是同一個 commit）：和舊快照的差異只供參考
+    rebase = recording and "--rebase" in opt and SNAPSHOT.exists()
     blocking = bool(problems) or (bool(unexpected) and not rebase)
     if recording:
         if blocking:

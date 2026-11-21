@@ -31,14 +31,23 @@ SONGS = ("songsing01", "songspeech01")
 AUDIO = (".flac", ".wav", ".mp3", ".m4a", ".ogg")  # run.py --songs、similarity.py 認的音檔
 META_KEYS = ("separation", "vocal_model", "karaoke", "acapella", "language", "lyrics_unreliable", "harmony")
 # JSON 裡每次都會變、和輸出內容無關的欄位：combo_lufs_sig 是用檔案 mtime（奈秒）組成的響度快取簽章
-VOLATILE = {"meta.json": ("combo_lufs_sig",)}
+VOLATILE = {"meta.json": {"combo_lufs_sig": r"\d+(\|\d+)*"}}  # 欄位 → 合法格式；只把值換成 <sig:段數>
+# 每首歌一定要有的輸出（缺了是執行失敗，不是差異）：exact() 只比兩邊都有的檔案，兩邊都漏會看不出來
+REQUIRED = {
+    "songsing01": ("lead.flac", "back.flac", "inst.flac", "pitch.json", "meta.json", "take_take01.json", "export.wav"),
+    "songspeech01": ("lead.flac", "back.flac", "inst.flac", "pitch.json", "meta.json", "lyrics_auto.lrc"),
+    "song": ("lead.flac", "back.flac", "inst.flac", "pitch.json", "meta.json"),  # run.py --songs 的 songNN
+}
 SKIP = ("timing.json", "run.json", "net_blocked.log")  # exact() 不比的檔案（處理時間、執行環境、診斷）
 
 
 def row(item: str, value, limit: str, ok: bool | None, num: float | None = None) -> dict:
-    """value 是給人看的文字；num 是沒有四捨五入的數字（相似度下限用它，不從文字解析）。inf 存成字串 "inf"（JSON 沒有 inf）。"""
+    """value 是給人看的文字；num 是沒有四捨五入的數字（相似度下限用它，不從文字解析）。
+    inf、-inf、nan 存成字串 "inf"、"-inf"、"nan"（JSON 沒有這些值；寫檔一律 allow_nan=False）。"""
     if num is not None:
-        num = "inf" if num == float("inf") else float(num)
+        num = float(num)
+        if not np.isfinite(num):
+            num = "nan" if np.isnan(num) else ("inf" if num > 0 else "-inf")
     return {"item": item, "value": value, "limit": limit, "ok": None if ok is None else bool(ok), "num": num}
 
 
@@ -47,7 +56,20 @@ def sdr(ref: np.ndarray, est: np.ndarray) -> float:
     if ref.shape != est.shape:
         raise ValueError(f"形狀不同：{ref.shape} vs {est.shape}")
     err = np.sum((ref - est) ** 2)
-    return float("inf") if err == 0 else float(10 * np.log10(np.sum(ref**2) / err))
+    if err == 0:
+        return float("inf")  # 完全相同（兩邊都是靜音也算）
+    power = np.sum(ref**2)
+    return float("-inf") if power == 0 else float(10 * np.log10(power / err))  # 參考是靜音、另一邊有聲音：最差
+
+
+def rms_db_diff(ya: np.ndarray, yb: np.ndarray) -> float:
+    """兩段的 RMS 差（dB）；兩段都是靜音是 0，只有一段靜音是 inf。"""
+    ra, rb = np.sqrt(np.mean(ya**2)), np.sqrt(np.mean(yb**2))
+    if ra == 0 and rb == 0:
+        return 0.0
+    if ra == 0 or rb == 0:
+        return float("inf")
+    return float(abs(20 * np.log10(ra / rb)))
 
 
 def audio_pair(pa: Path, pb: Path) -> tuple[np.ndarray, np.ndarray, str]:
@@ -72,33 +94,66 @@ def _files(d: Path) -> set[str]:
     }
 
 
+def _volatile(name: str, j):
+    """VOLATILE 欄位：格式正確就換成 <sig:段數>（保留欄位存在與結構），格式不對原樣留下（會被比出差異）。"""
+    rules = VOLATILE.get(name, {})
+    if not isinstance(j, dict) or not rules:
+        return j
+    out = dict(j)
+    for k, rx in rules.items():
+        v = out.get(k)
+        if isinstance(v, str) and re.fullmatch(rx, v):
+            out[k] = f"<sig:{v.count('|') + 1}>"
+    return out
+
+
+def required(d: Path) -> list[str]:
+    """一份輸出缺了哪些必要檔案、哪些 JSON 讀不了、音檔打不開（空清單＝完整）。"""
+    bad = []
+    sids = [*SONGS, *sorted(x.name for x in d.iterdir() if x.is_dir() and re.fullmatch(r"song\d+", x.name))] \
+        if d.exists() else list(SONGS)
+    for sid in sids:
+        for f in REQUIRED.get(sid, REQUIRED["song"]):
+            p = d / sid / f
+            if not p.exists():
+                bad.append(f"{sid}/{f} 不存在")
+                continue
+            try:
+                if p.suffix == ".json":
+                    json.loads(p.read_text("utf-8"))
+                elif p.suffix in (".flac", ".wav"):
+                    sf.info(str(p))
+            except Exception as e:  # noqa: BLE001
+                bad.append(f"{sid}/{f} 讀不了：{type(e).__name__}: {e}"[:200])
+    return bad
+
+
 def exact(a: Path, b: Path) -> list[dict]:  # noqa: C901
-    """逐檔核對兩份輸出是否完全相同。"""
+    """逐檔核對兩份輸出是否完全相同（必要檔案缺少另由 required() 檢查）。"""
     fa, fb = _files(a), _files(b)
     rows = [row(f, f"只有{'A' if f in fa else 'B'}有這個檔案", "兩邊都有", False) for f in sorted(fa ^ fb)]
     for f in sorted(fa & fb):
         pa, pb = a / f, b / f
         if pa.suffix.lower() in (".flac", ".wav"):
             ia, ib = sf.info(str(pa)), sf.info(str(pb))
-            keys = ("samplerate", "channels", "frames", "subtype")
+            keys = ("format", "samplerate", "channels", "frames", "subtype")
             fmt = [f"{k} {getattr(ia, k)} vs {getattr(ib, k)}" for k in keys if getattr(ia, k) != getattr(ib, k)]
             if fmt:
                 rows.append(row(f, "、".join(fmt), "格式與長度相同", False))
                 continue
             ya, yb = (sf.read(str(p), dtype="float64", always_2d=True)[0] for p in (pa, pb))
-            n = int(np.sum(ya != yb))
-            v = "每個取樣都相同" if n == 0 else f"{n} 個取樣不同（最大差 {np.max(np.abs(ya - yb)):.3g}）"
+            # 解碼後逐位元比（+0.0 和 -0.0 也算不同）；不比檔頭（libsndfile 寫浮點 WAV 時有時間戳記）
+            n = int(np.sum(ya.view(np.uint64) != yb.view(np.uint64)))
+            v = "解碼後每個取樣逐位元相同" if n == 0 else f"{n} 個取樣不同（最大差 {np.max(np.abs(ya - yb)):.3g}）"
             rows.append(row(f, v, "完全相同", n == 0))
         elif pa.suffix == ".json":
-            ja, jb = (json.loads(p.read_text("utf-8")) for p in (pa, pb))
-            drop = VOLATILE.get(pa.name, ())
-            if isinstance(ja, dict) and isinstance(jb, dict):
-                ja, jb = ({k: v for k, v in x.items() if k not in drop} for x in (ja, jb))
+            ja, jb = (_volatile(pa.name, json.loads(p.read_text("utf-8"))) for p in (pa, pb))
+            drop = tuple(VOLATILE.get(pa.name, {}))
             same = _canon(ja) == _canon(jb)
             keys = []
             if not same and isinstance(ja, dict) and isinstance(jb, dict):
                 keys = sorted(k for k in ja.keys() | jb.keys() if _canon(ja.get(k)) != _canon(jb.get(k)))
-            note = f"（不比 {'、'.join(drop)}）" if drop else ""
+            note = f"（{'、'.join(drop)} 只比欄位與格式）" if drop else ""
             rows.append(row(f, "相同" + note if same else f"不同：{'、'.join(keys) or '內容'}", "完全相同", same))
         else:
             same = pa.read_bytes() == pb.read_bytes()
@@ -157,6 +212,32 @@ def _lyrics(a: Path, b: Path, sid: str) -> list[dict]:
     return rows
 
 
+def match_notes(na: list, nb: list, tol: float = 0.1) -> tuple[list, int, int]:
+    """依時間順序一對一配對音符（起點差 < tol 秒才算同一個音），回傳 (配對, A 沒配到的數量, B 沒配到的數量)。"""
+    i = j = 0
+    out = []
+    while i < len(na) and j < len(nb):
+        d = na[i][0] - nb[j][0]
+        if abs(d) < tol:
+            out.append((na[i], nb[j]))
+            i += 1
+            j += 1
+        elif d < 0:
+            i += 1
+        else:
+            j += 1
+    return out, len(na) - len(out), len(nb) - len(out)
+
+
+assert match_notes([[0, 1, 60], [0.01, 1, 60], [1, 2, 60]], [[0, 1, 60], [1, 2, 60], [9, 10, 60]])[1:] == (1, 1)
+
+
+def _num(d: dict, k: str):
+    """評分欄位一定要是數字（缺少、null、字串都不是 0）。"""
+    v = d.get(k)
+    return v if isinstance(v, (int, float)) and not isinstance(v, bool) else None
+
+
 def pair(a: Path, b: Path) -> list[dict]:  # noqa: C901
     rows: list[dict] = []
     for sid in songs(a, b):
@@ -190,16 +271,18 @@ def pair(a: Path, b: Path) -> list[dict]:  # noqa: C901
             ok = abs(len(na) - len(nb)) <= max(1, 0.02 * len(na))
             rows.append(row(f"{sid} 音符數", f"{len(na)} vs {len(nb)}", "差 <= max(1, 2%)", ok, abs(len(na) - len(nb))))
             if na and nb:
-                # 每個 A 的音符配對 B 裡起點最近的音符，比起點、結束、音高（音符數不同時也能比）
-                sb = np.array([n[0] for n in nb])
-                match = [(n, nb[int(np.argmin(np.abs(sb - n[0])))]) for n in na]
-                d0 = float(np.median([abs(x[0] - y[0]) for x, y in match]) * 1000)
-                d1 = float(np.median([abs(x[1] - y[1]) for x, y in match]) * 1000)
-                dm = sum(1 for x, y in match if x[2] != y[2])
-                rows.append(row(f"{sid} 音符起點差中位數", f"{d0:.1f} ms", "< 20 ms", d0 < 20, d0))
-                rows.append(row(f"{sid} 音符結束差中位數", f"{d1:.1f} ms", "< 20 ms", d1 < 20, d1))
-                rows.append(row(f"{sid} 音符音高不同的個數", f"{dm}／{len(match)}", "<= max(1, 2%)",
-                                dm <= max(1, 0.02 * len(match)), dm))
+                match, ua, ub = match_notes(na, nb)
+                lim = max(1, 0.02 * max(len(na), len(nb)))
+                rows.append(row(f"{sid} 沒有配對到的音符", f"A 多 {ua} 個、B 多 {ub} 個", "各 <= max(1, 2%)",
+                                ua <= lim and ub <= lim, ua + ub))
+                if match:
+                    d0 = float(np.median([abs(x[0] - y[0]) for x, y in match]) * 1000)
+                    d1 = float(np.median([abs(x[1] - y[1]) for x, y in match]) * 1000)
+                    dm = sum(1 for x, y in match if x[2] != y[2])
+                    rows.append(row(f"{sid} 音符起點差中位數", f"{d0:.1f} ms", "< 20 ms", d0 < 20, d0))
+                    rows.append(row(f"{sid} 音符結束差中位數", f"{d1:.1f} ms", "< 20 ms", d1 < 20, d1))
+                    rows.append(row(f"{sid} 音符音高不同的個數", f"{dm}／{len(match)}", "<= max(1, 2%)",
+                                    dm <= lim, dm))
         ma_, mb_ = _json(a / sid / "meta.json"), _json(b / sid / "meta.json")
         if ma_ is None or mb_ is None:
             rows.append(row(f"{sid} meta", "meta.json 不存在", "", False))
@@ -217,8 +300,15 @@ def pair(a: Path, b: Path) -> list[dict]:  # noqa: C901
         ok = ka.get("status") == kb.get("status") == "done"
         rows.append(row("評分狀態", f"{ka.get('status')} vs {kb.get('status')}", "都是 done", ok))
         if ok:
+            missing = [k for k in ("acc", "mean", "spread", "offset", "frames") for x in (ka, kb) if _num(x, k) is None]
+            if missing:
+                rows.append(row("評分欄位", f"缺少或不是數字：{'、'.join(sorted(set(missing)))}", "都是數字", False))
+                return rows + _export_rows(a, b)
             d = abs(ka["acc"] - kb["acc"]) * 100
             rows.append(row("評分準確率差", f"{d:.1f} 分（{ka['acc']} vs {kb['acc']}）", "<= 1 分", d <= 1, d))
+            d = abs(ka["frames"] - kb["frames"])
+            rows.append(row("評分影格數差", f"{d}（{ka['frames']} vs {kb['frames']}）", "<= 2%",
+                            d <= 0.02 * max(ka["frames"], kb["frames"], 1), d))
             # key_hint 拆開比：shift、suggest 要相同，share（比例）允許小差距；octave 要相同
             ha, hb = ka.get("key_hint") or {}, kb.get("key_hint") or {}
             for k in ("shift", "suggest"):
@@ -233,31 +323,68 @@ def pair(a: Path, b: Path) -> list[dict]:  # noqa: C901
             rows.append(row("評分 octave", f"{ka.get('octave')} vs {kb.get('octave')}", "相同",
                             _canon(ka.get("octave")) == _canon(kb.get("octave"))))
             for k in ("mean", "spread"):
-                d = abs((ka.get(k) or 0) - (kb.get(k) or 0))
-                rows.append(row(f"評分 {k} 差", f"{d:.1f} cents（{ka.get(k)} vs {kb.get(k)}）", "<= 3 cents", d <= 3, d))
-            d = abs((ka.get("offset") or 0) - (kb.get("offset") or 0))
-            rows.append(row("評分 offset 差", f"{d:.3f} 秒（{ka.get('offset')} vs {kb.get('offset')}）", "<= 0.02 秒",
+                d = abs(ka[k] - kb[k])
+                rows.append(row(f"評分 {k} 差", f"{d:.1f} cents（{ka[k]} vs {kb[k]}）", "<= 3 cents", d <= 3, d))
+            d = abs(ka["offset"] - kb["offset"])
+            rows.append(row("評分 offset 差", f"{d:.3f} 秒（{ka['offset']} vs {kb['offset']}）", "<= 0.02 秒",
                             d <= 0.02, d))
-            la_, lb_ = ka.get("lines") or [], kb.get("lines") or []
-            if len(la_) != len(lb_):
-                rows.append(row("評分逐句的句數", f"{len(la_)} vs {len(lb_)}", "相同", False))
-            elif la_:
-                worst = max(abs(x["acc"] - y["acc"]) for x, y in zip(la_, lb_, strict=True)) * 100
-                rows.append(row("評分逐句準確率最大差", f"{worst:.1f} 分（{len(la_)} 句）", "<= 5 分", worst <= 5, worst))
-    pa, pb = a / "songsing01" / "export.wav", b / "songsing01" / "export.wav"
-    if pa.exists() and pb.exists():
-        ya, yb, bad = audio_pair(pa, pb)
-        if bad:
-            rows.append(row("匯出檔", bad, "取樣率、聲道、長度相同", False))
-            return rows
-        v = sdr(ya, yb)
-        rows.append(row("匯出檔 SDR", f"{v:.1f} dB", "> 30 dB", v > 30, v))
-        # 舊分支比的是 LUFS 差 <= 0.1；這裡用 RMS 差（不用 import 被測程式的響度函式）
-        rd = abs(20 * np.log10(np.sqrt(np.mean(ya**2)) / np.sqrt(np.mean(yb**2))))
-        rows.append(row("匯出檔 RMS 差", f"{rd:.3f} dB", "<= 0.1 dB", rd <= 0.1, rd))
-    else:
-        rows.append(row("匯出檔", "export.wav 不存在", "", False))
+            rows += _lines_rows(ka.get("lines"), kb.get("lines"))
+            rows += _take_pitch_rows(ka.get("pitch"), kb.get("pitch"))
+    return rows + _export_rows(a, b)
+
+
+def _lines_rows(la, lb) -> list[dict]:
+    """評分逐句：句數、每句的時間、文字、影格數要相同，準確率、mean 允許小差距。"""
+    la, lb = la or [], lb or []
+    if len(la) != len(lb):
+        return [row("評分逐句的句數", f"{len(la)} vs {len(lb)}", "相同", False, abs(len(la) - len(lb)))]
+    if not la:
+        return []
+    ident = sum(1 for x, y in zip(la, lb, strict=True)
+                if _canon([x.get("t"), x.get("text"), x.get("n")]) != _canon([y.get("t"), y.get("text"), y.get("n")]))
+    rows = [row("評分逐句的時間、文字、影格數", "相同" if not ident else f"{ident} 句不同", "相同", ident == 0, ident)]
+    try:
+        acc = max(abs(x["acc"] - y["acc"]) for x, y in zip(la, lb, strict=True)) * 100
+        mean = max(abs(x["mean"] - y["mean"]) for x, y in zip(la, lb, strict=True))
+    except (KeyError, TypeError):
+        return rows + [row("評分逐句欄位", "acc 或 mean 缺少、不是數字", "都是數字", False)]
+    rows.append(row("評分逐句準確率最大差", f"{acc:.1f} 分（{len(la)} 句）", "<= 5 分", acc <= 5, acc))
+    rows.append(row("評分逐句 mean 最大差", f"{mean:.1f} cents", "<= 3 cents", mean <= 3, mean))
     return rows
+
+
+def _take_pitch_rows(pa, pb) -> list[dict]:
+    """評分裡錄音的音高曲線：hop、起點、影格數相同，有聲一致率與音高差和 pitch.json 同樣的門檻。"""
+    if not (isinstance(pa, dict) and isinstance(pb, dict)):
+        return [row("評分錄音音高", f"{type(pa).__name__} vs {type(pb).__name__}", "兩邊都有", False)]
+    rows = []
+    for k, lim in (("hop", 0.0), ("t0", 0.02)):
+        x, y = _num(pa, k), _num(pb, k)
+        ok = x is not None and y is not None and abs(x - y) <= lim
+        rows.append(row(f"評分錄音音高 {k}", f"{x} vs {y}", "相同" if lim == 0 else f"差 <= {lim:g} 秒", ok))
+    ma, mb = (np.array([np.nan if v is None else v for v in p.get("midi") or []], dtype=float) for p in (pa, pb))
+    if len(ma) != len(mb):
+        return rows + [row("評分錄音音高影格數", f"{len(ma)} vs {len(mb)}", "相同", False, abs(len(ma) - len(mb)))]
+    agree = float(np.mean(np.isnan(ma) == np.isnan(mb))) if len(ma) else 1.0
+    both = ~np.isnan(ma) & ~np.isnan(mb)
+    cents = float(np.median(np.abs(ma[both] - mb[both])) * 100) if both.any() else 0.0
+    rows.append(row("評分錄音有聲判斷一致率", f"{agree:.4f}", ">= 0.98", agree >= 0.98, agree))
+    rows.append(row("評分錄音音高差中位數", f"{cents:.2f} cents", "< 10 cents", cents < 10, cents))
+    return rows
+
+
+def _export_rows(a: Path, b: Path) -> list[dict]:
+    pa, pb = a / "songsing01" / "export.wav", b / "songsing01" / "export.wav"
+    if not (pa.exists() and pb.exists()):
+        return [row("匯出檔", "export.wav 不存在", "", False)]
+    ya, yb, bad = audio_pair(pa, pb)
+    if bad:
+        return [row("匯出檔", bad, "取樣率、聲道、長度相同", False)]
+    v = sdr(ya, yb)
+    # 舊分支比的是 LUFS 差 <= 0.1；這裡用 RMS 差（不用 import 被測程式的響度函式）
+    rd = rms_db_diff(ya, yb)
+    return [row("匯出檔 SDR", f"{v:.1f} dB", "> 30 dB", v > 30, v),
+            row("匯出檔 RMS 差", f"{rd:.3f} dB", "<= 0.1 dB", rd <= 0.1, rd)]
 
 
 def _truth_sing() -> tuple[np.ndarray, np.ndarray]:
