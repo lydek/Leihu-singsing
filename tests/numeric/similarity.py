@@ -36,13 +36,17 @@ sys.path[:0] = [str(HERE), str(ROOT / "tests" / "contract")]
 
 import compare as C  # noqa: E402
 from baseline import INPUTS, MODELS, SUMMARY, log_alerts, machine, used  # noqa: E402
-from compare_upstream import OUT, _git, export  # noqa: E402
+from compare_upstream import OUT, _git, commit_of, export  # noqa: E402
 
 SONGS = ROOT / "tests" / "private" / "songs"
 
 
 def number(r: dict) -> float | None:
-    """表格數值轉成一個數字：「25 vs 24」取差的絕對值；「相同」是 0；meta 不同（dict）是 1；讀不到是 None。"""
+    """row 的 num（沒有四捨五入）；沒有 num 的項目（例如「相同／不同」）：相同是 0、不同是 1。"""
+    if r.get("num") is not None:
+        return float("inf") if r["num"] == "inf" else float(r["num"])
+    if r.get("ok") is not None and r["limit"] in ("相同", "都是 done"):
+        return 0.0 if r["ok"] else 1.0
     v = r["value"]
     if isinstance(v, dict):
         return 1.0
@@ -65,6 +69,9 @@ def main() -> int:  # noqa: C901
     ref = args[0] if args else "v2.3.2"
     label = opt.get("label") or platform.node().lower()
     runs = int(opt.get("runs", 3))
+    if runs < 2:
+        print("--runs 至少要 2：相似度要兩兩比較")
+        return 2
     quality = opt.get("quality", "standard")
     if not (INPUTS / "manifest.json").exists() or not MODELS.exists():
         print(f"找不到 {INPUTS / 'manifest.json'} 或 {MODELS}（見計畫 3.8）")
@@ -134,7 +141,7 @@ def main() -> int:  # noqa: C901
     rep = [
         f"# 相似度基準：{name}（{label}）",
         "",
-        f"- 被測程式：`{name}`（{code}）",
+        f"- 被測程式：`{name}`（commit {commit_of(code)}；{code}）",
         f"- 測試工具：commit `{tool}`" + ("，`tests/` 有未 commit 的修改" if dirty else ""),
         f"- Python：{sys.version.split()[0]}（{sys.executable}）",
         f"- 電腦：{mach['cpu']}（{mach['logical_cpus']} 個邏輯處理器）；{mach['ram_gb']} GB RAM；{mach['os']}",
@@ -179,7 +186,9 @@ def main() -> int:  # noqa: C901
         "environment": {k: v for k, v in (rj.get("environment") or {}).items() if k != "executable"},
         "conditions": rj.get("conditions"),
         "quality": quality,
+        "commit": commit_of(code),
         "inputs": rj.get("inputs"),
+        "models": rj.get("models"),
         "songs": rj.get("songs"),
         "problems": problems,
         "pairs": pairs,

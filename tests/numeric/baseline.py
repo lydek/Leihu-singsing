@@ -33,7 +33,7 @@ ROOT = HERE.parents[1]
 sys.path[:0] = [str(HERE), str(ROOT / "tests" / "contract")]
 
 import compare as C  # noqa: E402
-from compare_upstream import LOG_ALERTS, OUT, _git, export  # noqa: E402
+from compare_upstream import LOG_ALERTS, OUT, _git, commit_of, export  # noqa: E402
 
 INPUTS = ROOT / "tests" / "private" / "numeric" / "inputs"
 MODELS = ROOT / "tests" / "private" / "models"
@@ -68,10 +68,13 @@ def log_alerts(log: str, label: str) -> list[str]:
             if needle in line:
                 out.append(f"{label} log（{what}）：{line.strip()[:200]}")
                 break
-    for m in re.finditer(r"\[(?:numeric|perf)\] 子程式載入 (.+)", log):
-        p = m.group(1).strip()
-        if "leihu-numeric-" not in p or not p.endswith(os.path.join("app", "gpu_worker.py")):
+    loaded = [("gpu_worker.py", m.group(1).strip()) for m in re.finditer(r"\[(?:numeric|perf)\] 子程式載入 (.+)", log)]
+    loaded += [("pipeline.py", m.group(1).strip()) for m in re.finditer(r"\[source\] pipeline (.+)", log)]
+    for want, p in loaded:
+        if "leihu-numeric-" not in p or not p.endswith(os.path.join("app", want)):
             out.append(f"{label} 子程式載入了暫存資料夾以外的程式：{p}")
+    if "[gpu] " in log and not any(w == "pipeline.py" for w, _ in loaded):
+        out.append(f"{label} 子程式沒有回報 pipeline 的來源（child_hook 沒有生效）")
     return out
 
 
@@ -100,7 +103,7 @@ def used(run_dir: Path, log: str) -> list[str]:
         "- 套件：" + "、".join(f"{k} {v}" for k, v in env.items() if k not in ("onnx_providers", "gpu_probe", "executable")),
         f"- 顯示卡子程式開了 {rj['worker_spawns']} 次（log 的「[gpu] 顯示卡處理程式」是子程式的名稱，不代表一定用顯示卡）",
     ]
-    for sid in C.SONGS:
+    for sid in C.songs(run_dir, run_dir):
         m = C._json(run_dir / sid / "meta.json") or {}
         lines.append(f"- {sid}：separation＝{m.get('separation')}、vocal_model＝{m.get('vocal_model')}、karaoke＝{m.get('karaoke')}")
     loads = sorted(set(re.findall(r"\[numeric\] 子程式載入 (.+)", log)))
@@ -118,6 +121,9 @@ def main() -> int:  # noqa: C901
     ref = args[0] if args else "v2.3.2"
     label = opt.get("label") or platform.node().lower()
     runs = int(opt.get("runs", 2))
+    if runs < 2:
+        print("--runs 至少要 2：數值基準要同一版跑兩次以上，逐檔核對確認結果穩定")
+        return 2
     if not (INPUTS / "manifest.json").exists() or not MODELS.exists():
         print(f"找不到 {INPUTS / 'manifest.json'} 或 {MODELS}：先跑 tests/numeric/make_inputs.py、複製模型（見計畫 3.8）")
         return 2
@@ -167,7 +173,7 @@ def main() -> int:  # noqa: C901
     rep = [
         f"# 數值基準：{name}（{label}）",
         "",
-        f"- 被測程式：`{name}`（{code}）",
+        f"- 被測程式：`{name}`（commit {commit_of(code)}；{code}）",
         f"- 測試工具：commit `{tool}`" + ("，`tests/` 有未 commit 的修改" if dirty else ""),
         f"- Python：{sys.version.split()[0]}（{sys.executable}）",
         f"- 電腦：{mach['cpu']}（{mach['logical_cpus']} 個邏輯處理器）；{mach['ram_gb']} GB RAM；{mach['os']}",
@@ -210,7 +216,10 @@ def main() -> int:  # noqa: C901
         # 不放 Python 的完整路徑（含使用者名稱）；報告裡有
         "environment": {k: v for k, v in (rj.get("environment") or {}).items() if k != "executable"},
         "conditions": rj.get("conditions"),
+        "commit": commit_of(code),
         "inputs": rj.get("inputs"),
+        "songs": rj.get("songs"),  # run.py --songs 的真實歌曲：匿名編號 → sha256（不記檔名）
+        "models": rj.get("models"),  # 模型檔 → sha256
         "problems": problems,
         "exact": {str(i): rows for i, rows in exact.items()},
         "stability": pair,

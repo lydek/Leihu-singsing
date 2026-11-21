@@ -55,6 +55,7 @@ t0 = time.time()
 import app  # noqa: E402, F401  只 import（啟動伺服器要 app.main()）；量 import 的時間
 
 app_import = round(time.time() - t0, 2)
+BOX.check_sources("app")
 import numpy as np  # noqa: E402
 import soundfile as sf  # noqa: E402
 
@@ -132,6 +133,7 @@ def main() -> None:
                 "problems": problems,
                 "worker_spawns": BOX.spawns,
                 "environment": BOX.environment(),
+                "models": BOX.models_sha,
                 "startup": {"import_pipeline_share": BOX.import_seconds, "import_app": app_import},
                 "song": {"duration": meta.get("duration"), "separation": meta.get("separation"),
                          "vocal_model": meta.get("vocal_model"), "karaoke": meta.get("karaoke"),

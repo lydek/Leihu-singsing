@@ -36,7 +36,9 @@ class Sandbox:
         self.junctions: list[Path] = []
         self.spawns = 0
         shutil.copytree(
-            code, self.root, ignore=shutil.ignore_patterns("library", "models", "logs", "tests", "__pycache__", ".git")
+            code, self.root,
+            # config.json 是使用者設定：library_dir、models_dir 會把資料導到沙盒外，不複製（用預設值）
+            ignore=shutil.ignore_patterns("library", "models", "logs", "tests", "__pycache__", ".git", "config.json"),
         )
         (self.root / "models").mkdir()
         atexit.register(self.cleanup)  # 中途失敗也要清
@@ -47,6 +49,7 @@ class Sandbox:
                 _winapi.CreateJunction(str(models / sub), str(self.root / "models" / sub))
                 self.junctions.append(self.root / "models" / sub)
         self.models_before = self.model_files()
+        self.models_sha = self.model_hashes()  # 模型的指紋：寫進 run.json，兩台電腦、前後兩次可以核對
         # LIANTAI_DATA 只給 netblock 寫擋下的連線（tmp/net_blocked.log）；上游不認這個變數。子程式會繼承這些設定
         os.environ.update(LIANTAI_DATA=str(self.tmp), HF_HUB_OFFLINE="1")
         if deterministic:
@@ -69,8 +72,10 @@ class Sandbox:
 
         self.import_seconds = round(time.time() - t0, 2)  # 效能基準記錄的啟動時間之一
 
-        assert Path(P.__file__).resolve().parent == self.root, f"import 到別的 pipeline：{P.__file__}"
         self.P, self.SH = P, SH
+        self.check_sources("pipeline", "share")
+        for what, d in (("歌曲庫", P.LIB), ("模型", P.MODELS)):  # 寫入位置一定要在沙盒裡
+            assert Path(d).resolve().is_relative_to(self.root), f"{what}資料夾不在沙盒裡：{d}"
         prefix = (
             f"import sys; sys.path[:0] = [{str(self.root)!r}, {str(NETBLOCK_DIR)!r}, {str(HERE)!r}]; import netblock; "
             + nodither
@@ -108,12 +113,32 @@ class Sandbox:
         setattr(self.P, name, value)
         self.cond(f"pipeline.{name}：{why}")
 
+    def check_sources(self, *names: str) -> None:
+        """被測模組一定要從沙盒 ROOT 載入（內嵌 Python 的 sys.path 裡有安裝資料夾，缺檔時會默默載入安裝版）。"""
+        for n in names:
+            f = Path(sys.modules[n].__file__).resolve()
+            assert f.parent == self.root, f"{n} 不是從沙盒載入的：{f}"
+
     def model_files(self) -> dict[str, list]:
+        """執行前後比對用：大小和 mtime（奈秒）；任何寫入都會改 mtime_ns。"""
         return {
-            str(p.relative_to(self.models)): [p.stat().st_size, int(p.stat().st_mtime)]
+            p.relative_to(self.models).as_posix(): [p.stat().st_size, p.stat().st_mtime_ns]
             for p in sorted(self.models.rglob("*"))
             if p.is_file()
         }
+
+    def model_hashes(self) -> dict[str, str]:
+        import hashlib
+
+        out = {}
+        for p in sorted(self.models.rglob("*")):
+            if p.is_file():
+                h = hashlib.sha256()
+                with open(p, "rb") as f:
+                    for chunk in iter(lambda: f.read(1 << 22), b""):
+                        h.update(chunk)
+                out[p.relative_to(self.models).as_posix()] = h.hexdigest()
+        return out
 
     def problems(self, out: Path) -> list[str]:
         """執行完要回報的問題：模型檔被改、想對外連線（log 複製到 out）、被測程式的 logs/、沒開過顯示卡子程式。"""

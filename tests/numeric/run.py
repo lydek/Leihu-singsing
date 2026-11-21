@@ -35,6 +35,10 @@ from sandbox import Sandbox  # noqa: E402
 args = [a for a in sys.argv[1:] if not a.startswith("--")]
 opt = dict(a[2:].split("=", 1) if "=" in a else (a[2:], "1") for a in sys.argv[1:] if a.startswith("--"))
 code, inputs, models, out = (Path(a).resolve() for a in args[:4])
+AUDIO = (".flac", ".wav", ".mp3", ".m4a", ".ogg")
+SONG_FILES = sorted(x for x in Path(opt["songs"]).glob("*") if x.suffix.lower() in AUDIO) if opt.get("songs") else []
+if opt.get("songs") and not SONG_FILES:  # 明確要求真實歌曲卻一首都沒有：不要默默只跑合成素材
+    sys.exit(f"--songs={opt['songs']} 裡沒有音檔（{'、'.join(AUDIO)}）")
 BOX = Sandbox(code, models, "[numeric]", deterministic="normal" not in opt)
 P, SH = BOX.P, BOX.SH
 cond = BOX.cond
@@ -48,8 +52,6 @@ if QUALITY == "standard":
     cond("分離固定用標準模型（vocal_quality、karaoke_quality＝standard）；歌詞用語音辨識（auto_recognize_lyrics）")
 else:
     cond(f"分離品質 {QUALITY}；歌詞用語音辨識（auto_recognize_lyrics）")
-AUDIO = (".flac", ".wav", ".mp3", ".m4a", ".ogg")
-SONG_FILES = sorted(x for x in Path(opt["songs"]).glob("*") if x.suffix.lower() in AUDIO) if opt.get("songs") else []
 OPTS = {
     "vocal_db": 0.0,
     "back_db": 0.0,
@@ -166,6 +168,7 @@ def main() -> None:
                 "worker_spawns": BOX.spawns,
                 "songs": {f"song{i:02d}": hashlib.sha256(f.read_bytes()).hexdigest() for i, f in enumerate(SONG_FILES, 1)},
                 "environment": BOX.environment(),
+                "models": BOX.models_sha,
                 "inputs": json.loads((inputs / "manifest.json").read_text("utf-8"))
                 if (inputs / "manifest.json").exists()
                 else None,
