@@ -21,3 +21,5 @@ installer/out/
 hotkeys_status.json
 .hotkeys_pause
 setlist.json
+# 測試的本機資料（基準結果、素材、模型），不進 git
+tests/private/

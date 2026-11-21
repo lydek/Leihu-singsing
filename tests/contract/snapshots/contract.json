@@ -1,0 +1,4142 @@
+{
+ "audio_bad_stem": {
+  "content_type": "text/html; charset=utf-8",
+  "files": {},
+  "headers": {},
+  "status": 404
+ },
+ "audio_lead": {
+  "audio": {
+   "channels": 2,
+   "format": "FLAC",
+   "frames": 88200,
+   "samplerate": 44100,
+   "subtype": "PCM_16"
+  },
+  "content_type": "audio/flac",
+  "files": {},
+  "headers": {
+   "Accept-Ranges": "bytes",
+   "Cache-Control": "no-cache, max-age=0"
+  },
+  "same_as_file": true,
+  "status": 200
+ },
+ "audio_lead_range": {
+  "bytes": 100,
+  "content_type": "audio/flac",
+  "files": {},
+  "headers": {
+   "Accept-Ranges": "bytes",
+   "Cache-Control": "no-cache, max-age=0",
+   "Content-Range": "bytes 0-99/<total>"
+  },
+  "same_as_file": true,
+  "status": 206
+ },
+ "audio_old_mix": {
+  "audio": {
+   "channels": 2,
+   "format": "WAV",
+   "frames": 88200,
+   "samplerate": 44100,
+   "subtype": "PCM_16"
+  },
+  "content_type": "audio/wav",
+  "files": {},
+  "headers": {
+   "Accept-Ranges": "bytes",
+   "Cache-Control": "no-cache, max-age=0"
+  },
+  "same_as_file": true,
+  "status": 200
+ },
+ "audio_variant_missing": {
+  "content_type": "text/html; charset=utf-8",
+  "files": {},
+  "headers": {},
+  "status": 404
+ },
+ "categories": {
+  "body": [
+   "測試分類"
+  ],
+  "content_type": "application/json",
+  "files": {},
+  "headers": {},
+  "status": 200
+ },
+ "categories_add": {
+  "body": [
+   "測試分類",
+   "新分類"
+  ],
+  "content_type": "application/json",
+  "files": {
+   "DATA/~library/categories.json": [
+    "測試分類",
+    "新分類"
+   ]
+  },
+  "headers": {},
+  "status": 200
+ },
+ "claude_align_empty": {
+  "body": {
+   "error": "先貼上正確的歌詞"
+  },
+  "content_type": "application/json",
+  "files": {},
+  "headers": {},
+  "status": 400
+ },
+ "claude_coach_unscored": {
+  "body": {
+   "error": "這次錄音還沒評分完成"
+  },
+  "content_type": "application/json",
+  "files": {},
+  "headers": {},
+  "status": 400
+ },
+ "config_bad_json": {
+  "content_type": "text/html; charset=utf-8",
+  "files": {},
+  "headers": {},
+  "status": 400
+ },
+ "config_get": {
+  "body": {
+   "anthropic_api_key": "sk-ant-…abcd",
+   "audio_out": "",
+   "auto_fine": true,
+   "auto_recognize_lyrics": false,
+   "balance_set_at": null,
+   "balance_usd": null,
+   "claude_model": "claude-sonnet-5-5",
+   "convert_to_taiwan": true,
+   "font": "huninn",
+   "global_hotkeys": true,
+   "has_key": true,
+   "karaoke_model": "UVR_MDXNET_KARA_2.onnx",
+   "karaoke_overlap": 2,
+   "karaoke_quality": "auto",
+   "lyrics_language": "",
+   "monitor_out": "",
+   "parallel_separation": false,
+   "pause_while_streaming": true,
+   "pitch_model": "auto",
+   "queue_paused": false,
+   "separation_model": "UVR-MDX-NET-Inst_HQ_3.onnx",
+   "streaming_apps": [
+    "obs64.exe",
+    "obs32.exe",
+    "VTube Studio.exe",
+    "Streamlabs OBS.exe",
+    "XSplit.Core.exe",
+    "vMix64.exe"
+   ],
+   "vocal_quality": "auto",
+   "whisper_model": "large-v3-turbo",
+   "yt_enabled": false
+  },
+  "content_type": "application/json",
+  "files": {},
+  "headers": {},
+  "status": 200
+ },
+ "config_no_content_type": {
+  "body": {
+   "anthropic_api_key": "sk-ant-…abcd",
+   "audio_out": "",
+   "auto_fine": true,
+   "auto_recognize_lyrics": false,
+   "balance_set_at": "<time>",
+   "balance_usd": 12.5,
+   "claude_model": "claude-sonnet-5-5",
+   "convert_to_taiwan": true,
+   "font": "huninn",
+   "global_hotkeys": true,
+   "has_key": true,
+   "karaoke_model": "UVR_MDXNET_KARA_2.onnx",
+   "karaoke_overlap": 2,
+   "karaoke_quality": "auto",
+   "lyrics_language": "",
+   "monitor_out": "",
+   "parallel_separation": false,
+   "pause_while_streaming": true,
+   "pitch_model": "auto",
+   "queue_paused": false,
+   "separation_model": "UVR-MDX-NET-Inst_HQ_3.onnx",
+   "streaming_apps": [
+    "obs64.exe",
+    "obs32.exe",
+    "VTube Studio.exe",
+    "Streamlabs OBS.exe",
+    "XSplit.Core.exe",
+    "vMix64.exe"
+   ],
+   "vocal_quality": "auto",
+   "whisper_model": "large-v3-turbo",
+   "yt_enabled": false
+  },
+  "content_type": "application/json",
+  "files": {
+   "DATA/~config.json": {
+    "anthropic_api_key": "sk-ant-api03-TESTKEY-<ns>-abcd",
+    "audio_out": "",
+    "auto_fine": true,
+    "auto_recognize_lyrics": false,
+    "balance_set_at": "<time>",
+    "balance_usd": 12.5,
+    "claude_model": "claude-sonnet-5-5",
+    "convert_to_taiwan": true,
+    "font": "huninn",
+    "global_hotkeys": true,
+    "karaoke_model": "UVR_MDXNET_KARA_2.onnx",
+    "karaoke_overlap": 2,
+    "karaoke_quality": "auto",
+    "lyrics_language": "",
+    "monitor_out": "",
+    "parallel_separation": false,
+    "pause_while_streaming": true,
+    "pitch_model": "auto",
+    "queue_paused": false,
+    "separation_model": "UVR-MDX-NET-Inst_HQ_3.onnx",
+    "streaming_apps": [
+     "obs64.exe",
+     "obs32.exe",
+     "VTube Studio.exe",
+     "Streamlabs OBS.exe",
+     "XSplit.Core.exe",
+     "vMix64.exe"
+    ],
+    "vocal_quality": "auto",
+    "whisper_model": "large-v3-turbo",
+    "yt_enabled": false
+   }
+  },
+  "headers": {},
+  "status": 200
+ },
+ "config_set": {
+  "body": {
+   "anthropic_api_key": "sk-ant-…abcd",
+   "audio_out": "",
+   "auto_fine": true,
+   "auto_recognize_lyrics": false,
+   "balance_set_at": "<time>",
+   "balance_usd": 12.5,
+   "claude_model": "claude-sonnet-5-5",
+   "convert_to_taiwan": true,
+   "font": "kai",
+   "global_hotkeys": true,
+   "has_key": true,
+   "karaoke_model": "UVR_MDXNET_KARA_2.onnx",
+   "karaoke_overlap": 2,
+   "karaoke_quality": "auto",
+   "lyrics_language": "",
+   "monitor_out": "",
+   "parallel_separation": false,
+   "pause_while_streaming": true,
+   "pitch_model": "auto",
+   "queue_paused": false,
+   "separation_model": "UVR-MDX-NET-Inst_HQ_3.onnx",
+   "streaming_apps": [
+    "obs64.exe",
+    "obs32.exe",
+    "VTube Studio.exe",
+    "Streamlabs OBS.exe",
+    "XSplit.Core.exe",
+    "vMix64.exe"
+   ],
+   "vocal_quality": "auto",
+   "whisper_model": "large-v3-turbo",
+   "yt_enabled": false
+  },
+  "content_type": "application/json",
+  "files": {
+   "DATA/~config.json": {
+    "anthropic_api_key": "sk-ant-api03-TESTKEY-<ns>-abcd",
+    "audio_out": "",
+    "auto_fine": true,
+    "auto_recognize_lyrics": false,
+    "balance_set_at": "<time>",
+    "balance_usd": 12.5,
+    "claude_model": "claude-sonnet-5-5",
+    "convert_to_taiwan": true,
+    "font": "kai",
+    "global_hotkeys": true,
+    "karaoke_model": "UVR_MDXNET_KARA_2.onnx",
+    "karaoke_overlap": 2,
+    "karaoke_quality": "auto",
+    "lyrics_language": "",
+    "monitor_out": "",
+    "parallel_separation": false,
+    "pause_while_streaming": true,
+    "pitch_model": "auto",
+    "queue_paused": false,
+    "separation_model": "UVR-MDX-NET-Inst_HQ_3.onnx",
+    "streaming_apps": [
+     "obs64.exe",
+     "obs32.exe",
+     "VTube Studio.exe",
+     "Streamlabs OBS.exe",
+     "XSplit.Core.exe",
+     "vMix64.exe"
+    ],
+    "vocal_quality": "auto",
+    "whisper_model": "large-v3-turbo",
+    "yt_enabled": false
+   }
+  },
+  "headers": {},
+  "status": 200
+ },
+ "config_text_plain": {
+  "body": {
+   "anthropic_api_key": "sk-ant-…abcd",
+   "audio_out": "",
+   "auto_fine": true,
+   "auto_recognize_lyrics": false,
+   "balance_set_at": "<time>",
+   "balance_usd": 12.5,
+   "claude_model": "claude-sonnet-5-5",
+   "convert_to_taiwan": true,
+   "font": "sans",
+   "global_hotkeys": true,
+   "has_key": true,
+   "karaoke_model": "UVR_MDXNET_KARA_2.onnx",
+   "karaoke_overlap": 2,
+   "karaoke_quality": "auto",
+   "lyrics_language": "",
+   "monitor_out": "",
+   "parallel_separation": false,
+   "pause_while_streaming": true,
+   "pitch_model": "auto",
+   "queue_paused": false,
+   "separation_model": "UVR-MDX-NET-Inst_HQ_3.onnx",
+   "streaming_apps": [
+    "obs64.exe",
+    "obs32.exe",
+    "VTube Studio.exe",
+    "Streamlabs OBS.exe",
+    "XSplit.Core.exe",
+    "vMix64.exe"
+   ],
+   "vocal_quality": "auto",
+   "whisper_model": "large-v3-turbo",
+   "yt_enabled": false
+  },
+  "content_type": "application/json",
+  "files": {
+   "DATA/~config.json": {
+    "anthropic_api_key": "sk-ant-api03-TESTKEY-<ns>-abcd",
+    "audio_out": "",
+    "auto_fine": true,
+    "auto_recognize_lyrics": false,
+    "balance_set_at": "<time>",
+    "balance_usd": 12.5,
+    "claude_model": "claude-sonnet-5-5",
+    "convert_to_taiwan": true,
+    "font": "sans",
+    "global_hotkeys": true,
+    "karaoke_model": "UVR_MDXNET_KARA_2.onnx",
+    "karaoke_overlap": 2,
+    "karaoke_quality": "auto",
+    "lyrics_language": "",
+    "monitor_out": "",
+    "parallel_separation": false,
+    "pause_while_streaming": true,
+    "pitch_model": "auto",
+    "queue_paused": false,
+    "separation_model": "UVR-MDX-NET-Inst_HQ_3.onnx",
+    "streaming_apps": [
+     "obs64.exe",
+     "obs32.exe",
+     "VTube Studio.exe",
+     "Streamlabs OBS.exe",
+     "XSplit.Core.exe",
+     "vMix64.exe"
+    ],
+    "vocal_quality": "auto",
+    "whisper_model": "large-v3-turbo",
+    "yt_enabled": false
+   }
+  },
+  "headers": {},
+  "status": 200
+ },
+ "export_setlist_empty": {
+  "body": {
+   "error": "這一場沒有唱過的歌"
+  },
+  "content_type": "application/json",
+  "files": {},
+  "headers": {},
+  "status": 400
+ },
+ "export_songlist_empty": {
+  "body": {
+   "error": "沒有符合條件的歌可以匯出"
+  },
+  "content_type": "application/json",
+  "files": {},
+  "headers": {},
+  "status": 400
+ },
+ "fine": {
+  "body": {
+   "job": "<id2>"
+  },
+  "content_type": "application/json",
+  "files": {
+   "DATA/~library/songnew001/meta.json": {
+    "acapella": false,
+    "artist": "測試歌手",
+    "combo_lufs": {
+     "001": -15.66,
+     "010": -14.78,
+     "011": -12.19,
+     "100": -14.72,
+     "101": -12.15,
+     "110": -11.74,
+     "111": -10.26
+    },
+    "combo_lufs_sig": "<ns>|<ns>|<ns>|<ns>",
+    "created": "<time>",
+    "duration": 2.0,
+    "fine_queued": true,
+    "id": "songnew001",
+    "kana_fix": {
+     "今日": "きょう"
+    },
+    "key": 0,
+    "key_set_at": "<time>",
+    "last_opened": "<time>",
+    "lufs": -18.0,
+    "lyrics_flag": true,
+    "lyrics_language": "zh",
+    "lyrics_online": {
+     "artist": "測試歌手",
+     "source": "LRCLIB",
+     "track": "合成測試歌"
+    },
+    "lyrics_pending": false,
+    "lyrics_source": "import",
+    "notes": [],
+    "separation": "UVR-MDX-NET-Inst_HQ_3.onnx",
+    "steps": {
+     "import": true,
+     "lyrics": true,
+     "pitch": true,
+     "separate": true
+    },
+    "title": "S.H.E 改過的歌名",
+    "title_locked": true
+   }
+  },
+  "headers": {},
+  "status": 200
+ },
+ "furigana": {
+  "body": {
+   "ruby": {
+    "今日は晴れ": [
+     {
+      "p": [
+       [
+        "今日",
+        "きょう"
+       ]
+      ]
+     },
+     {
+      "p": [
+       [
+        "は",
+        ""
+       ]
+      ],
+      "pt": 1
+     },
+     {
+      "p": [
+       [
+        "晴",
+        "は"
+       ],
+       [
+        "れ",
+        ""
+       ]
+      ]
+     }
+    ]
+   },
+   "state": {
+    "state": "ready"
+   }
+  },
+  "content_type": "application/json",
+  "files": {},
+  "headers": {},
+  "status": 200
+ },
+ "hotkeys_get": {
+  "body": {
+   "actions": [
+    {
+     "default": "Ctrl+Alt+Space",
+     "id": "play",
+     "label": "播放／暫停"
+    },
+    {
+     "default": "Ctrl+Alt+A",
+     "id": "now",
+     "label": "這句對準"
+    },
+    {
+     "default": "Ctrl+Alt+S",
+     "id": "next-line",
+     "label": "下一句對準"
+    },
+    {
+     "default": "Ctrl+Alt+Comma",
+     "id": "minus",
+     "label": "目前這句提早 0.1 秒"
+    },
+    {
+     "default": "Ctrl+Alt+Period",
+     "id": "plus",
+     "label": "目前這句延後 0.1 秒"
+    },
+    {
+     "default": "Ctrl+Alt+K",
+     "id": "mode",
+     "label": "原曲／卡拉OK 切換"
+    },
+    {
+     "default": "Ctrl+Alt+N",
+     "id": "next-song",
+     "label": "待唱清單的下一首"
+    },
+    {
+     "default": "Ctrl+Alt+PageUp",
+     "id": "key-up",
+     "label": "KEY 升一個半音"
+    },
+    {
+     "default": "Ctrl+Alt+PageDown",
+     "id": "key-down",
+     "label": "KEY 降一個半音"
+    },
+    {
+     "default": "Ctrl+Alt+F",
+     "id": "flag",
+     "label": "標記／取消「歌詞待修」"
+    },
+    {
+     "default": "Ctrl+Alt+P",
+     "id": "pause-all",
+     "label": "處理佇列全部暫停／繼續"
+    }
+   ],
+   "current": {
+    "flag": "Ctrl+Alt+F",
+    "key-down": "Ctrl+Alt+PageDown",
+    "key-up": "Ctrl+Alt+PageUp",
+    "minus": "Ctrl+Alt+Comma",
+    "mode": "Ctrl+Alt+K",
+    "next-line": "Ctrl+Alt+S",
+    "next-song": "Ctrl+Alt+N",
+    "now": "Ctrl+Alt+A",
+    "pause-all": "Ctrl+Alt+P",
+    "play": "Ctrl+Alt+Space",
+    "plus": "Ctrl+Alt+Period"
+   },
+   "enabled": true,
+   "status": null
+  },
+  "content_type": "application/json",
+  "files": {},
+  "headers": {},
+  "status": 200
+ },
+ "hotkeys_pause_off": {
+  "body": {
+   "ok": true
+  },
+  "content_type": "application/json",
+  "files": {
+   "DATA/-.hotkeys_pause": null
+  },
+  "headers": {},
+  "status": 200
+ },
+ "hotkeys_pause_on": {
+  "body": {
+   "ok": true
+  },
+  "content_type": "application/json",
+  "files": {
+   "DATA/+.hotkeys_pause": "<binary>"
+  },
+  "headers": {},
+  "status": 200
+ },
+ "hotkeys_set": {
+  "body": {
+   "current": {
+    "flag": "Ctrl+Alt+F",
+    "key-down": "Ctrl+Alt+PageDown",
+    "key-up": "Ctrl+Alt+PageUp",
+    "minus": "Ctrl+Alt+Comma",
+    "mode": "Ctrl+Alt+K",
+    "next-line": "Ctrl+Alt+S",
+    "next-song": "Ctrl+Alt+N",
+    "now": "Ctrl+Alt+A",
+    "pause-all": "Ctrl+Alt+P",
+    "play": "Ctrl+Alt+Space",
+    "plus": "Ctrl+Alt+Period"
+   }
+  },
+  "content_type": "application/json",
+  "files": {
+   "DATA/~config.json": {
+    "anthropic_api_key": "sk-ant-api03-TESTKEY-<ns>-abcd",
+    "audio_out": "",
+    "auto_fine": true,
+    "auto_recognize_lyrics": false,
+    "balance_set_at": "<time>",
+    "balance_usd": 12.5,
+    "claude_model": "claude-sonnet-5-5",
+    "convert_to_taiwan": true,
+    "font": "huninn",
+    "global_hotkeys": true,
+    "hotkeys": {
+     "flag": "Ctrl+Alt+F",
+     "key-down": "Ctrl+Alt+PageDown",
+     "key-up": "Ctrl+Alt+PageUp",
+     "minus": "Ctrl+Alt+Comma",
+     "mode": "Ctrl+Alt+K",
+     "next-line": "Ctrl+Alt+S",
+     "next-song": "Ctrl+Alt+N",
+     "now": "Ctrl+Alt+A",
+     "pause-all": "Ctrl+Alt+P",
+     "play": "Ctrl+Alt+Space",
+     "plus": "Ctrl+Alt+Period"
+    },
+    "karaoke_model": "UVR_MDXNET_KARA_2.onnx",
+    "karaoke_overlap": 2,
+    "karaoke_quality": "auto",
+    "lyrics_language": "",
+    "monitor_out": "",
+    "parallel_separation": false,
+    "pause_while_streaming": true,
+    "pitch_model": "auto",
+    "queue_paused": false,
+    "separation_model": "UVR-MDX-NET-Inst_HQ_3.onnx",
+    "streaming_apps": [
+     "obs64.exe",
+     "obs32.exe",
+     "VTube Studio.exe",
+     "Streamlabs OBS.exe",
+     "XSplit.Core.exe",
+     "vMix64.exe"
+    ],
+    "vocal_quality": "auto",
+    "whisper_model": "large-v3-turbo",
+    "yt_enabled": false
+   }
+  },
+  "headers": {},
+  "status": 200
+ },
+ "job_cancel": {
+  "body": {
+   "ok": true
+  },
+  "content_type": "application/json",
+  "files": {},
+  "headers": {},
+  "status": 200
+ },
+ "job_get": {
+  "body": {
+   "ahead": 2,
+   "created": "<time>",
+   "error": null,
+   "id": "<id4>",
+   "kind": "process",
+   "label": "pitch",
+   "progress": 0.0,
+   "song": "songold002",
+   "status": "queued",
+   "step": "排隊中"
+  },
+  "content_type": "application/json",
+  "files": {},
+  "headers": {},
+  "status": 200
+ },
+ "job_missing": {
+  "content_type": "text/html; charset=utf-8",
+  "files": {},
+  "headers": {},
+  "status": 404
+ },
+ "job_move": {
+  "body": {
+   "ok": true
+  },
+  "content_type": "application/json",
+  "files": {},
+  "headers": {},
+  "status": 200
+ },
+ "job_top": {
+  "body": {
+   "ok": true
+  },
+  "content_type": "application/json",
+  "files": {},
+  "headers": {},
+  "status": 200
+ },
+ "jobs_pause_all": {
+  "body": {
+   "paused": true
+  },
+  "content_type": "application/json",
+  "files": {
+   "DATA/~config.json": {
+    "anthropic_api_key": "sk-ant-api03-TESTKEY-<ns>-abcd",
+    "audio_out": "",
+    "auto_fine": true,
+    "auto_recognize_lyrics": false,
+    "balance_set_at": "<time>",
+    "balance_usd": 12.5,
+    "claude_model": "claude-sonnet-5-5",
+    "convert_to_taiwan": true,
+    "font": "huninn",
+    "global_hotkeys": true,
+    "hotkeys": {
+     "flag": "Ctrl+Alt+F",
+     "key-down": "Ctrl+Alt+PageDown",
+     "key-up": "Ctrl+Alt+PageUp",
+     "minus": "Ctrl+Alt+Comma",
+     "mode": "Ctrl+Alt+K",
+     "next-line": "Ctrl+Alt+S",
+     "next-song": "Ctrl+Alt+N",
+     "now": "Ctrl+Alt+A",
+     "pause-all": "Ctrl+Alt+P",
+     "play": "Ctrl+Alt+Space",
+     "plus": "Ctrl+Alt+Period"
+    },
+    "karaoke_model": "UVR_MDXNET_KARA_2.onnx",
+    "karaoke_overlap": 2,
+    "karaoke_quality": "auto",
+    "lyrics_language": "",
+    "monitor_out": "",
+    "parallel_separation": false,
+    "pause_while_streaming": true,
+    "pitch_model": "auto",
+    "queue_paused": true,
+    "separation_model": "UVR-MDX-NET-Inst_HQ_3.onnx",
+    "streaming_apps": [
+     "obs64.exe",
+     "obs32.exe",
+     "VTube Studio.exe",
+     "Streamlabs OBS.exe",
+     "XSplit.Core.exe",
+     "vMix64.exe"
+    ],
+    "vocal_quality": "auto",
+    "whisper_model": "large-v3-turbo",
+    "yt_enabled": true
+   }
+  },
+  "headers": {},
+  "status": 200
+ },
+ "jobs_pause_toggle": {
+  "body": {
+   "paused": false
+  },
+  "content_type": "application/json",
+  "files": {
+   "DATA/~config.json": {
+    "anthropic_api_key": "sk-ant-api03-TESTKEY-<ns>-abcd",
+    "audio_out": "",
+    "auto_fine": true,
+    "auto_recognize_lyrics": false,
+    "balance_set_at": "<time>",
+    "balance_usd": 12.5,
+    "claude_model": "claude-sonnet-5-5",
+    "convert_to_taiwan": true,
+    "font": "huninn",
+    "global_hotkeys": true,
+    "hotkeys": {
+     "flag": "Ctrl+Alt+F",
+     "key-down": "Ctrl+Alt+PageDown",
+     "key-up": "Ctrl+Alt+PageUp",
+     "minus": "Ctrl+Alt+Comma",
+     "mode": "Ctrl+Alt+K",
+     "next-line": "Ctrl+Alt+S",
+     "next-song": "Ctrl+Alt+N",
+     "now": "Ctrl+Alt+A",
+     "pause-all": "Ctrl+Alt+P",
+     "play": "Ctrl+Alt+Space",
+     "plus": "Ctrl+Alt+Period"
+    },
+    "karaoke_model": "UVR_MDXNET_KARA_2.onnx",
+    "karaoke_overlap": 2,
+    "karaoke_quality": "auto",
+    "lyrics_language": "",
+    "monitor_out": "",
+    "parallel_separation": false,
+    "pause_while_streaming": true,
+    "pitch_model": "auto",
+    "queue_paused": false,
+    "separation_model": "UVR-MDX-NET-Inst_HQ_3.onnx",
+    "streaming_apps": [
+     "obs64.exe",
+     "obs32.exe",
+     "VTube Studio.exe",
+     "Streamlabs OBS.exe",
+     "XSplit.Core.exe",
+     "vMix64.exe"
+    ],
+    "vocal_quality": "auto",
+    "whisper_model": "large-v3-turbo",
+    "yt_enabled": true
+   }
+  },
+  "headers": {},
+  "status": 200
+ },
+ "kana": {
+  "body": {
+   "kana_fix": {
+    "今日": "きょう"
+   }
+  },
+  "content_type": "application/json",
+  "files": {
+   "DATA/~library/songnew001/meta.json": {
+    "acapella": false,
+    "artist": "測試歌手",
+    "combo_lufs": {
+     "001": -15.66,
+     "010": -14.78,
+     "011": -12.19,
+     "100": -14.72,
+     "101": -12.15,
+     "110": -11.74,
+     "111": -10.26
+    },
+    "combo_lufs_sig": "<ns>|<ns>|<ns>|<ns>",
+    "created": "<time>",
+    "duration": 2.0,
+    "id": "songnew001",
+    "kana_fix": {
+     "今日": "きょう"
+    },
+    "key": 0,
+    "key_set_at": "<time>",
+    "last_opened": "<time>",
+    "lufs": -18.0,
+    "lyrics_flag": true,
+    "lyrics_language": "zh",
+    "lyrics_source": "online",
+    "notes": [],
+    "separation": "UVR-MDX-NET-Inst_HQ_3.onnx",
+    "steps": {
+     "import": true,
+     "lyrics": true,
+     "pitch": true,
+     "separate": true
+    },
+    "title": "S.H.E 改過的歌名",
+    "title_locked": true
+   }
+  },
+  "headers": {},
+  "status": 200
+ },
+ "live_override": {
+  "body": {
+   "ok": true
+  },
+  "content_type": "application/json",
+  "files": {},
+  "headers": {},
+  "status": 200
+ },
+ "lyrics_apply": {
+  "body": {
+   "how": "使用網站提供的時間軸",
+   "lrc": "[00:00.20]線上第一句\n[00:01.10]線上第二句\n"
+  },
+  "content_type": "application/json",
+  "files": {
+   "DATA/~library/songnew001/lyrics.lrc": "[00:00.20]線上第一句\n[00:01.10]線上第二句\n",
+   "DATA/~library/songnew001/lyrics_online.lrc": "[00:00.20]線上第一句\n[00:01.10]線上第二句\n",
+   "DATA/~library/songnew001/meta.json": {
+    "acapella": false,
+    "artist": "測試歌手",
+    "combo_lufs": {
+     "001": -15.66,
+     "010": -14.78,
+     "011": -12.19,
+     "100": -14.72,
+     "101": -12.15,
+     "110": -11.74,
+     "111": -10.26
+    },
+    "combo_lufs_sig": "<ns>|<ns>|<ns>|<ns>",
+    "created": "<time>",
+    "duration": 2.0,
+    "id": "songnew001",
+    "kana_fix": {
+     "今日": "きょう"
+    },
+    "key": 0,
+    "key_set_at": "<time>",
+    "last_opened": "<time>",
+    "lufs": -18.0,
+    "lyrics_flag": true,
+    "lyrics_language": "zh",
+    "lyrics_online": {
+     "artist": "測試歌手",
+     "source": "LRCLIB",
+     "track": "合成測試歌"
+    },
+    "lyrics_pending": false,
+    "lyrics_source": "online",
+    "notes": [],
+    "separation": "UVR-MDX-NET-Inst_HQ_3.onnx",
+    "steps": {
+     "import": true,
+     "lyrics": true,
+     "pitch": true,
+     "separate": true
+    },
+    "title": "S.H.E 改過的歌名",
+    "title_locked": true
+   }
+  },
+  "headers": {},
+  "status": 200
+ },
+ "lyrics_apply_empty": {
+  "body": {
+   "error": "這筆歌詞沒有內容"
+  },
+  "content_type": "application/json",
+  "files": {},
+  "headers": {},
+  "status": 400
+ },
+ "lyrics_autoshift": {
+  "body": {
+   "offset": 0.0,
+   "scale": 1.0
+  },
+  "content_type": "application/json",
+  "files": {},
+  "headers": {},
+  "status": 200
+ },
+ "lyrics_autoshift_too_few": {
+  "body": {
+   "error": "含時間的歌詞太少，沒辦法自動校正"
+  },
+  "content_type": "application/json",
+  "files": {},
+  "headers": {},
+  "status": 400
+ },
+ "lyrics_candidates": {
+  "body": {
+   "pending": false,
+   "recognized": "辨識第一句\n辨識第二句",
+   "results": [
+    {
+     "album": "",
+     "artist": "測試歌手",
+     "duration": 2.0,
+     "id": "lrclib:1",
+     "plain": "線上第一句\n線上第二句",
+     "source": "LRCLIB",
+     "synced": "[00:00.20]線上第一句\n[00:01.10]線上第二句",
+     "track": "合成測試歌"
+    }
+   ]
+  },
+  "content_type": "application/json",
+  "files": {},
+  "headers": {},
+  "status": 200
+ },
+ "lyrics_export": {
+  "body": {
+   "path": "<DOWNLOADS>\\雷虎練唱台\\S.H.E 改過的歌名.srt"
+  },
+  "content_type": "application/json",
+  "files": {
+   "DOWNLOADS/+雷虎練唱台/S.H.E 改過的歌名.srt": "1\n00:00:00,400 --> 00:00:01,250\n匯入第一句\n\n2\n00:00:01,300 --> 00:00:01,950\n匯入第二句\n"
+  },
+  "headers": {},
+  "status": 200
+ },
+ "lyrics_get": {
+  "body": {
+   "auto": "[00:00.20]辨識第一句\n[00:01.10]辨識第二句\n",
+   "kana_fix": {},
+   "language": null,
+   "lrc": "[00:00.20]第一句\n[00:01.10]第二句\n",
+   "online": "[00:00.20]第一句\n[00:01.10]第二句\n",
+   "online_info": null,
+   "reasons": [],
+   "recognized": true,
+   "song_language": "zh",
+   "source": "online",
+   "unreliable": false
+  },
+  "content_type": "application/json",
+  "files": {},
+  "headers": {},
+  "status": 200
+ },
+ "lyrics_import": {
+  "body": {
+   "how": "使用歌詞檔裡的時間",
+   "lrc": "[00:00.40]匯入第一句\n[00:01.30]匯入第二句\n"
+  },
+  "content_type": "application/json",
+  "files": {
+   "DATA/~library/songnew001/lyrics.lrc": "[00:00.40]匯入第一句\n[00:01.30]匯入第二句\n",
+   "DATA/~library/songnew001/meta.json": {
+    "acapella": false,
+    "artist": "測試歌手",
+    "combo_lufs": {
+     "001": -15.66,
+     "010": -14.78,
+     "011": -12.19,
+     "100": -14.72,
+     "101": -12.15,
+     "110": -11.74,
+     "111": -10.26
+    },
+    "combo_lufs_sig": "<ns>|<ns>|<ns>|<ns>",
+    "created": "<time>",
+    "duration": 2.0,
+    "id": "songnew001",
+    "kana_fix": {
+     "今日": "きょう"
+    },
+    "key": 0,
+    "key_set_at": "<time>",
+    "last_opened": "<time>",
+    "lufs": -18.0,
+    "lyrics_flag": true,
+    "lyrics_language": "zh",
+    "lyrics_online": {
+     "artist": "測試歌手",
+     "source": "LRCLIB",
+     "track": "合成測試歌"
+    },
+    "lyrics_pending": false,
+    "lyrics_source": "import",
+    "notes": [],
+    "separation": "UVR-MDX-NET-Inst_HQ_3.onnx",
+    "steps": {
+     "import": true,
+     "lyrics": true,
+     "pitch": true,
+     "separate": true
+    },
+    "title": "S.H.E 改過的歌名",
+    "title_locked": true
+   }
+  },
+  "headers": {},
+  "status": 200
+ },
+ "lyrics_keep": {
+  "body": {
+   "ok": true
+  },
+  "content_type": "application/json",
+  "files": {},
+  "headers": {},
+  "status": 200
+ },
+ "lyrics_old_get": {
+  "body": {
+   "auto": "",
+   "kana_fix": {},
+   "language": null,
+   "lrc": "[00:00.20]第一句\n[00:01.10]第二句\n",
+   "online": "",
+   "online_info": null,
+   "reasons": [],
+   "recognized": true,
+   "song_language": null,
+   "source": null,
+   "unreliable": false
+  },
+  "content_type": "application/json",
+  "files": {},
+  "headers": {},
+  "status": 200
+ },
+ "lyrics_old_get_again": {
+  "body": {
+   "auto": "",
+   "kana_fix": {},
+   "language": null,
+   "lrc": "[00:00.20]第一句\n[00:01.10]第二句\n",
+   "online": "",
+   "online_info": null,
+   "reasons": [],
+   "recognized": true,
+   "song_language": null,
+   "source": null,
+   "unreliable": false
+  },
+  "content_type": "application/json",
+  "files": {},
+  "headers": {},
+  "status": 200
+ },
+ "lyrics_put": {
+  "body": {
+   "ok": true
+  },
+  "content_type": "application/json",
+  "files": {
+   "DATA/~library/songnew001/lyrics.lrc": "[00:00.30]改過的第一句\n[00:01.20]改過的第二句",
+   "DATA/~library/songnew001/meta.json": {
+    "acapella": false,
+    "artist": "測試歌手",
+    "combo_lufs": {
+     "001": -15.66,
+     "010": -14.78,
+     "011": -12.19,
+     "100": -14.72,
+     "101": -12.15,
+     "110": -11.74,
+     "111": -10.26
+    },
+    "combo_lufs_sig": "<ns>|<ns>|<ns>|<ns>",
+    "created": "<time>",
+    "duration": 2.0,
+    "id": "songnew001",
+    "kana_fix": {
+     "今日": "きょう"
+    },
+    "key": 0,
+    "key_set_at": "<time>",
+    "last_opened": "<time>",
+    "lufs": -18.0,
+    "lyrics_flag": true,
+    "lyrics_language": "zh",
+    "lyrics_pending": false,
+    "lyrics_source": "manual",
+    "notes": [],
+    "separation": "UVR-MDX-NET-Inst_HQ_3.onnx",
+    "steps": {
+     "import": true,
+     "lyrics": true,
+     "pitch": true,
+     "separate": true
+    },
+    "title": "S.H.E 改過的歌名",
+    "title_locked": true
+   }
+  },
+  "headers": {},
+  "status": 200
+ },
+ "lyrics_search_bad_id": {
+  "body": {
+   "error": "歌曲編號不正確"
+  },
+  "content_type": "application/json",
+  "files": {},
+  "headers": {},
+  "status": 400
+ },
+ "lyrics_search_missing": {
+  "body": {
+   "error": "找不到這首歌"
+  },
+  "content_type": "application/json",
+  "files": {},
+  "headers": {},
+  "status": 400
+ },
+ "lyrics_use": {
+  "body": {
+   "lrc": "[00:00.20]辨識第一句\n[00:01.10]辨識第二句\n",
+   "source": "whisper"
+  },
+  "content_type": "application/json",
+  "files": {
+   "DATA/~library/songnew001/lyrics.lrc": "[00:00.20]辨識第一句\n[00:01.10]辨識第二句\n",
+   "DATA/~library/songnew001/meta.json": {
+    "acapella": false,
+    "artist": "測試歌手",
+    "combo_lufs": {
+     "001": -15.66,
+     "010": -14.78,
+     "011": -12.19,
+     "100": -14.72,
+     "101": -12.15,
+     "110": -11.74,
+     "111": -10.26
+    },
+    "combo_lufs_sig": "<ns>|<ns>|<ns>|<ns>",
+    "created": "<time>",
+    "duration": 2.0,
+    "id": "songnew001",
+    "kana_fix": {
+     "今日": "きょう"
+    },
+    "key": 0,
+    "key_set_at": "<time>",
+    "last_opened": "<time>",
+    "lufs": -18.0,
+    "lyrics_flag": true,
+    "lyrics_language": "zh",
+    "lyrics_pending": false,
+    "lyrics_source": "whisper",
+    "notes": [],
+    "separation": "UVR-MDX-NET-Inst_HQ_3.onnx",
+    "steps": {
+     "import": true,
+     "lyrics": true,
+     "pitch": true,
+     "separate": true
+    },
+    "title": "S.H.E 改過的歌名",
+    "title_locked": true
+   }
+  },
+  "headers": {},
+  "status": 200
+ },
+ "mixdown": {
+  "body": {
+   "file": "<DOWNLOADS>\\雷虎練唱台\\S.H.E 改過的歌名_混音_原調.wav",
+   "job": "<id3>"
+  },
+  "content_type": "application/json",
+  "files": {},
+  "headers": {},
+  "status": 200
+ },
+ "open_app": {
+  "body": {
+   "app": "<v>",
+   "ok": true
+  },
+  "content_type": "application/json",
+  "files": {
+   "DATA/~spawn.log": [
+    {
+     "kind": "browser",
+     "target": "http://127.0.0.1:<PORT>/"
+    }
+   ]
+  },
+  "headers": {},
+  "status": 200
+ },
+ "open_overlay": {
+  "body": {
+   "ok": true
+  },
+  "content_type": "application/json",
+  "files": {
+   "DATA/~spawn.log": [
+    {
+     "kind": "browser",
+     "target": "http://127.0.0.1:<PORT>/overlay?font=kai"
+    }
+   ]
+  },
+  "headers": {},
+  "status": 200
+ },
+ "open_overlay_bad": {
+  "body": {
+   "error": "網址格式不正確"
+  },
+  "content_type": "application/json",
+  "files": {},
+  "headers": {},
+  "status": 400
+ },
+ "open_url": {
+  "body": {
+   "ok": true
+  },
+  "content_type": "application/json",
+  "files": {
+   "DATA/~spawn.log": [
+    {
+     "kind": "browser",
+     "target": "https://github.com/LeihuTW/Leihu-singsing"
+    }
+   ]
+  },
+  "headers": {},
+  "status": 200
+ },
+ "open_url_denied": {
+  "body": {
+   "error": "不允許開啟這個網址"
+  },
+  "content_type": "application/json",
+  "files": {},
+  "headers": {},
+  "status": 400
+ },
+ "overlay_get": {
+  "body": {
+   "artist": "測試歌手",
+   "color": true,
+   "key": 0,
+   "lines": [],
+   "playing": true,
+   "rate": 1.0,
+   "sid": "songnew001",
+   "t": "<v>",
+   "title": "合成測試歌",
+   "ver": 1
+  },
+  "content_type": "application/json",
+  "files": {},
+  "headers": {},
+  "status": 200
+ },
+ "overlay_set": {
+  "body": {
+   "ok": true
+  },
+  "content_type": "application/json",
+  "files": {},
+  "headers": {},
+  "status": 200
+ },
+ "page_index": {
+  "content_type": "text/html; charset=utf-8",
+  "files": {},
+  "headers": {
+   "Accept-Ranges": "bytes",
+   "Cache-Control": "no-cache"
+  },
+  "status": 200
+ },
+ "page_overlay": {
+  "content_type": "text/html; charset=utf-8",
+  "files": {},
+  "headers": {
+   "Accept-Ranges": "bytes",
+   "Cache-Control": "no-cache, max-age=0"
+  },
+  "status": 200
+ },
+ "page_timing": {
+  "content_type": "text/html; charset=utf-8",
+  "files": {},
+  "headers": {
+   "Accept-Ranges": "bytes",
+   "Cache-Control": "no-cache, max-age=0"
+  },
+  "status": 200
+ },
+ "pitch": {
+  "body": {
+   "hop": 0.01,
+   "midi": [
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    60,
+    60,
+    60,
+    60,
+    60,
+    60,
+    60,
+    60,
+    60,
+    60,
+    60,
+    60,
+    60,
+    60,
+    60,
+    60,
+    60,
+    60,
+    60,
+    60,
+    60,
+    60,
+    60,
+    60,
+    60,
+    60,
+    60,
+    60,
+    60,
+    60,
+    61,
+    61,
+    61,
+    61,
+    61,
+    61,
+    61,
+    61,
+    61,
+    61,
+    61,
+    61,
+    61,
+    61,
+    61,
+    61,
+    61,
+    61,
+    61,
+    61,
+    61,
+    61,
+    61,
+    61,
+    61,
+    61,
+    61,
+    61,
+    61,
+    61,
+    61,
+    61,
+    61,
+    61,
+    61,
+    61,
+    61,
+    61,
+    61,
+    61,
+    61,
+    61,
+    61,
+    61,
+    61,
+    61,
+    61,
+    61,
+    61,
+    61,
+    62,
+    62,
+    62,
+    62,
+    62,
+    62,
+    62,
+    62,
+    62,
+    62,
+    62,
+    62,
+    62,
+    62,
+    62,
+    62,
+    62,
+    62,
+    62,
+    62,
+    62,
+    62,
+    62,
+    62,
+    62,
+    62,
+    62,
+    62,
+    62,
+    62,
+    62,
+    62,
+    62,
+    62,
+    62,
+    62,
+    62,
+    62,
+    62,
+    62,
+    62,
+    62,
+    62,
+    62,
+    62,
+    62,
+    62,
+    62,
+    62,
+    62,
+    63,
+    63,
+    63,
+    63,
+    63,
+    63,
+    63,
+    63,
+    63,
+    63,
+    63,
+    63,
+    63,
+    63,
+    63,
+    63,
+    63,
+    63,
+    63,
+    63,
+    63,
+    63,
+    63,
+    63,
+    63,
+    63,
+    63,
+    63,
+    63,
+    63,
+    63,
+    63,
+    63,
+    63,
+    63,
+    63,
+    63,
+    63,
+    63,
+    63,
+    63,
+    63,
+    63,
+    63,
+    63,
+    63,
+    63,
+    63,
+    63,
+    63
+   ],
+   "notes": [
+    [
+     0.2,
+     0.7,
+     60
+    ],
+    [
+     0.7,
+     1.2,
+     61
+    ],
+    [
+     1.2,
+     1.7,
+     62
+    ]
+   ]
+  },
+  "content_type": "application/json",
+  "files": {},
+  "headers": {
+   "Accept-Ranges": "bytes",
+   "Cache-Control": "no-cache, max-age=0"
+  },
+  "sha256": "b1a34ff1a68d9702",
+  "status": 200
+ },
+ "prioritize_missing": {
+  "body": {
+   "error": "找不到這首歌"
+  },
+  "content_type": "application/json",
+  "files": {},
+  "headers": {},
+  "status": 400
+ },
+ "prioritize_queued": {
+  "body": {
+   "job": "<id4>",
+   "what": "moved"
+  },
+  "content_type": "application/json",
+  "files": {},
+  "headers": {},
+  "status": 200
+ },
+ "process_old": {
+  "body": {
+   "job": "<id4>"
+  },
+  "content_type": "application/json",
+  "files": {},
+  "headers": {},
+  "status": 200
+ },
+ "redownload_old": {
+  "body": {
+   "error": "這首歌不需要重新下載"
+  },
+  "content_type": "application/json",
+  "files": {},
+  "headers": {},
+  "status": 400
+ },
+ "remote_open": {
+  "body": {
+   "seq": 1
+  },
+  "content_type": "application/json",
+  "files": {},
+  "headers": {},
+  "status": 200
+ },
+ "remote_open_bad_id": {
+  "body": {
+   "error": "歌曲編號不正確"
+  },
+  "content_type": "application/json",
+  "files": {},
+  "headers": {},
+  "status": 400
+ },
+ "remote_open_key_range": {
+  "body": {
+   "error": "KEY 範圍是 ±6"
+  },
+  "content_type": "application/json",
+  "files": {},
+  "headers": {},
+  "status": 400
+ },
+ "remote_open_key_text": {
+  "body": {
+   "error": "KEY 格式不正確"
+  },
+  "content_type": "application/json",
+  "files": {},
+  "headers": {},
+  "status": 400
+ },
+ "remote_open_no_content_type": {
+  "body": {
+   "seq": 2
+  },
+  "content_type": "application/json",
+  "files": {},
+  "headers": {},
+  "status": 200
+ },
+ "reveal": {
+  "body": {
+   "ok": true
+  },
+  "content_type": "application/json",
+  "files": {
+   "DATA/~spawn.log": [
+    {
+     "kind": "reveal",
+     "target": "<DOWNLOADS>\\雷虎練唱台\\歌單範本.csv"
+    }
+   ]
+  },
+  "headers": {},
+  "status": 200
+ },
+ "reveal_outside": {
+  "body": {
+   "error": "找不到這個檔案"
+  },
+  "content_type": "application/json",
+  "files": {},
+  "headers": {},
+  "status": 400
+ },
+ "setlist_add": {
+  "body": {
+   "ok": true
+  },
+  "content_type": "application/json",
+  "files": {
+   "DATA/+setlist.json": {
+    "items": [
+     {
+      "artist": "",
+      "id": "songnew001",
+      "key": 0,
+      "s": "<time>",
+      "t": "<time>",
+      "title": "合成測試歌"
+     }
+    ],
+    "started": "<time>"
+   },
+   "DATA/~library/songnew001/meta.json": {
+    "acapella": false,
+    "artist": "測試歌手",
+    "combo_lufs": {
+     "001": -15.66,
+     "010": -14.78,
+     "011": -12.19,
+     "100": -14.72,
+     "101": -12.15,
+     "110": -11.74,
+     "111": -10.26
+    },
+    "combo_lufs_sig": "<ns>|<ns>|<ns>|<ns>",
+    "created": "<time>",
+    "duration": 2.0,
+    "fine_queued": true,
+    "id": "songnew001",
+    "kana_fix": {
+     "今日": "きょう"
+    },
+    "key": 0,
+    "key_set_at": "<time>",
+    "last_opened": "<time>",
+    "last_sung": "<time>",
+    "lufs": -18.0,
+    "lyrics_flag": true,
+    "lyrics_language": "zh",
+    "lyrics_online": {
+     "artist": "測試歌手",
+     "source": "LRCLIB",
+     "track": "合成測試歌"
+    },
+    "lyrics_pending": false,
+    "lyrics_source": "import",
+    "notes": [],
+    "separation": "UVR-MDX-NET-Inst_HQ_3.onnx",
+    "steps": {
+     "import": true,
+     "lyrics": true,
+     "pitch": true,
+     "separate": true
+    },
+    "sung": 1,
+    "title": "S.H.E 改過的歌名",
+    "title_locked": true
+   }
+  },
+  "headers": {},
+  "status": 200
+ },
+ "setlist_clear": {
+  "body": {
+   "ok": true
+  },
+  "content_type": "application/json",
+  "files": {
+   "DATA/+setlists/<ts>.json": {
+    "items": [
+     {
+      "artist": "",
+      "id": "songnew001",
+      "key": 0,
+      "s": "<time>",
+      "t": "<time>",
+      "title": "合成測試歌"
+     }
+    ],
+    "started": "<time>"
+   },
+   "DATA/~setlist.json": {
+    "items": [],
+    "started": null
+   }
+  },
+  "headers": {},
+  "status": 200
+ },
+ "setlist_delete_current": {
+  "body": {
+   "ok": true
+  },
+  "content_type": "application/json",
+  "files": {},
+  "headers": {},
+  "status": 200
+ },
+ "setlist_get": {
+  "body": {
+   "items": [
+    {
+     "artist": "",
+     "id": "songnew001",
+     "key": 0,
+     "s": "<time>",
+     "t": "<time>",
+     "title": "合成測試歌"
+    }
+   ],
+   "started": "<time>"
+  },
+  "content_type": "application/json",
+  "files": {},
+  "headers": {},
+  "status": 200
+ },
+ "setlist_get_bad_file": {
+  "body": {
+   "error": "找不到這一場"
+  },
+  "content_type": "application/json",
+  "files": {},
+  "headers": {},
+  "status": 400
+ },
+ "setlist_history_empty": {
+  "body": [],
+  "content_type": "application/json",
+  "files": {},
+  "headers": {},
+  "status": 200
+ },
+ "setlist_remove_none": {
+  "body": {
+   "error": "請先勾選要刪除的歌"
+  },
+  "content_type": "application/json",
+  "files": {},
+  "headers": {},
+  "status": 400
+ },
+ "sheet_export": {
+  "body": {
+   "files": [
+    "<DOWNLOADS>\\雷虎練唱台\\S.H.E 改過的歌名 旋律譜（A4）\\01.png"
+   ],
+   "folder": "<DOWNLOADS>\\雷虎練唱台\\S.H.E 改過的歌名 旋律譜（A4）",
+   "tonic": "F"
+  },
+  "content_type": "application/json",
+  "files": {
+   "DOWNLOADS/+雷虎練唱台/S.H.E 改過的歌名 旋律譜（A4）/01.png": "<binary>"
+  },
+  "headers": {},
+  "status": 200
+ },
+ "sheet_template": {
+  "body": {
+   "path": "<DOWNLOADS>\\雷虎練唱台\\歌單範本.csv"
+  },
+  "content_type": "application/json",
+  "files": {
+   "DATA/+spawn.log": [
+    {
+     "kind": "reveal",
+     "target": "<DOWNLOADS>\\雷虎練唱台\\歌單範本.csv"
+    }
+   ],
+   "DOWNLOADS/+雷虎練唱台/歌單範本.csv": "歌手,曲名,KEY,語言,YouTube\n五月天,終結孤單,-4,國語,https://www.youtube.com/watch?v=SkYNyrMVOhE\n梁靜茹,溫柔,,國語,https://www.youtube.com/watch?v=vPkKH9OT93s\nYOASOBI,夜に駆ける,+2,日語,\n"
+  },
+  "headers": {},
+  "status": 200
+ },
+ "song_bad_id": {
+  "body": {
+   "error": "歌曲編號不正確"
+  },
+  "content_type": "application/json",
+  "files": {},
+  "headers": {},
+  "status": 400
+ },
+ "song_delete_uploaded": {
+  "body": {
+   "ok": true
+  },
+  "content_type": "application/json",
+  "files": {
+   "DATA/-library/<id12>/meta.json": null,
+   "DATA/-library/<id12>/original.wav": null
+  },
+  "headers": {},
+  "status": 200
+ },
+ "song_delete_youtube": {
+  "body": {
+   "ok": true
+  },
+  "content_type": "application/json",
+  "files": {
+   "DATA/-library/<id9>/meta.json": null
+  },
+  "headers": {},
+  "status": 200
+ },
+ "song_get": {
+  "body": {
+   "acapella": false,
+   "artist": "測試歌手",
+   "combo_lufs": {
+    "001": -15.66,
+    "010": -14.78,
+    "011": -12.19,
+    "100": -14.72,
+    "101": -12.15,
+    "110": -11.74,
+    "111": -10.26
+   },
+   "combo_lufs_sig": "<ns>|<ns>|<ns>|<ns>",
+   "created": "<time>",
+   "duration": 2.0,
+   "id": "songnew001",
+   "key": 0,
+   "last_opened": "<time>",
+   "lufs": -18.0,
+   "lyrics_language": "zh",
+   "lyrics_source": "online",
+   "norm_gain_db": 2.0,
+   "norm_range": [
+    -15.0,
+    12.0
+   ],
+   "norm_target": -16.0,
+   "notes": [],
+   "separation": "UVR-MDX-NET-Inst_HQ_3.onnx",
+   "steps": {
+    "import": true,
+    "lyrics": true,
+    "pitch": true,
+    "separate": true
+   },
+   "takes": [
+    {
+     "acc": 0.75,
+     "algo": 4,
+     "created": "<time>",
+     "duration": 2.0,
+     "frames": 150,
+     "id": "20000101-000000-fix1",
+     "key": 0,
+     "key_hint": {
+      "share": 0.1,
+      "shift": 0,
+      "suggest": 0
+     },
+     "lines": [
+      {
+       "acc": 0.8,
+       "mean": -10.0,
+       "t": 0.2,
+       "text": "第一句"
+      },
+      {
+       "acc": 0.7,
+       "mean": -14.0,
+       "t": 1.1,
+       "text": "第二句"
+      }
+     ],
+     "mean": -12.0,
+     "octave": 0,
+     "offset": 0.0,
+     "speed": 1.0,
+     "spread": 30.0,
+     "start": 0.0,
+     "status": "done"
+    },
+    {
+     "acc": null,
+     "created": "<time>",
+     "duration": 2.0,
+     "error": "評分沒有完成（可能是程式被關掉），可以按「重新評分」",
+     "id": "20000101-000000-fix2",
+     "key": 0,
+     "speed": 1.0,
+     "start": 0.0,
+     "status": "error"
+    }
+   ],
+   "title": "合成測試歌"
+  },
+  "content_type": "application/json",
+  "files": {
+   "DATA/~library/songnew001/meta.json": {
+    "acapella": false,
+    "artist": "測試歌手",
+    "combo_lufs": {
+     "001": -15.66,
+     "010": -14.78,
+     "011": -12.19,
+     "100": -14.72,
+     "101": -12.15,
+     "110": -11.74,
+     "111": -10.26
+    },
+    "combo_lufs_sig": "<ns>|<ns>|<ns>|<ns>",
+    "created": "<time>",
+    "duration": 2.0,
+    "id": "songnew001",
+    "key": 0,
+    "last_opened": "<time>",
+    "lufs": -18.0,
+    "lyrics_language": "zh",
+    "lyrics_source": "online",
+    "notes": [],
+    "separation": "UVR-MDX-NET-Inst_HQ_3.onnx",
+    "steps": {
+     "import": true,
+     "lyrics": true,
+     "pitch": true,
+     "separate": true
+    },
+    "title": "合成測試歌"
+   }
+  },
+  "headers": {},
+  "status": 200
+ },
+ "song_get_again": {
+  "body": {
+   "acapella": false,
+   "artist": "測試歌手",
+   "combo_lufs": {
+    "001": -15.66,
+    "010": -14.78,
+    "011": -12.19,
+    "100": -14.72,
+    "101": -12.15,
+    "110": -11.74,
+    "111": -10.26
+   },
+   "combo_lufs_sig": "<ns>|<ns>|<ns>|<ns>",
+   "created": "<time>",
+   "duration": 2.0,
+   "id": "songnew001",
+   "key": 0,
+   "last_opened": "<time>",
+   "lufs": -18.0,
+   "lyrics_language": "zh",
+   "lyrics_source": "online",
+   "norm_gain_db": 2.0,
+   "norm_range": [
+    -15.0,
+    12.0
+   ],
+   "norm_target": -16.0,
+   "notes": [],
+   "separation": "UVR-MDX-NET-Inst_HQ_3.onnx",
+   "steps": {
+    "import": true,
+    "lyrics": true,
+    "pitch": true,
+    "separate": true
+   },
+   "takes": [
+    {
+     "acc": 0.75,
+     "algo": 4,
+     "created": "<time>",
+     "duration": 2.0,
+     "frames": 150,
+     "id": "20000101-000000-fix1",
+     "key": 0,
+     "key_hint": {
+      "share": 0.1,
+      "shift": 0,
+      "suggest": 0
+     },
+     "lines": [
+      {
+       "acc": 0.8,
+       "mean": -10.0,
+       "t": 0.2,
+       "text": "第一句"
+      },
+      {
+       "acc": 0.7,
+       "mean": -14.0,
+       "t": 1.1,
+       "text": "第二句"
+      }
+     ],
+     "mean": -12.0,
+     "octave": 0,
+     "offset": 0.0,
+     "speed": 1.0,
+     "spread": 30.0,
+     "start": 0.0,
+     "status": "done"
+    },
+    {
+     "acc": null,
+     "created": "<time>",
+     "duration": 2.0,
+     "error": "評分沒有完成（可能是程式被關掉），可以按「重新評分」",
+     "id": "20000101-000000-fix2",
+     "key": 0,
+     "speed": 1.0,
+     "start": 0.0,
+     "status": "error"
+    }
+   ],
+   "title": "合成測試歌"
+  },
+  "content_type": "application/json",
+  "files": {},
+  "headers": {},
+  "status": 200
+ },
+ "song_missing": {
+  "body": {
+   "error": "找不到這首歌"
+  },
+  "content_type": "application/json",
+  "files": {},
+  "headers": {},
+  "status": 400
+ },
+ "song_old_get": {
+  "body": {
+   "acapella": false,
+   "combo_lufs": {
+    "001": -15.47,
+    "010": -14.75,
+    "011": -12.09,
+    "100": -14.69,
+    "101": -12.05,
+    "110": -11.71,
+    "111": -10.19
+   },
+   "combo_lufs_sig": "<ns>|<ns>|<ns>|<ns>",
+   "created": "<time>",
+   "duration": 2.0,
+   "id": "songold002",
+   "last_opened": "<time>",
+   "lufs": -14.87,
+   "norm_gain_db": -1.13,
+   "norm_range": [
+    -15.0,
+    12.0
+   ],
+   "norm_target": -16.0,
+   "notes": [],
+   "peak_db": -13.98,
+   "steps": {
+    "import": true,
+    "lyrics": true,
+    "pitch": false,
+    "separate": true
+   },
+   "takes": [],
+   "title": "舊格式的歌"
+  },
+  "content_type": "application/json",
+  "files": {
+   "DATA/~library/songold002/meta.json": {
+    "acapella": false,
+    "combo_lufs": {
+     "001": -15.47,
+     "010": -14.75,
+     "011": -12.09,
+     "100": -14.69,
+     "101": -12.05,
+     "110": -11.71,
+     "111": -10.19
+    },
+    "combo_lufs_sig": "<ns>|<ns>|<ns>|<ns>",
+    "created": "<time>",
+    "duration": 2.0,
+    "id": "songold002",
+    "last_opened": "<time>",
+    "lufs": -14.87,
+    "notes": [],
+    "peak_db": -13.98,
+    "steps": {
+     "import": true,
+     "lyrics": true,
+     "pitch": false,
+     "separate": true
+    },
+    "title": "舊格式的歌"
+   }
+  },
+  "headers": {},
+  "status": 200
+ },
+ "song_old_get_again": {
+  "body": {
+   "acapella": false,
+   "combo_lufs": {
+    "001": -15.47,
+    "010": -14.75,
+    "011": -12.09,
+    "100": -14.69,
+    "101": -12.05,
+    "110": -11.71,
+    "111": -10.19
+   },
+   "combo_lufs_sig": "<ns>|<ns>|<ns>|<ns>",
+   "created": "<time>",
+   "duration": 2.0,
+   "id": "songold002",
+   "last_opened": "<time>",
+   "lufs": -14.87,
+   "norm_gain_db": -1.13,
+   "norm_range": [
+    -15.0,
+    12.0
+   ],
+   "norm_target": -16.0,
+   "notes": [],
+   "peak_db": -13.98,
+   "steps": {
+    "import": true,
+    "lyrics": true,
+    "pitch": false,
+    "separate": true
+   },
+   "takes": [],
+   "title": "舊格式的歌"
+  },
+  "content_type": "application/json",
+  "files": {},
+  "headers": {},
+  "status": 200
+ },
+ "song_patch": {
+  "body": {
+   "acapella": false,
+   "artist": "測試歌手",
+   "combo_lufs": {
+    "001": -15.66,
+    "010": -14.78,
+    "011": -12.19,
+    "100": -14.72,
+    "101": -12.15,
+    "110": -11.74,
+    "111": -10.26
+   },
+   "combo_lufs_sig": "<ns>|<ns>|<ns>|<ns>",
+   "created": "<time>",
+   "duration": 2.0,
+   "id": "songnew001",
+   "key": 2,
+   "key_set_at": "<time>",
+   "last_opened": "<time>",
+   "lufs": -18.0,
+   "lyrics_language": "zh",
+   "lyrics_source": "online",
+   "notes": [],
+   "separation": "UVR-MDX-NET-Inst_HQ_3.onnx",
+   "steps": {
+    "import": true,
+    "lyrics": true,
+    "pitch": true,
+    "separate": true
+   },
+   "title": "S.H.E 改過的歌名",
+   "title_locked": true
+  },
+  "content_type": "application/json",
+  "files": {
+   "DATA/~library/songnew001/meta.json": {
+    "acapella": false,
+    "artist": "測試歌手",
+    "combo_lufs": {
+     "001": -15.66,
+     "010": -14.78,
+     "011": -12.19,
+     "100": -14.72,
+     "101": -12.15,
+     "110": -11.74,
+     "111": -10.26
+    },
+    "combo_lufs_sig": "<ns>|<ns>|<ns>|<ns>",
+    "created": "<time>",
+    "duration": 2.0,
+    "id": "songnew001",
+    "key": 2,
+    "key_set_at": "<time>",
+    "last_opened": "<time>",
+    "lufs": -18.0,
+    "lyrics_language": "zh",
+    "lyrics_source": "online",
+    "notes": [],
+    "separation": "UVR-MDX-NET-Inst_HQ_3.onnx",
+    "steps": {
+     "import": true,
+     "lyrics": true,
+     "pitch": true,
+     "separate": true
+    },
+    "title": "S.H.E 改過的歌名",
+    "title_locked": true
+   }
+  },
+  "headers": {},
+  "status": 200
+ },
+ "song_patch_key_bool": {
+  "body": {
+   "acapella": false,
+   "artist": "測試歌手",
+   "combo_lufs": {
+    "001": -15.66,
+    "010": -14.78,
+    "011": -12.19,
+    "100": -14.72,
+    "101": -12.15,
+    "110": -11.74,
+    "111": -10.26
+   },
+   "combo_lufs_sig": "<ns>|<ns>|<ns>|<ns>",
+   "created": "<time>",
+   "duration": 2.0,
+   "id": "songnew001",
+   "key": 0,
+   "key_set_at": "<time>",
+   "last_opened": "<time>",
+   "lufs": -18.0,
+   "lyrics_language": "zh",
+   "lyrics_source": "online",
+   "notes": [],
+   "separation": "UVR-MDX-NET-Inst_HQ_3.onnx",
+   "steps": {
+    "import": true,
+    "lyrics": true,
+    "pitch": true,
+    "separate": true
+   },
+   "title": "S.H.E 改過的歌名",
+   "title_locked": true
+  },
+  "content_type": "application/json",
+  "files": {
+   "DATA/~library/songnew001/meta.json": {
+    "acapella": false,
+    "artist": "測試歌手",
+    "combo_lufs": {
+     "001": -15.66,
+     "010": -14.78,
+     "011": -12.19,
+     "100": -14.72,
+     "101": -12.15,
+     "110": -11.74,
+     "111": -10.26
+    },
+    "combo_lufs_sig": "<ns>|<ns>|<ns>|<ns>",
+    "created": "<time>",
+    "duration": 2.0,
+    "id": "songnew001",
+    "key": 0,
+    "key_set_at": "<time>",
+    "last_opened": "<time>",
+    "lufs": -18.0,
+    "lyrics_language": "zh",
+    "lyrics_source": "online",
+    "notes": [],
+    "separation": "UVR-MDX-NET-Inst_HQ_3.onnx",
+    "steps": {
+     "import": true,
+     "lyrics": true,
+     "pitch": true,
+     "separate": true
+    },
+    "title": "S.H.E 改過的歌名",
+    "title_locked": true
+   }
+  },
+  "headers": {},
+  "status": 200
+ },
+ "song_patch_key_float": {
+  "body": {
+   "acapella": false,
+   "artist": "測試歌手",
+   "combo_lufs": {
+    "001": -15.66,
+    "010": -14.78,
+    "011": -12.19,
+    "100": -14.72,
+    "101": -12.15,
+    "110": -11.74,
+    "111": -10.26
+   },
+   "combo_lufs_sig": "<ns>|<ns>|<ns>|<ns>",
+   "created": "<time>",
+   "duration": 2.0,
+   "id": "songnew001",
+   "key": 0,
+   "key_set_at": "<time>",
+   "last_opened": "<time>",
+   "lufs": -18.0,
+   "lyrics_language": "zh",
+   "lyrics_source": "online",
+   "notes": [],
+   "separation": "UVR-MDX-NET-Inst_HQ_3.onnx",
+   "steps": {
+    "import": true,
+    "lyrics": true,
+    "pitch": true,
+    "separate": true
+   },
+   "title": "S.H.E 改過的歌名",
+   "title_locked": true
+  },
+  "content_type": "application/json",
+  "files": {
+   "DATA/~library/songnew001/meta.json": {
+    "acapella": false,
+    "artist": "測試歌手",
+    "combo_lufs": {
+     "001": -15.66,
+     "010": -14.78,
+     "011": -12.19,
+     "100": -14.72,
+     "101": -12.15,
+     "110": -11.74,
+     "111": -10.26
+    },
+    "combo_lufs_sig": "<ns>|<ns>|<ns>|<ns>",
+    "created": "<time>",
+    "duration": 2.0,
+    "id": "songnew001",
+    "key": 0,
+    "key_set_at": "<time>",
+    "last_opened": "<time>",
+    "lufs": -18.0,
+    "lyrics_language": "zh",
+    "lyrics_source": "online",
+    "notes": [],
+    "separation": "UVR-MDX-NET-Inst_HQ_3.onnx",
+    "steps": {
+     "import": true,
+     "lyrics": true,
+     "pitch": true,
+     "separate": true
+    },
+    "title": "S.H.E 改過的歌名",
+    "title_locked": true
+   }
+  },
+  "headers": {},
+  "status": 200
+ },
+ "song_patch_key_text": {
+  "body": {
+   "acapella": false,
+   "artist": "測試歌手",
+   "combo_lufs": {
+    "001": -15.66,
+    "010": -14.78,
+    "011": -12.19,
+    "100": -14.72,
+    "101": -12.15,
+    "110": -11.74,
+    "111": -10.26
+   },
+   "combo_lufs_sig": "<ns>|<ns>|<ns>|<ns>",
+   "created": "<time>",
+   "duration": 2.0,
+   "id": "songnew001",
+   "key": 0,
+   "key_set_at": "<time>",
+   "last_opened": "<time>",
+   "lufs": -18.0,
+   "lyrics_language": "zh",
+   "lyrics_source": "online",
+   "notes": [],
+   "separation": "UVR-MDX-NET-Inst_HQ_3.onnx",
+   "steps": {
+    "import": true,
+    "lyrics": true,
+    "pitch": true,
+    "separate": true
+   },
+   "title": "S.H.E 改過的歌名",
+   "title_locked": true
+  },
+  "content_type": "application/json",
+  "files": {
+   "DATA/~library/songnew001/meta.json": {
+    "acapella": false,
+    "artist": "測試歌手",
+    "combo_lufs": {
+     "001": -15.66,
+     "010": -14.78,
+     "011": -12.19,
+     "100": -14.72,
+     "101": -12.15,
+     "110": -11.74,
+     "111": -10.26
+    },
+    "combo_lufs_sig": "<ns>|<ns>|<ns>|<ns>",
+    "created": "<time>",
+    "duration": 2.0,
+    "id": "songnew001",
+    "key": 0,
+    "key_set_at": "<time>",
+    "last_opened": "<time>",
+    "lufs": -18.0,
+    "lyrics_language": "zh",
+    "lyrics_source": "online",
+    "notes": [],
+    "separation": "UVR-MDX-NET-Inst_HQ_3.onnx",
+    "steps": {
+     "import": true,
+     "lyrics": true,
+     "pitch": true,
+     "separate": true
+    },
+    "title": "S.H.E 改過的歌名",
+    "title_locked": true
+   }
+  },
+  "headers": {},
+  "status": 200
+ },
+ "song_patch_lyrics_flag": {
+  "body": {
+   "acapella": false,
+   "artist": "測試歌手",
+   "combo_lufs": {
+    "001": -15.66,
+    "010": -14.78,
+    "011": -12.19,
+    "100": -14.72,
+    "101": -12.15,
+    "110": -11.74,
+    "111": -10.26
+   },
+   "combo_lufs_sig": "<ns>|<ns>|<ns>|<ns>",
+   "created": "<time>",
+   "duration": 2.0,
+   "id": "songnew001",
+   "key": 0,
+   "key_set_at": "<time>",
+   "last_opened": "<time>",
+   "lufs": -18.0,
+   "lyrics_flag": true,
+   "lyrics_language": "zh",
+   "lyrics_source": "online",
+   "notes": [],
+   "separation": "UVR-MDX-NET-Inst_HQ_3.onnx",
+   "steps": {
+    "import": true,
+    "lyrics": true,
+    "pitch": true,
+    "separate": true
+   },
+   "title": "S.H.E 改過的歌名",
+   "title_locked": true
+  },
+  "content_type": "application/json",
+  "files": {
+   "DATA/~library/songnew001/meta.json": {
+    "acapella": false,
+    "artist": "測試歌手",
+    "combo_lufs": {
+     "001": -15.66,
+     "010": -14.78,
+     "011": -12.19,
+     "100": -14.72,
+     "101": -12.15,
+     "110": -11.74,
+     "111": -10.26
+    },
+    "combo_lufs_sig": "<ns>|<ns>|<ns>|<ns>",
+    "created": "<time>",
+    "duration": 2.0,
+    "id": "songnew001",
+    "key": 0,
+    "key_set_at": "<time>",
+    "last_opened": "<time>",
+    "lufs": -18.0,
+    "lyrics_flag": true,
+    "lyrics_language": "zh",
+    "lyrics_source": "online",
+    "notes": [],
+    "separation": "UVR-MDX-NET-Inst_HQ_3.onnx",
+    "steps": {
+     "import": true,
+     "lyrics": true,
+     "pitch": true,
+     "separate": true
+    },
+    "title": "S.H.E 改過的歌名",
+    "title_locked": true
+   }
+  },
+  "headers": {},
+  "status": 200
+ },
+ "song_upload": {
+  "body": {
+   "id": "<id12>",
+   "job": "<id13>"
+  },
+  "content_type": "application/json",
+  "files": {
+   "DATA/+library/<id12>/meta.json": {
+    "category": "測試分類",
+    "created": "<time>",
+    "duration": null,
+    "id": "<id12>",
+    "lyrics_source": null,
+    "notes": [],
+    "separation": null,
+    "steps": {
+     "import": false,
+     "lyrics": false,
+     "pitch": false,
+     "separate": false
+    },
+    "title": "take"
+   },
+   "DATA/+library/<id12>/original.wav": "<binary>"
+  },
+  "headers": {},
+  "status": 200
+ },
+ "songs": {
+  "body": [
+   {
+    "artist": "測試歌手",
+    "best": 0.75,
+    "created": "<time>",
+    "duration": 2.0,
+    "id": "songnew001",
+    "key": 0,
+    "lufs": -18.0,
+    "lyrics_language": "zh",
+    "lyrics_source": "online",
+    "lyrics_text": "第一句 第二句",
+    "notes": [],
+    "separation": "UVR-MDX-NET-Inst_HQ_3.onnx",
+    "steps": {
+     "import": true,
+     "lyrics": true,
+     "pitch": true,
+     "separate": true
+    },
+    "takes": 2,
+    "title": "合成測試歌"
+   },
+   {
+    "best": null,
+    "created": "<time>",
+    "duration": 2.0,
+    "id": "songold002",
+    "lyrics_text": "第一句 第二句",
+    "notes": [],
+    "steps": {
+     "import": true,
+     "lyrics": true,
+     "pitch": false,
+     "separate": true
+    },
+    "takes": 0,
+    "title": "舊格式的歌"
+   }
+  ],
+  "content_type": "application/json",
+  "files": {},
+  "headers": {},
+  "status": 200
+ },
+ "songs_end": {
+  "body": [
+   {
+    "best": null,
+    "created": "<time>",
+    "dl_state": "queued",
+    "duration": null,
+    "id": "<id11>",
+    "lyrics_source": null,
+    "notes": [],
+    "separation": null,
+    "source_url": "https://www.youtube.com/watch?v=BBBBBBBBBBB",
+    "steps": {
+     "import": false,
+     "lyrics": false,
+     "pitch": false,
+     "separate": false
+    },
+    "takes": 0,
+    "title": "批次（排隊下載）"
+   },
+   {
+    "acapella": false,
+    "artist": "測試歌手",
+    "best": 0.75,
+    "combo_lufs": {
+     "001": -15.66,
+     "010": -14.78,
+     "011": -12.19,
+     "100": -14.72,
+     "101": -12.15,
+     "110": -11.74,
+     "111": -10.26
+    },
+    "combo_lufs_sig": "<ns>|<ns>|<ns>|<ns>",
+    "created": "<time>",
+    "duration": 2.0,
+    "fine_queued": true,
+    "id": "songnew001",
+    "kana_fix": {
+     "今日": "きょう"
+    },
+    "key": 0,
+    "key_set_at": "<time>",
+    "last_opened": "<time>",
+    "last_sung": "<time>",
+    "lufs": -18.0,
+    "lyrics_flag": true,
+    "lyrics_language": "zh",
+    "lyrics_online": {
+     "artist": "測試歌手",
+     "source": "LRCLIB",
+     "track": "合成測試歌"
+    },
+    "lyrics_pending": false,
+    "lyrics_source": "import",
+    "lyrics_text": "匯入第一句 匯入第二句",
+    "notes": [],
+    "separation": "UVR-MDX-NET-Inst_HQ_3.onnx",
+    "steps": {
+     "import": true,
+     "lyrics": true,
+     "pitch": true,
+     "separate": true
+    },
+    "sung": 1,
+    "takes": 1,
+    "title": "S.H.E 改過的歌名",
+    "title_locked": true
+   },
+   {
+    "acapella": false,
+    "best": null,
+    "combo_lufs": {
+     "001": -15.47,
+     "010": -14.75,
+     "011": -12.09,
+     "100": -14.69,
+     "101": -12.05,
+     "110": -11.71,
+     "111": -10.19
+    },
+    "combo_lufs_sig": "<ns>|<ns>|<ns>|<ns>",
+    "created": "<time>",
+    "duration": 2.0,
+    "id": "songold002",
+    "last_opened": "<time>",
+    "lufs": -14.87,
+    "lyrics_text": "第一句 第二句",
+    "notes": [],
+    "peak_db": -13.98,
+    "steps": {
+     "import": true,
+     "lyrics": true,
+     "pitch": false,
+     "separate": true
+    },
+    "takes": 0,
+    "title": "舊格式的歌"
+   }
+  ],
+  "content_type": "application/json",
+  "files": {},
+  "headers": {},
+  "status": 200
+ },
+ "songs_search": {
+  "body": {
+   "kind": {},
+   "match": [
+    "songnew001"
+   ],
+   "similar": [],
+   "snip": {}
+  },
+  "content_type": "application/json",
+  "files": {},
+  "headers": {},
+  "status": 200
+ },
+ "status": {
+  "body": {
+   "claude_ready": true,
+   "cuda_note": "",
+   "hq": null,
+   "hq_model": "mel_band_roformer_karaoke_aufr33_viperx_sdr_10.1956.ckpt",
+   "hqv": null,
+   "jobs": [],
+   "live": {
+    "apps": [],
+    "hold": false,
+    "holding": "",
+    "paused": false,
+    "reason": ""
+   },
+   "modules": {
+    "anthropic": true,
+    "crepe": true,
+    "cuda": false,
+    "kana": true,
+    "opencc": true,
+    "pedalboard": true,
+    "uvr": true,
+    "whisper": true
+   },
+   "parallel_ok": false,
+   "queued_total": 0,
+   "remote": {
+    "id": null,
+    "key": 0,
+    "seq": 0
+   },
+   "root": "<v>",
+   "session_cost": "<v>",
+   "update": "<v>",
+   "version": "<v>",
+   "vram": null,
+   "yt": false,
+   "yt_pause": {
+    "at": 0.0,
+    "on": false,
+    "reason": ""
+   }
+  },
+  "content_type": "application/json",
+  "files": {},
+  "headers": {},
+  "status": 200
+ },
+ "status_end": {
+  "body": {
+   "claude_ready": true,
+   "cuda_note": "",
+   "hq": null,
+   "hq_model": "mel_band_roformer_karaoke_aufr33_viperx_sdr_10.1956.ckpt",
+   "hqv": null,
+   "jobs": [
+    {
+     "created": "<time>",
+     "error": null,
+     "id": "<id2>",
+     "kind": "process",
+     "label": "fine",
+     "order": 0,
+     "progress": 0.0,
+     "song": "songnew001",
+     "status": "queued",
+     "step": "排隊中"
+    },
+    {
+     "created": "<time>",
+     "error": null,
+     "id": "<id3>",
+     "kind": "export",
+     "label": "mixdown",
+     "order": 1,
+     "progress": 0.0,
+     "song": "songnew001",
+     "status": "queued",
+     "step": "排隊中"
+    },
+    {
+     "created": "<time>",
+     "error": null,
+     "id": "<id5>",
+     "kind": "process",
+     "label": "compact",
+     "order": 2,
+     "progress": 0.0,
+     "song": "",
+     "status": "queued",
+     "step": "排隊中"
+    },
+    {
+     "created": "<time>",
+     "error": null,
+     "id": "<id6>",
+     "kind": "take",
+     "label": "20000101-000000-fix1",
+     "order": 3,
+     "progress": 0.0,
+     "song": "songnew001",
+     "status": "queued",
+     "step": "排隊中"
+    },
+    {
+     "created": "<time>",
+     "error": null,
+     "id": "<id7>",
+     "kind": "export",
+     "label": "20000101-000000-fix1",
+     "order": 4,
+     "progress": 0.0,
+     "song": "songnew001",
+     "status": "queued",
+     "step": "排隊中"
+    },
+    {
+     "created": "<time>",
+     "error": null,
+     "id": "<id8>",
+     "kind": "take",
+     "label": "<take1>",
+     "order": 5,
+     "progress": 0.0,
+     "song": "songnew001",
+     "status": "queued",
+     "step": "排隊中"
+    },
+    {
+     "created": "<time>",
+     "error": null,
+     "id": "<id10>",
+     "kind": "process",
+     "label": "youtube",
+     "order": 6,
+     "progress": 0.0,
+     "song": "<id9>",
+     "status": "queued",
+     "step": "排隊中"
+    },
+    {
+     "created": "<time>",
+     "error": null,
+     "id": "<id14>",
+     "kind": "process",
+     "label": "youtube",
+     "order": 7,
+     "progress": 0.0,
+     "song": "<id11>",
+     "status": "queued",
+     "step": "排隊中"
+    },
+    {
+     "created": "<time>",
+     "error": null,
+     "id": "<id13>",
+     "kind": "process",
+     "label": "all",
+     "order": 8,
+     "progress": 0.0,
+     "song": "<id12>",
+     "status": "queued",
+     "step": "排隊中"
+    },
+    {
+     "created": "<time>",
+     "error": null,
+     "id": "<id1>",
+     "kind": "variant",
+     "label": "2:1.0",
+     "order": 0,
+     "progress": 0.0,
+     "song": "songnew001",
+     "status": "queued",
+     "step": "排隊中"
+    }
+   ],
+   "live": {
+    "apps": [],
+    "hold": false,
+    "holding": "",
+    "paused": false,
+    "reason": ""
+   },
+   "modules": {
+    "anthropic": true,
+    "crepe": true,
+    "cuda": false,
+    "kana": true,
+    "opencc": true,
+    "pedalboard": true,
+    "uvr": true,
+    "whisper": true
+   },
+   "parallel_ok": false,
+   "queued_total": 5,
+   "remote": {
+    "id": "songnew001",
+    "key": 1,
+    "seq": 2
+   },
+   "root": "<v>",
+   "session_cost": "<v>",
+   "update": "<v>",
+   "version": "<v>",
+   "vram": null,
+   "yt": true,
+   "yt_pause": {
+    "at": 0.0,
+    "on": false,
+    "reason": ""
+   }
+  },
+  "content_type": "application/json",
+  "files": {},
+  "headers": {},
+  "status": 200
+ },
+ "status_live": {
+  "body": {
+   "claude_ready": true,
+   "cuda_note": "",
+   "hq": null,
+   "hq_model": "mel_band_roformer_karaoke_aufr33_viperx_sdr_10.1956.ckpt",
+   "hqv": null,
+   "jobs": [
+    {
+     "created": "<time>",
+     "error": null,
+     "id": "<id2>",
+     "kind": "process",
+     "label": "fine",
+     "order": 0,
+     "progress": 0.0,
+     "song": "songnew001",
+     "status": "queued",
+     "step": "排隊中"
+    },
+    {
+     "created": "<time>",
+     "error": null,
+     "id": "<id3>",
+     "kind": "export",
+     "label": "mixdown",
+     "order": 1,
+     "progress": 0.0,
+     "song": "songnew001",
+     "status": "queued",
+     "step": "排隊中"
+    },
+    {
+     "created": "<time>",
+     "error": null,
+     "id": "<id5>",
+     "kind": "process",
+     "label": "compact",
+     "order": 2,
+     "progress": 0.0,
+     "song": "",
+     "status": "queued",
+     "step": "排隊中"
+    },
+    {
+     "created": "<time>",
+     "error": null,
+     "id": "<id6>",
+     "kind": "take",
+     "label": "20000101-000000-fix1",
+     "order": 3,
+     "progress": 0.0,
+     "song": "songnew001",
+     "status": "queued",
+     "step": "排隊中"
+    },
+    {
+     "created": "<time>",
+     "error": null,
+     "id": "<id7>",
+     "kind": "export",
+     "label": "20000101-000000-fix1",
+     "order": 4,
+     "progress": 0.0,
+     "song": "songnew001",
+     "status": "queued",
+     "step": "排隊中"
+    },
+    {
+     "created": "<time>",
+     "error": null,
+     "id": "<id8>",
+     "kind": "take",
+     "label": "<take1>",
+     "order": 5,
+     "progress": 0.0,
+     "song": "songnew001",
+     "status": "queued",
+     "step": "排隊中"
+    },
+    {
+     "created": "<time>",
+     "error": null,
+     "id": "<id10>",
+     "kind": "process",
+     "label": "youtube",
+     "order": 6,
+     "progress": 0.0,
+     "song": "<id9>",
+     "status": "queued",
+     "step": "排隊中"
+    },
+    {
+     "created": "<time>",
+     "error": null,
+     "id": "<id14>",
+     "kind": "process",
+     "label": "youtube",
+     "order": 7,
+     "progress": 0.0,
+     "song": "<id11>",
+     "status": "queued",
+     "step": "排隊中"
+    },
+    {
+     "created": "<time>",
+     "error": null,
+     "id": "<id13>",
+     "kind": "process",
+     "label": "all",
+     "order": 8,
+     "progress": 0.0,
+     "song": "<id12>",
+     "status": "queued",
+     "step": "排隊中"
+    },
+    {
+     "created": "<time>",
+     "error": null,
+     "id": "<id1>",
+     "kind": "variant",
+     "label": "2:1.0",
+     "order": 0,
+     "progress": 0.0,
+     "song": "songnew001",
+     "status": "queued",
+     "step": "排隊中"
+    }
+   ],
+   "live": {
+    "apps": [],
+    "hold": true,
+    "holding": "",
+    "paused": false,
+    "reason": "直播模式開著"
+   },
+   "modules": {
+    "anthropic": true,
+    "crepe": true,
+    "cuda": false,
+    "kana": true,
+    "opencc": true,
+    "pedalboard": true,
+    "uvr": true,
+    "whisper": true
+   },
+   "parallel_ok": false,
+   "queued_total": 5,
+   "remote": {
+    "id": "songnew001",
+    "key": 1,
+    "seq": 2
+   },
+   "root": "<v>",
+   "session_cost": "<v>",
+   "update": "<v>",
+   "version": "<v>",
+   "vram": null,
+   "yt": true,
+   "yt_pause": {
+    "at": 0.0,
+    "on": false,
+    "reason": ""
+   }
+  },
+  "content_type": "application/json",
+  "files": {},
+  "headers": {},
+  "status": 200
+ },
+ "status_override": {
+  "body": {
+   "claude_ready": true,
+   "cuda_note": "",
+   "hq": null,
+   "hq_model": "mel_band_roformer_karaoke_aufr33_viperx_sdr_10.1956.ckpt",
+   "hqv": null,
+   "jobs": [
+    {
+     "created": "<time>",
+     "error": null,
+     "id": "<id2>",
+     "kind": "process",
+     "label": "fine",
+     "order": 0,
+     "progress": 0.0,
+     "song": "songnew001",
+     "status": "queued",
+     "step": "排隊中"
+    },
+    {
+     "created": "<time>",
+     "error": null,
+     "id": "<id3>",
+     "kind": "export",
+     "label": "mixdown",
+     "order": 1,
+     "progress": 0.0,
+     "song": "songnew001",
+     "status": "queued",
+     "step": "排隊中"
+    },
+    {
+     "created": "<time>",
+     "error": null,
+     "id": "<id5>",
+     "kind": "process",
+     "label": "compact",
+     "order": 2,
+     "progress": 0.0,
+     "song": "",
+     "status": "queued",
+     "step": "排隊中"
+    },
+    {
+     "created": "<time>",
+     "error": null,
+     "id": "<id6>",
+     "kind": "take",
+     "label": "20000101-000000-fix1",
+     "order": 3,
+     "progress": 0.0,
+     "song": "songnew001",
+     "status": "queued",
+     "step": "排隊中"
+    },
+    {
+     "created": "<time>",
+     "error": null,
+     "id": "<id7>",
+     "kind": "export",
+     "label": "20000101-000000-fix1",
+     "order": 4,
+     "progress": 0.0,
+     "song": "songnew001",
+     "status": "queued",
+     "step": "排隊中"
+    },
+    {
+     "created": "<time>",
+     "error": null,
+     "id": "<id8>",
+     "kind": "take",
+     "label": "<take1>",
+     "order": 5,
+     "progress": 0.0,
+     "song": "songnew001",
+     "status": "queued",
+     "step": "排隊中"
+    },
+    {
+     "created": "<time>",
+     "error": null,
+     "id": "<id10>",
+     "kind": "process",
+     "label": "youtube",
+     "order": 6,
+     "progress": 0.0,
+     "song": "<id9>",
+     "status": "queued",
+     "step": "排隊中"
+    },
+    {
+     "created": "<time>",
+     "error": null,
+     "id": "<id14>",
+     "kind": "process",
+     "label": "youtube",
+     "order": 7,
+     "progress": 0.0,
+     "song": "<id11>",
+     "status": "queued",
+     "step": "排隊中"
+    },
+    {
+     "created": "<time>",
+     "error": null,
+     "id": "<id13>",
+     "kind": "process",
+     "label": "all",
+     "order": 8,
+     "progress": 0.0,
+     "song": "<id12>",
+     "status": "queued",
+     "step": "排隊中"
+    },
+    {
+     "created": "<time>",
+     "error": null,
+     "id": "<id1>",
+     "kind": "variant",
+     "label": "2:1.0",
+     "order": 0,
+     "progress": 0.0,
+     "song": "songnew001",
+     "status": "queued",
+     "step": "排隊中"
+    }
+   ],
+   "live": {
+    "apps": [],
+    "hold": false,
+    "holding": "",
+    "override": true,
+    "paused": false,
+    "reason": ""
+   },
+   "modules": {
+    "anthropic": true,
+    "crepe": true,
+    "cuda": false,
+    "kana": true,
+    "opencc": true,
+    "pedalboard": true,
+    "uvr": true,
+    "whisper": true
+   },
+   "parallel_ok": false,
+   "queued_total": 5,
+   "remote": {
+    "id": "songnew001",
+    "key": 1,
+    "seq": 2
+   },
+   "root": "<v>",
+   "session_cost": "<v>",
+   "update": "<v>",
+   "version": "<v>",
+   "vram": null,
+   "yt": true,
+   "yt_pause": {
+    "at": 0.0,
+    "on": false,
+    "reason": ""
+   }
+  },
+  "content_type": "application/json",
+  "files": {},
+  "headers": {},
+  "status": 200
+ },
+ "status_paused": {
+  "body": {
+   "claude_ready": true,
+   "cuda_note": "",
+   "hq": null,
+   "hq_model": "mel_band_roformer_karaoke_aufr33_viperx_sdr_10.1956.ckpt",
+   "hqv": null,
+   "jobs": [
+    {
+     "created": "<time>",
+     "error": null,
+     "id": "<id2>",
+     "kind": "process",
+     "label": "fine",
+     "order": 0,
+     "progress": 0.0,
+     "song": "songnew001",
+     "status": "queued",
+     "step": "排隊中"
+    },
+    {
+     "created": "<time>",
+     "error": null,
+     "id": "<id3>",
+     "kind": "export",
+     "label": "mixdown",
+     "order": 1,
+     "progress": 0.0,
+     "song": "songnew001",
+     "status": "queued",
+     "step": "排隊中"
+    },
+    {
+     "created": "<time>",
+     "error": null,
+     "id": "<id5>",
+     "kind": "process",
+     "label": "compact",
+     "order": 2,
+     "progress": 0.0,
+     "song": "",
+     "status": "queued",
+     "step": "排隊中"
+    },
+    {
+     "created": "<time>",
+     "error": null,
+     "id": "<id6>",
+     "kind": "take",
+     "label": "20000101-000000-fix1",
+     "order": 3,
+     "progress": 0.0,
+     "song": "songnew001",
+     "status": "queued",
+     "step": "排隊中"
+    },
+    {
+     "created": "<time>",
+     "error": null,
+     "id": "<id7>",
+     "kind": "export",
+     "label": "20000101-000000-fix1",
+     "order": 4,
+     "progress": 0.0,
+     "song": "songnew001",
+     "status": "queued",
+     "step": "排隊中"
+    },
+    {
+     "created": "<time>",
+     "error": null,
+     "id": "<id8>",
+     "kind": "take",
+     "label": "<take1>",
+     "order": 5,
+     "progress": 0.0,
+     "song": "songnew001",
+     "status": "queued",
+     "step": "排隊中"
+    },
+    {
+     "created": "<time>",
+     "error": null,
+     "id": "<id10>",
+     "kind": "process",
+     "label": "youtube",
+     "order": 6,
+     "progress": 0.0,
+     "song": "<id9>",
+     "status": "queued",
+     "step": "排隊中"
+    },
+    {
+     "created": "<time>",
+     "error": null,
+     "id": "<id14>",
+     "kind": "process",
+     "label": "youtube",
+     "order": 7,
+     "progress": 0.0,
+     "song": "<id11>",
+     "status": "queued",
+     "step": "排隊中"
+    },
+    {
+     "created": "<time>",
+     "error": null,
+     "id": "<id13>",
+     "kind": "process",
+     "label": "all",
+     "order": 8,
+     "progress": 0.0,
+     "song": "<id12>",
+     "status": "queued",
+     "step": "排隊中"
+    },
+    {
+     "created": "<time>",
+     "error": null,
+     "id": "<id1>",
+     "kind": "variant",
+     "label": "2:1.0",
+     "order": 0,
+     "progress": 0.0,
+     "song": "songnew001",
+     "status": "queued",
+     "step": "排隊中"
+    }
+   ],
+   "live": {
+    "apps": [],
+    "hold": false,
+    "holding": "",
+    "override": true,
+    "paused": true,
+    "reason": ""
+   },
+   "modules": {
+    "anthropic": true,
+    "crepe": true,
+    "cuda": false,
+    "kana": true,
+    "opencc": true,
+    "pedalboard": true,
+    "uvr": true,
+    "whisper": true
+   },
+   "parallel_ok": false,
+   "queued_total": 5,
+   "remote": {
+    "id": "songnew001",
+    "key": 1,
+    "seq": 2
+   },
+   "root": "<v>",
+   "session_cost": "<v>",
+   "update": "<v>",
+   "version": "<v>",
+   "vram": null,
+   "yt": true,
+   "yt_pause": {
+    "at": 0.0,
+    "on": false,
+    "reason": ""
+   }
+  },
+  "content_type": "application/json",
+  "files": {},
+  "headers": {},
+  "status": 200
+ },
+ "storage": {
+  "body": {
+   "bytes": "<v>",
+   "convertible": 1764220,
+   "removable": 0,
+   "saving": 882110,
+   "songs": 2
+  },
+  "content_type": "application/json",
+  "files": {},
+  "headers": {},
+  "status": 200
+ },
+ "storage_adopt_missing": {
+  "body": {
+   "error": "找不到這個資料夾"
+  },
+  "content_type": "application/json",
+  "files": {},
+  "headers": {},
+  "status": 400
+ },
+ "storage_compact": {
+  "body": {
+   "job": "<id5>"
+  },
+  "content_type": "application/json",
+  "files": {},
+  "headers": {},
+  "status": 200
+ },
+ "storage_delete_old_denied": {
+  "body": {
+   "error": "只能刪除搬移前的舊位置"
+  },
+  "content_type": "application/json",
+  "files": {},
+  "headers": {},
+  "status": 400
+ },
+ "storage_location": {
+  "body": {
+   "drives": "<v>",
+   "library": "<DATA>\\library",
+   "library_default": true,
+   "library_free": "<v>",
+   "library_missing": false,
+   "library_size": "<v>",
+   "models": "<v>",
+   "models_default": "<v>",
+   "models_free": "<v>",
+   "models_size": "<v>",
+   "moving": false,
+   "old": []
+  },
+  "content_type": "application/json",
+  "files": {},
+  "headers": {},
+  "status": 200
+ },
+ "storage_move_no_target": {
+  "body": {
+   "error": "請選擇或輸入新的位置"
+  },
+  "content_type": "application/json",
+  "files": {},
+  "headers": {},
+  "status": 400
+ },
+ "take_audio": {
+  "audio": {
+   "channels": 1,
+   "format": "WAV",
+   "frames": 88200,
+   "samplerate": 48000,
+   "subtype": "PCM_16"
+  },
+  "content_type": "audio/wav",
+  "files": {},
+  "headers": {
+   "Accept-Ranges": "bytes",
+   "Cache-Control": "no-cache, max-age=0"
+  },
+  "same_as_file": true,
+  "status": 200
+ },
+ "take_audio_range": {
+  "bytes": 100,
+  "content_type": "audio/wav",
+  "files": {},
+  "headers": {
+   "Accept-Ranges": "bytes",
+   "Cache-Control": "no-cache, max-age=0",
+   "Content-Range": "bytes 0-99/<total>"
+  },
+  "same_as_file": true,
+  "status": 206
+ },
+ "take_bad_id": {
+  "content_type": "text/html; charset=utf-8",
+  "files": {},
+  "headers": {},
+  "status": 404
+ },
+ "take_delete": {
+  "body": {
+   "ok": true
+  },
+  "content_type": "application/json",
+  "files": {
+   "DATA/-library/songnew001/takes/<take1>.json": null,
+   "DATA/-library/songnew001/takes/<take1>.wav": null
+  },
+  "headers": {},
+  "status": 200
+ },
+ "take_export_png": {
+  "body": {
+   "files": [
+    "<DOWNLOADS>\\雷虎練唱台\\S.H.E 改過的歌名_我的演唱_20000101-0000_成績卡.png"
+   ],
+   "job": "<id7>"
+  },
+  "content_type": "application/json",
+  "files": {},
+  "headers": {},
+  "status": 200
+ },
+ "take_get": {
+  "body": {
+   "acc": 0.75,
+   "algo": 4,
+   "created": "<time>",
+   "duration": 2.0,
+   "frames": 150,
+   "id": "20000101-000000-fix1",
+   "key": 0,
+   "key_hint": {
+    "share": 0.1,
+    "shift": 0,
+    "suggest": 0
+   },
+   "lines": [
+    {
+     "acc": 0.8,
+     "mean": -10.0,
+     "t": 0.2,
+     "text": "第一句"
+    },
+    {
+     "acc": 0.7,
+     "mean": -14.0,
+     "t": 1.1,
+     "text": "第二句"
+    }
+   ],
+   "mean": -12.0,
+   "octave": 0,
+   "offset": 0.0,
+   "pitch": {
+    "hop": 0.01,
+    "midi": [
+     null,
+     60.1,
+     60.2,
+     null
+    ],
+    "t0": 0.0
+   },
+   "speed": 1.0,
+   "spread": 30.0,
+   "start": 0.0,
+   "status": "done"
+  },
+  "content_type": "application/json",
+  "files": {},
+  "headers": {
+   "Accept-Ranges": "bytes",
+   "Cache-Control": "no-cache, max-age=0"
+  },
+  "sha256": "378eadaac8200891",
+  "status": 200
+ },
+ "take_missing": {
+  "content_type": "text/html; charset=utf-8",
+  "files": {},
+  "headers": {},
+  "status": 404
+ },
+ "take_mixprep": {
+  "body": {
+   "back": "/api/songs/songnew001/audio/back?key=0&speed=1.0",
+   "balance": null,
+   "inst": "/api/songs/songnew001/audio/inst?key=0&speed=1.0",
+   "key": 0,
+   "master_db": -3.42,
+   "speed": 1.0,
+   "start": 0.0,
+   "vocal": "/api/songs/songnew001/takes/20000101-000000-fix1/vocal/v2_1_light?t=<t>"
+  },
+  "content_type": "application/json",
+  "files": {
+   "DATA/+library/songnew001/loudness.json": {
+    "bed_lufs": -13.58,
+    "master_db": -3.42
+   },
+   "DATA/+library/songnew001/takes/20000101-000000-fix1.vocal_v2_1_light.wav": "<binary>"
+  },
+  "headers": {},
+  "status": 200
+ },
+ "take_preview": {
+  "body": {
+   "url": "/api/songs/songnew001/takes/20000101-000000-fix1/preview.wav?t=<t>"
+  },
+  "content_type": "application/json",
+  "files": {
+   "DATA/+library/songnew001/takes/20000101-000000-fix1.preview.wav": "<binary>"
+  },
+  "headers": {},
+  "status": 200
+ },
+ "take_preview_file": {
+  "audio": {
+   "channels": 2,
+   "format": "WAV",
+   "frames": 88200,
+   "samplerate": 44100,
+   "subtype": "PCM_16"
+  },
+  "content_type": "audio/wav",
+  "files": {},
+  "headers": {
+   "Accept-Ranges": "bytes",
+   "Cache-Control": "no-cache, max-age=0"
+  },
+  "status": 200
+ },
+ "take_rescore": {
+  "body": {
+   "job": "<id6>"
+  },
+  "content_type": "application/json",
+  "files": {},
+  "headers": {},
+  "status": 200
+ },
+ "take_upload": {
+  "body": {
+   "id": "<take1>",
+   "job": "<id8>"
+  },
+  "content_type": "application/json",
+  "files": {
+   "DATA/+library/songnew001/takes/<take1>.json": {
+    "created": "<time>",
+    "duration": 1.0,
+    "id": "<take1>",
+    "key": 0,
+    "speed": 1.0,
+    "start": 0.5,
+    "status": "scoring"
+   },
+   "DATA/+library/songnew001/takes/<take1>.wav": "<binary>"
+  },
+  "headers": {},
+  "status": 200
+ },
+ "take_upload_empty": {
+  "body": {
+   "error": "沒有收到錄音"
+  },
+  "content_type": "application/json",
+  "files": {},
+  "headers": {},
+  "status": 400
+ },
+ "take_vocal_bad_tag": {
+  "content_type": "text/html; charset=utf-8",
+  "files": {},
+  "headers": {},
+  "status": 404
+ },
+ "take_vocal_missing": {
+  "content_type": "text/html; charset=utf-8",
+  "files": {},
+  "headers": {},
+  "status": 404
+ },
+ "takes_delete_batch": {
+  "body": {
+   "deleted": 1
+  },
+  "content_type": "application/json",
+  "files": {
+   "DATA/-library/songnew001/takes/20000101-000000-fix2.json": null,
+   "DATA/-library/songnew001/takes/20000101-000000-fix2.wav": null
+  },
+  "headers": {},
+  "status": 200
+ },
+ "timing_cmd_put": {
+  "body": {
+   "ok": true
+  },
+  "content_type": "application/json",
+  "files": {},
+  "headers": {},
+  "status": 200
+ },
+ "timing_cmds": {
+  "body": {
+   "alive": true,
+   "cmds": [
+    {
+     "seek": 1
+    }
+   ],
+   "seq": 1
+  },
+  "content_type": "application/json",
+  "files": {},
+  "headers": {},
+  "status": 200
+ },
+ "timing_cmds_first": {
+  "body": {
+   "alive": false,
+   "cmds": [],
+   "seq": 0
+  },
+  "content_type": "application/json",
+  "files": {},
+  "headers": {},
+  "status": 200
+ },
+ "timing_state_get": {
+  "body": {
+   "line": 1,
+   "seq": 1
+  },
+  "content_type": "application/json",
+  "files": {},
+  "headers": {},
+  "status": 200
+ },
+ "timing_state_put": {
+  "body": {
+   "ok": true
+  },
+  "content_type": "application/json",
+  "files": {},
+  "headers": {},
+  "status": 200
+ },
+ "update_install": {
+  "body": {
+   "error": "這個版本沒辦法在程式裡更新，請到下載頁下載新版安裝檔"
+  },
+  "content_type": "application/json",
+  "files": {},
+  "headers": {},
+  "status": 400
+ },
+ "upgrade_separation_not_ready": {
+  "body": {
+   "error": "高品質人聲模型（約 640 MB）還在下載，下載完成後再按一次"
+  },
+  "content_type": "application/json",
+  "files": {},
+  "headers": {},
+  "status": 400
+ },
+ "usage": {
+  "body": {
+   "balance": {
+    "entered_at": "<time>",
+    "entered_usd": 12.5,
+    "estimated_usd": 12.5,
+    "spent_since_usd": 0
+   },
+   "last": null,
+   "recent": [],
+   "session": {
+    "calls": 0,
+    "cost_usd": 0,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "unpriced": 0
+   },
+   "total": {
+    "calls": 0,
+    "cost_usd": 0,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "unpriced": 0
+   }
+  },
+  "content_type": "application/json",
+  "files": {},
+  "headers": {},
+  "status": 200
+ },
+ "variant": {
+  "body": {
+   "job": "<id1>",
+   "ready": false
+  },
+  "content_type": "application/json",
+  "files": {},
+  "headers": {},
+  "status": 200
+ },
+ "youtube_add": {
+  "body": {
+   "id": "<id9>",
+   "job": "<id10>"
+  },
+  "content_type": "application/json",
+  "files": {
+   "DATA/+library/<id9>/meta.json": {
+    "category": "測試分類",
+    "created": "<time>",
+    "dl_state": "queued",
+    "duration": null,
+    "id": "<id9>",
+    "lyrics_source": null,
+    "notes": [],
+    "separation": null,
+    "source_url": "https://www.youtube.com/watch?v=AAAAAAAAAAA",
+    "steps": {
+     "import": false,
+     "lyrics": false,
+     "pitch": false,
+     "separate": false
+    },
+    "title": "YouTube 影片（排隊下載）"
+   }
+  },
+  "headers": {},
+  "status": 200
+ },
+ "youtube_add_duplicate": {
+  "body": {
+   "error": "這首歌已經在下載佇列裡：YouTube 影片（排隊下載）"
+  },
+  "content_type": "application/json",
+  "files": {},
+  "headers": {},
+  "status": 400
+ },
+ "youtube_bad_url": {
+  "body": {
+   "error": "這不是 YouTube 網址"
+  },
+  "content_type": "application/json",
+  "files": {},
+  "headers": {},
+  "status": 400
+ },
+ "youtube_batch": {
+  "body": {
+   "added": 1,
+   "skipped": 1,
+   "updated": 0
+  },
+  "content_type": "application/json",
+  "files": {
+   "DATA/+library/<id11>/meta.json": {
+    "created": "<time>",
+    "dl_state": "queued",
+    "duration": null,
+    "id": "<id11>",
+    "lyrics_source": null,
+    "notes": [],
+    "separation": null,
+    "source_url": "https://www.youtube.com/watch?v=BBBBBBBBBBB",
+    "steps": {
+     "import": false,
+     "lyrics": false,
+     "pitch": false,
+     "separate": false
+    },
+    "title": "批次（排隊下載）"
+   }
+  },
+  "headers": {},
+  "status": 200
+ },
+ "youtube_locked": {
+  "body": {
+   "error": "這個功能尚未開啟"
+  },
+  "content_type": "application/json",
+  "files": {},
+  "headers": {},
+  "status": 400
+ },
+ "youtube_resolve_bad": {
+  "body": {
+   "error": "格式不正確"
+  },
+  "content_type": "application/json",
+  "files": {},
+  "headers": {},
+  "status": 400
+ },
+ "youtube_resume": {
+  "body": {
+   "resumed": 0
+  },
+  "content_type": "application/json",
+  "files": {},
+  "headers": {},
+  "status": 200
+ },
+ "youtube_sheet": {
+  "body": {
+   "lines": [
+    "測試歌手 合成測試歌"
+   ],
+   "rows": [
+    {
+     "artist": "測試歌手",
+     "category": null,
+     "key": -2,
+     "lang": null,
+     "line": "測試歌手 合成測試歌",
+     "row": 2,
+     "song": "合成測試歌",
+     "url": ""
+    }
+   ]
+  },
+  "content_type": "application/json",
+  "files": {},
+  "headers": {},
+  "status": 200
+ },
+ "youtube_sheet_empty": {
+  "body": {
+   "error": "沒有收到檔案"
+  },
+  "content_type": "application/json",
+  "files": {},
+  "headers": {},
+  "status": 400
+ },
+ "yt_unlock": {
+  "body": {
+   "ok": true
+  },
+  "content_type": "application/json",
+  "files": {
+   "DATA/~config.json": {
+    "anthropic_api_key": "sk-ant-api03-TESTKEY-<ns>-abcd",
+    "audio_out": "",
+    "auto_fine": true,
+    "auto_recognize_lyrics": false,
+    "balance_set_at": "<time>",
+    "balance_usd": 12.5,
+    "claude_model": "claude-sonnet-5-5",
+    "convert_to_taiwan": true,
+    "font": "huninn",
+    "global_hotkeys": true,
+    "hotkeys": {
+     "flag": "Ctrl+Alt+F",
+     "key-down": "Ctrl+Alt+PageDown",
+     "key-up": "Ctrl+Alt+PageUp",
+     "minus": "Ctrl+Alt+Comma",
+     "mode": "Ctrl+Alt+K",
+     "next-line": "Ctrl+Alt+S",
+     "next-song": "Ctrl+Alt+N",
+     "now": "Ctrl+Alt+A",
+     "pause-all": "Ctrl+Alt+P",
+     "play": "Ctrl+Alt+Space",
+     "plus": "Ctrl+Alt+Period"
+    },
+    "karaoke_model": "UVR_MDXNET_KARA_2.onnx",
+    "karaoke_overlap": 2,
+    "karaoke_quality": "auto",
+    "lyrics_language": "",
+    "monitor_out": "",
+    "parallel_separation": false,
+    "pause_while_streaming": true,
+    "pitch_model": "auto",
+    "queue_paused": false,
+    "separation_model": "UVR-MDX-NET-Inst_HQ_3.onnx",
+    "streaming_apps": [
+     "obs64.exe",
+     "obs32.exe",
+     "VTube Studio.exe",
+     "Streamlabs OBS.exe",
+     "XSplit.Core.exe",
+     "vMix64.exe"
+    ],
+    "vocal_quality": "auto",
+    "whisper_model": "large-v3-turbo",
+    "yt_enabled": true
+   }
+  },
+  "headers": {},
+  "status": 200
+ }
+}
