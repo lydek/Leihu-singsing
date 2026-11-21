@@ -382,7 +382,12 @@ shim 要補的地方：
 **進度（2026-11-21）**：接在 `test/upstream-baseline` 上做完，四個 commit 依序對應上面四步（`f8538e4`、`e234dd4`、`5d3db0d`、`5d430b7`）。
 - 本機 `uv run pytest`：4 個通過、1 個不收集（`test_contract_snapshot`）。`import app` 沒有寫到使用者資料。
 - `uvx ruff@0.17.5 check .`：上游程式（不含 `tests/`）277 個違規，`format --check` 有 10 個檔案要格式化；D 組工具（`tests/`）32 個違規；B 組新增的檔案沒有違規。F821 證實 `pipeline.py` 缺 `import subprocess`。
-- 沒驗證：CI 還沒在 `windows-latest` 跑過（`push` 只跑 `main`，要開 PR 才會跑）；這台電腦沒有 makensis，`build.sh` 沒有實際建立安裝檔。
+- CI（2026-11-22，PR lydek/Leihu-singsing#1 → `refactor`）：`windows-latest` 上 `uv run pytest` 通過。第一次跑時 O14 的 PowerShell 測試失敗，修了兩處測試環境的問題：
+  - 子程式 Windows PowerShell 5.1 不帶 `PSModulePath`：GitHub Actions 用 PowerShell 7 跑步驟，這個變數指向 7 的模組。
+  - PowerShell 用 UTF-8 輸出、Python 用 UTF-8 讀取：CI 的地區編碼不是 UTF-8，中文例外訊息解碼失敗、stdout 變成 `None`。
+  - 實際安裝由 NSIS 在一般環境開 `install.ps1`，不受這兩點影響。
+- action 升到 Node.js 24 的版本並釘 commit SHA：`actions/checkout` v7.0.1、`astral-sh/setup-uv` v10.4.0；checkout 加 `persist-credentials: false`。升級後 CI 通過、沒有 annotation。
+- 沒驗證：這台電腦沒有 makensis，`build.sh` 沒有實際建立安裝檔。
 
 ### 3.12 C 組進度：S28（2026-11-21）
 - 環境變數：`LIANTAI_DATA`（使用者資料：歌曲庫、`config.json`、`usage.json`、`setlist.json`、`setlists/`、快捷鍵狀態檔、`.appwin`、`.duet_cleaned`、`logs/lyrics.log`、`logs/claude.log`）、`LIANTAI_DOWNLOADS`、`LIANTAI_NO_BACKGROUND`（啟動時的背景工作、背景下載高品質模型、裝套件、升級 yt-dlp、背景探測顯示卡）、`LIANTAI_NO_JOBS`（佇列只排隊）、`LIANTAI_NO_SPAWN`（開瀏覽器、檔案總管、app 視窗、安裝檔改記到 `DATA/spawn.log`，記法和 `serve_upstream.py` 相同）。
