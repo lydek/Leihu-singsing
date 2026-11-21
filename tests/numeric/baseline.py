@@ -172,7 +172,8 @@ FLOOR_PACKAGES = ("torch", "onnxruntime", "onnxruntime-gpu", "audio-separator", 
                   "torchcrepe")
 
 
-def floor_source(floor_path: Path, expect: dict) -> tuple[dict | None, list[str]]:
+def floor_source(floor_path: Path, expect: dict, mode: str = "fixed",
+                 quality: str | None = "standard") -> tuple[dict | None, list[str]]:
     """讀相似度下限，核對它能不能拿來判斷這一次：上游版本、固定條件（similarity.py --fixed）、標準模型、
     錄的時候沒有異常，以及電腦、套件版本、模型、素材都和這一次一樣。回傳 (下限, 不能用的原因)。"""
     if not floor_path.exists():
@@ -180,10 +181,11 @@ def floor_source(floor_path: Path, expect: dict) -> tuple[dict | None, list[str]
                       "先在這台電腦用同一個 --label 跑 tests/numeric/similarity.py v2.3.2 --fixed"]
     f = json.loads(floor_path.read_text("utf-8"))
     why = []
-    if f.get("mode") != "fixed":
-        why.append(f"下限是 {f.get('mode') or '平常'} 條件錄的，數值基準是固定條件（要用 --fixed 錄）")
-    if f.get("quality") != "standard":
-        why.append(f"下限的分離品質是 {f.get('quality')}，數值基準固定用標準模型")
+    if f.get("mode") != mode:
+        why.append(f"下限是 {f.get('mode') or 'normal'} 條件錄的，這次要的是 {mode}" +
+                   ("（固定條件的下限要用 similarity.py --fixed 錄）" if mode == "fixed" else ""))
+    if quality is not None and f.get("quality") != quality:
+        why.append(f"下限的分離品質是 {f.get('quality')}，這次是 {quality}")
     if f.get("problems"):
         why.append(f"下限錄的時候有 {len(f['problems'])} 項異常")
     for key in ("cpu", "gpus"):
@@ -195,14 +197,17 @@ def floor_source(floor_path: Path, expect: dict) -> tuple[dict | None, list[str]
         why.append("模型檔的 sha256 和這一次不同")
     if (f.get("inputs") or {}).get("sha256") != (expect.get("inputs") or {}).get("sha256"):
         why.append("素材的 sha256 和這一次不同")
+    if (f.get("songs") or {}) != (expect.get("songs") or {}):  # song01 這類編號要對應到同一首歌
+        why.append("真實歌曲（tests/private/songs/）和錄下限時不同：編號對應的 sha256 不一樣")
     return f, [f"相似度下限 {floor_path.name} 不能用：{w}" for w in why]
 
 
-def floor_check(rows: list[dict], floor_path: Path, expect: dict) -> list[str]:
+def floor_check(rows: list[dict], floor_path: Path, expect: dict, mode: str = "fixed",
+                quality: str | None = "standard") -> list[str]:
     """顯示卡路徑的穩定性：每一項不能比同一台電腦、同樣條件錄的相似度下限（上游自己跑多次的最差值）還差。
     下限不存在、不能用、沒有這一項都算沒判定（列進異常），固定門檻不拿來判斷；沒有數字的項目（相同／不同）
     是硬性條件，一定要通過。"""
-    f, why = floor_source(floor_path, expect)
+    f, why = floor_source(floor_path, expect, mode, quality)
     if f is None or why:
         return why
     floor = f.get("floor", {})
@@ -339,7 +344,7 @@ def main() -> int:  # noqa: C901
     # 下限一律用上游（--floor-version，預設 v2.3.2）在這台電腦錄的，不用被測版本自己的
     floor_path = SUMMARY / f"{opt.get('floor-version', BASE)}-{label}-similarity-fixed.json"
     expect = {"machine": machine(), "environment": rj0.get("environment"), "models": rj0.get("models"),
-              "inputs": rj0.get("inputs")}
+              "inputs": rj0.get("inputs"), "songs": rj0.get("songs")}
     for i in exact:
         if not on_gpu:
             problems += [f"第 1 次和第 {i} 次不完全相同：{r['item']} {r['value']}" for r in exact[i] if not r["ok"]]

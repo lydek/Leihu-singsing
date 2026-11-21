@@ -81,7 +81,7 @@ def main() -> int:  # noqa: C901
         return 2
     has_songs = SONGS.exists() and any(x.suffix.lower() in C.AUDIO for x in SONGS.iterdir())  # fetch.py 等不算
     name, code = export(ref)
-    base = OUT / name / "similarity" / label
+    base = OUT / name / ("similarity-fixed" if fixed else "similarity") / label  # 兩種模式不互相覆蓋
     base.mkdir(parents=True, exist_ok=True)
     problems: list[str] = list(EXPORT_NOTES)
     logs: dict[int, str] = {}
@@ -182,7 +182,7 @@ def main() -> int:  # noqa: C901
         "## 執行條件（和平常使用不同的地方）",
         "",
         *([f"- {c}" for c in rj.get("conditions", [])] or ["（沒有 run.json，讀不到）"]),
-        "- 執行緒數、torchcrepe 隨機抖動照平常（run.py --normal）",
+        *([] if fixed else ["- 執行緒數、torchcrepe 隨機抖動、亂數種子照平常（run.py --normal）"]),
         "",
         "## 實際使用的裝置與模型",
         "",

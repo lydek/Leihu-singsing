@@ -30,6 +30,7 @@ _REPARSE = 0x400  # FILE_ATTRIBUTE_REPARSE_POINT：junction、符號連結
 
 
 STAGE = "leihu-nstage-"  # make_tmp 還沒改名前的名稱（只有 owner.pid）
+LIVE_KEEP = "保留（行程可能還在跑）"  # clean_stale 的訊息字首：有這種訊息時 Sandbox 不開始量測
 
 
 def remove_tree(d: Path, allowed: tuple[Path, ...] = ()) -> str:
@@ -143,7 +144,7 @@ def clean_stale(parent: Path | None = None, pattern: str | None = None, allowed:
                     tree = [tuple(x) for x in json.loads(keep.read_text("utf-8")).get("tree", [])]
                     left = still_alive(tree) if tree else []
                     if left or not tree:
-                        out.append(f"保留 {d.name}：上次逾時沒確認停止，" + (f"PID {left} 還在跑或查不到" if left
+                        out.append(f"{LIVE_KEEP}{d.name}：上次逾時沒確認停止，" + (f"PID {left} 還在跑或查不到" if left
                                    else "沒有記到行程清單，無法確認") + "（確認沒有在跑再手動刪）")
                         continue
                 if state != "dead":
@@ -248,6 +249,10 @@ class Sandbox:
         self.models, self.tag = Path(models).resolve(), tag  # 之後會 chdir 到沙盒：相對路徑要先轉成絕對路徑
         self.conditions: list[str] = []
         self.stale = clean_stale()  # 先清上一次被強制結束留下的（problems() 會列出來）
+        live = [m for m in self.stale if m.startswith(LIVE_KEEP)]
+        if live:  # 殘留的行程會吃 CPU／顯示卡、可能還在寫它的沙盒：這時量出來的數字不能信
+            raise SystemExit("上一次逾時留下的行程可能還在跑，這次不開始量測（先結束它們，或確認後手動刪掉暫存資料夾）：\n"
+                             + "\n".join(live))
         self.tmp = make_tmp()
         self.root = self.tmp / "app"
         self.junctions: list[Path] = []
