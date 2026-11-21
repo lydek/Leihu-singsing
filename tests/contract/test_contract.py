@@ -348,8 +348,8 @@ def _files(base: Path) -> dict[str, str]:
 
 
 def audio_summary(src) -> dict:
-    """音訊的格式、長度，加上整體與 16 段的 RMS（dB，取到 0.1）：同格式同長度的靜音或另一段音訊也分得出來。
-    不比位元組：FLAC 編碼和混音的浮點運算在不同 CPU 上位元組可能不同，行為卻一樣。"""
+    """音訊的格式、長度、解碼後取樣的雜湊（反相、左右聲道對調都分得出來），加上整體與 16 段的 RMS、峰值當診斷。
+    雜湊比的是解碼後的取樣，不是檔案位元組（不受檔頭影響）；契約快照和比對都在同一台電腦上跑。"""
     info = sf.info(src)
     if hasattr(src, "seek"):
         src.seek(0)
@@ -367,6 +367,7 @@ def audio_summary(src) -> dict:
         "rms_db": db(y),
         "peak_db": round(float(20 * np.log10(np.max(np.abs(y)) + 1e-9)), 1) if y.size else None,
         "rms_db_16": [db(b) for b in np.array_split(y, 16)] if len(y) >= 16 else [],
+        "pcm_sha256": hashlib.sha256(np.ascontiguousarray(y).tobytes()).hexdigest()[:16],
     }
 
 

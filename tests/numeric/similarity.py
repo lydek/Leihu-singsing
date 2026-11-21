@@ -34,6 +34,7 @@ ROOT = HERE.parents[1]
 sys.path[:0] = [str(HERE), str(ROOT / "tests" / "contract")]
 
 import compare as C  # noqa: E402
+import numpy as np  # noqa: E402
 from baseline import INPUTS, MODELS, SUMMARY, TIMEOUT, log_alerts, machine, run_logged, used  # noqa: E402
 from compare_upstream import scrub, tools_dirty, OUT, _git, commit_of, export  # noqa: E402
 
@@ -43,7 +44,7 @@ SONGS = ROOT / "tests" / "private" / "songs"
 def number(r: dict) -> float | None:
     """row 的 num（沒有四捨五入）；沒有 num 的項目（例如「相同／不同」）：相同是 0、不同是 1。"""
     if r.get("num") is not None:
-        return float("inf") if r["num"] == "inf" else float(r["num"])
+        return float(r["num"])  # "inf"、"-inf"、"nan" 也能轉
     if r.get("ok") is not None and r["limit"] in ("相同", "都是 done"):
         return 0.0 if r["ok"] else 1.0
     v = r["value"]
@@ -103,6 +104,8 @@ def main() -> int:  # noqa: C901
         else:
             problems.append(f"第 {i} 次沒有產生 run.json，結果不完整")
         problems += log_alerts(logs[i], f"第 {i} 次")
+        if (out / "run.json").exists():  # 缺檔是執行失敗，不是自然差異
+            problems += [f"第 {i} 次輸出不完整：{p}" for p in C.required(out)]
     ok_runs = [i for i in logs if (base / f"run{i}" / "run.json").exists()
                and not json.loads((base / f"run{i}" / "run.json").read_text("utf-8")).get("incomplete")]
     if len(ok_runs) < 2:
@@ -191,13 +194,13 @@ def main() -> int:  # noqa: C901
         "songs": rj.get("songs"),
         "problems": problems,
         "pairs": pairs,
-        "floor": {k: {"values": ["inf" if x == float("inf") else x for x in v["values"]], "limit": v["limit"],
-                      "over": v["over"]} for k, v in items.items()},  # inf 不是標準 JSON
+        "floor": {k: {"values": [x if x is None or np.isfinite(x) else str(x) for x in v["values"]],
+                      "limit": v["limit"], "over": v["over"]} for k, v in items.items()},  # inf、nan 不是標準 JSON
         "truth": {str(i): q for i, q in quality_runs.items()},
         "wall_seconds": wall,
     }
     out_json = SUMMARY / f"{name}-{label}-similarity.json"
-    out_json.write_text(json.dumps(scrub(summary), ensure_ascii=False, indent=1, default=str), "utf-8")
+    out_json.write_text(json.dumps(scrub(summary), ensure_ascii=False, allow_nan=False, indent=1, default=str), "utf-8")
     print("\n".join(rep))
     print(f"報告：{base / 'similarity-report.md'}；摘要：{out_json}")
     return 1 if problems else 0
