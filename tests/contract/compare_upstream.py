@@ -255,6 +255,10 @@ _IDS = {
 }
 
 
+# --code 指到 repo 本身時，.venv、tests/private（模型約 2 GB，junction 會被當成資料夾複製）等不能複製進沙盒
+_COPY_IGNORE = shutil.ignore_patterns("config.json", ".git", ".venv", ".pytest_cache", ".ruff_cache", "__pycache__", "private")
+
+
 def run_once(name: str, code: Path, tag: str) -> dict:
     """用 serve_upstream.py 跑一次 CASES。回傳結果、伺服器 log、沙盒紀錄、路由清單；log 另存在 OUT/name。"""
     tmp = Path(tempfile.mkdtemp(prefix="leihu-upstream-"))
@@ -270,7 +274,7 @@ def run_once(name: str, code: Path, tag: str) -> dict:
             },
             server=[sys.executable, str(HERE / "serve_upstream.py")],
             # 不複製使用者設定：config.json 的 library_dir、models_dir 會把資料導到沙盒外（fixture 已經寫好測試設定）
-            setup=lambda data: shutil.copytree(code, data, dirs_exist_ok=True, ignore=shutil.ignore_patterns("config.json")),
+            setup=lambda data: shutil.copytree(code, data, dirs_exist_ok=True, ignore=_COPY_IGNORE),
         )
         log = (tmp / "server.log").read_text("utf-8", errors="replace")
         notes = [json.loads(x) for x in shim.read_text("utf-8").splitlines() if x] if shim.exists() else []

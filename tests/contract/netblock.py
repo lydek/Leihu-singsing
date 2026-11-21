@@ -8,7 +8,8 @@ import socket
 from pathlib import Path
 
 _LOCAL = {"127.0.0.1", "localhost", "::1"}
-_BLOCKED_LOG = Path(os.environ["LIANTAI_DATA"]) / "net_blocked.log"
+# LEIHU_NET_LOG：數值、效能沙盒用（不能設 LIANTAI_DATA，S28 之後被測程式會把資料搬過去）
+_BLOCKED_LOG = Path(os.environ.get("LEIHU_NET_LOG") or Path(os.environ["LIANTAI_DATA"]) / "net_blocked.log")
 
 
 def _block(host) -> None:

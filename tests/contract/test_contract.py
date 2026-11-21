@@ -614,7 +614,7 @@ def test_contract_snapshot(tmp_path, app_module):
     rules = {
         f"{r.endpoint} {m}"
         for r in app_module.app.url_map.iter_rules()
-        if r.endpoint not in ("static", "system.debug_stacks")
+        if r.endpoint not in ("static", "debug_stacks", "system.debug_stacks")  # 扁平結構、步驟 1 拆 Blueprint 之後
         for m in r.methods - {"HEAD", "OPTIONS"}
     }
     assert rules - hit == set(), f"沒有案例的路由：{sorted(rules - hit)}"
