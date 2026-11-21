@@ -34,7 +34,7 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[1]
-sys.path[:0] = [str(HERE), str(ROOT), str(ROOT / "tests")]
+sys.path[:0] = [str(HERE), str(ROOT), str(ROOT / "tests"), str(ROOT / "tests" / "numeric")]
 
 from test_contract import CASES, SNAPSHOT, run_contract  # noqa: E402
 
@@ -174,9 +174,21 @@ def export(ref: str) -> tuple[str, Path]:
     import atexit
     import time
 
-    fresh = OUT / name / "exports" / f"{os.getpid()}-{time.time_ns()}"
-    fresh.mkdir(parents=True)
-    atexit.register(shutil.rmtree, fresh, True)  # 匯出的程式碼裡沒有 junction，可以直接刪
+    from sandbox import clean_stale, owner_text, remove_tree
+
+    exports = OUT / name / "exports"
+    exports.mkdir(parents=True, exist_ok=True)
+    EXPORT_NOTES.extend(f"匯出資料夾：{m}" for m in clean_stale(exports, "*", allowed=(exports,)))
+    fresh = exports / f"{os.getpid()}-{time.time_ns()}"
+    fresh.mkdir()
+    (fresh / "owner.pid").write_text(owner_text(), "utf-8")  # 被強制結束時，下一次 export() 會清掉
+
+    def _drop(d=fresh):
+        why = remove_tree(d, allowed=(exports,))
+        if why:
+            print(f"匯出資料夾刪不掉：{d}：{why}", flush=True)
+
+    atexit.register(_drop)
     blob = subprocess.run(["git", "archive", "--format=tar", full], cwd=ROOT, capture_output=True, check=True).stdout
     with tempfile.TemporaryFile() as f:
         f.write(blob)
@@ -185,6 +197,9 @@ def export(ref: str) -> tuple[str, Path]:
             t.extractall(fresh, filter="data")
     (fresh / ".leihu-commit").write_text(full, "utf-8")
     return name, fresh
+
+
+EXPORT_NOTES: list[str] = []  # export() 清理舊匯出時發生的事，報告要列出來
 
 
 def commit_of(code: Path) -> str:
@@ -369,6 +384,9 @@ def main() -> int:  # noqa: C901
         if ref_full != base_full:
             print(f"--rebase 只能重建基準本身：參照 {ref_full[:12]} 和 --base {base_full[:12]} 不是同一個 commit")
             return 2
+        # 之後一律用驗證過的完整 commit 匯出（分支、tag 在中途移動也不會匯出別的 commit）
+        args = [ref_full, *args[1:]]
+        opt["--base"] = base_full
     if "--code" in opt:
         code = Path(opt["--code"]).resolve()
         name = code.name
@@ -381,7 +399,7 @@ def main() -> int:  # noqa: C901
     result = runs[0]["result"]
 
     known: list[str] = []
-    problems = alerts(runs[0], "第 1 次", known)
+    problems = alerts(runs[0], "第 1 次", known) + EXPORT_NOTES
     if len(runs) > 1:
         problems += alerts(runs[1], "第 2 次", known)
         for c, ds in raw_diff(runs[1]["result"], result).items():  # 同一版：不套用 RULES，要完全相同
@@ -444,7 +462,7 @@ def main() -> int:  # noqa: C901
     lines += ["## 沙盒替換", "", *[f"- {s}" for s in stubs], ""]
 
     # 重錄基準本身而且明確加了 --rebase（上面已確認參照和 --base 是同一個 commit）：和舊快照的差異只供參考
-    rebase = recording and "--rebase" in opt and SNAPSHOT.exists()
+    rebase = recording and "--rebase" in opt and SNAPSHOT.exists() and commit_of(code) == opt.get("--base")
     blocking = bool(problems) or (bool(unexpected) and not rebase)
     if recording:
         if blocking:

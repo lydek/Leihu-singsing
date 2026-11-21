@@ -37,7 +37,7 @@ ROOT = HERE.parents[1]
 sys.path[:0] = [str(HERE), str(ROOT / "tests" / "contract")]
 
 import compare as C  # noqa: E402
-from compare_upstream import write_summary, tools_dirty, LOG_ALERTS, OUT, _git, commit_of, export  # noqa: E402
+from compare_upstream import EXPORT_NOTES, write_summary, tools_dirty, LOG_ALERTS, OUT, _git, commit_of, export  # noqa: E402
 
 INPUTS = ROOT / "tests" / "private" / "numeric" / "inputs"
 MODELS = ROOT / "tests" / "private" / "models"
@@ -68,8 +68,12 @@ def machine() -> dict:
 TIMEOUT = 7200  # 秒：每一次執行的上限（--timeout 可改）；推論卡住時不會一直等下去
 
 
-def kill_tree(p: subprocess.Popen) -> str:
-    """結束整個行程樹，taskkill 和之後的等待都有期限；回傳空字串＝確認停止，否則是說明（寫進報告）。"""
+def kill_tree(p: subprocess.Popen) -> tuple[bool, str]:
+    """結束整個行程樹：先記下所有子孫（PID＋建立時間），taskkill 和等待都有期限，最後逐一確認都停了。
+    回傳 (確認全部停止, 說明)；說明要寫進報告。"""
+    from sandbox import still_alive, tree_with_start
+
+    tree = tree_with_start(p.pid)
     try:
         r = subprocess.run(["taskkill", "/T", "/F", "/PID", str(p.pid)], capture_output=True, text=True,
                            encoding="utf-8", errors="replace", timeout=60)
@@ -79,8 +83,13 @@ def kill_tree(p: subprocess.Popen) -> str:
     try:
         p.wait(timeout=60)
     except subprocess.TimeoutExpired:
-        return f"無法確認行程樹已經停止（{note or 'taskkill 回報成功'}），暫存資料夾可能還在用"
-    return note
+        pass
+    for _ in range(20):
+        left = still_alive(tree)
+        if not left:
+            return True, note
+        time.sleep(0.5)
+    return False, f"未確認全部停止：PID {left} 還在跑（{note or 'taskkill 回報成功'}），沙盒保留不刪"
 
 
 def run_logged(cmd: list[str], log: Path, timeout: float) -> tuple[int | None, list[str]]:
@@ -94,9 +103,13 @@ def run_logged(cmd: list[str], log: Path, timeout: float) -> tuple[int | None, l
         try:
             return p.wait(timeout=timeout), []
         except subprocess.TimeoutExpired:
-            note = kill_tree(p)
-    return None, [f"超過 {timeout:g} 秒沒有結束，已結束整個行程樹，這次結果不完整（log：{log}）",
-                  *([note] if note else []), *clean_stale()]
+            stopped, note = kill_tree(p)
+    head = (f"超過 {timeout:g} 秒沒有結束，" + ("已結束整個行程樹" if stopped else "嘗試結束行程樹")
+            + f"，這次結果不完整（log：{log}）")
+    with open(log, "a", encoding="utf-8") as f:  # 也寫回 log，事後看 log 就知道
+        f.write(f"\n[baseline] {head}{'；' + note if note else ''}\n")
+    # 沒確認全部停止時不清理：子孫可能還在用沙盒（clean_stale 只看建立者，看不到孫行程）
+    return None, [head, *([note] if note else []), *(clean_stale() if stopped else [])]
 
 
 def log_alerts(log: str, label: str) -> list[str]:
@@ -189,7 +202,7 @@ def main() -> int:  # noqa: C901
     name, code = export(ref)
     base = OUT / name / "numeric" / label
     base.mkdir(parents=True, exist_ok=True)
-    problems: list[str] = []
+    problems: list[str] = list(EXPORT_NOTES)
     logs: dict[int, str] = {}
     wall: dict[int, float] = {}
     for i in range(1, runs + 1):

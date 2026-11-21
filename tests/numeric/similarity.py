@@ -36,7 +36,7 @@ sys.path[:0] = [str(HERE), str(ROOT / "tests" / "contract")]
 import compare as C  # noqa: E402
 import numpy as np  # noqa: E402
 from baseline import INPUTS, MODELS, SUMMARY, TIMEOUT, log_alerts, machine, run_logged, used  # noqa: E402
-from compare_upstream import write_summary, tools_dirty, OUT, _git, commit_of, export  # noqa: E402
+from compare_upstream import EXPORT_NOTES, write_summary, tools_dirty, OUT, _git, commit_of, export  # noqa: E402
 
 SONGS = ROOT / "tests" / "private" / "songs"
 
@@ -80,7 +80,7 @@ def main() -> int:  # noqa: C901
     name, code = export(ref)
     base = OUT / name / "similarity" / label
     base.mkdir(parents=True, exist_ok=True)
-    problems: list[str] = []
+    problems: list[str] = list(EXPORT_NOTES)
     logs: dict[int, str] = {}
     wall: dict[int, float] = {}
     for i in range(1, runs + 1):
