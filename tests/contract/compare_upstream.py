@@ -369,6 +369,8 @@ def meta(name: str, code: Path, runs: int) -> list[str]:
         f"- 電腦：{platform.platform()}；{platform.processor() or '（CPU 型號讀不到）'}",
         f"- 執行次數：{runs}；時間：{__import__('time').strftime('%Y-%m-%d %H:%M:%S')}",
         "- 沙盒條件：背景工作不執行、不連網、不開外部程式、固定為沒有可用的顯示卡；完整清單在下方「沙盒替換」",
+        "- 正規化的盲點：15 位以上的長數字、10 位十六進位字串、執行當下 3 天內的時間會換成佔位字，"
+        "這些位置的值改錯看不出來（同一次執行內的引用關係有保留）",
     ]
 
 

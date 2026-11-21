@@ -147,6 +147,46 @@ def device_lines(log: str) -> list[str]:
     return out
 
 
+def valid_runs(base: Path, logs: dict) -> list[int]:
+    """可以拿來比的那幾次：有 run.json、不是中途中斷、必要產物都在而且讀得了（問題已另外列進異常）。"""
+    out = []
+    for i in logs:
+        f = base / f"run{i}" / "run.json"
+        try:
+            ok = f.exists() and not json.loads(f.read_text("utf-8")).get("incomplete") and not C.required(base / f"run{i}")
+        except Exception:  # noqa: BLE001
+            ok = False
+        if ok:
+            out.append(i)
+    return out
+
+
+def floor_check(rows: list[dict], floor_path: Path) -> list[str]:
+    """顯示卡路徑的穩定性：每一項不能比同一台電腦錄的相似度下限（上游自己跑多次的最差值）還差。
+    沒有下限檔、下限沒有這一項都算沒判定（列進異常），固定門檻不拿來判斷。"""
+    if not floor_path.exists():
+        return [f"顯示卡路徑沒有同一台電腦的相似度下限（{floor_path.name}），穩定性沒有判定："
+                "先用同一個 --label 跑 tests/numeric/similarity.py"]
+    floor = json.loads(floor_path.read_text("utf-8")).get("floor", {})
+    out = []
+    for r in rows:
+        if r.get("num") is None:
+            if not r["ok"]:
+                out.append(f"{r['item']} {r['value']}")
+            continue
+        f = floor.get(r["item"])
+        vals = [float(v) for v in (f or {}).get("values", []) if v is not None and str(v) != "nan"]
+        if not vals:
+            out.append(f"相似度下限沒有「{r['item']}」，沒有判定")
+            continue
+        v = float(r["num"])
+        higher = any(k in r["item"] for k in ("SDR", "一致率"))
+        worst = min(vals) if higher else max(vals)
+        if v != v or (v < worst if higher else v > worst):
+            out.append(f"{r['item']} {r['value']}，比上游自己跑多次的最差值 {worst:g} 還差")
+    return out
+
+
 def device_report(logs: dict[str, str]) -> list[str]:
     """每一次各自的實際裝置；每次都一樣就只列一次並註明。"""
     per = {k: device_lines(v) for k, v in logs.items()}
@@ -230,19 +270,31 @@ def main() -> int:  # noqa: C901
         problems += log_alerts(logs[i], f"第 {i} 次")
         if (out / "run.json").exists():
             problems += [f"第 {i} 次輸出不完整：{p}" for p in C.required(out)]
-    ok_runs = [i for i in logs if (base / f"run{i}" / "run.json").exists()
-               and not json.loads((base / f"run{i}" / "run.json").read_text("utf-8")).get("incomplete")]
+    ok_runs = valid_runs(base, logs)
     # 穩定性：第 2 次起每一次都和第 1 次比。全部在 CPU 上要逐檔完全相同；有用到顯示卡改看差距表的門檻
     on_gpu = gpu_used({f"第 {i} 次": logs[i] for i in ok_runs})
-    exact = {i: C.exact(base / "run1", base / f"run{i}") for i in ok_runs if i != 1 and 1 in ok_runs}
-    pairs = {i: C.pair(base / "run1", base / f"run{i}") for i in exact}
+    exact: dict[int, list] = {}
+    pairs: dict[int, list] = {}
+    for i in (i for i in ok_runs if i != 1 and 1 in ok_runs):
+        try:
+            exact[i], pairs[i] = C.exact(base / "run1", base / f"run{i}"), C.pair(base / "run1", base / f"run{i}")
+        except Exception as e:  # noqa: BLE001  比對本身出錯也要寫出報告
+            problems.append(f"第 1 次和第 {i} 次比對時出錯：{type(e).__name__}: {e}"[:300])
+    floor_path = SUMMARY / f"{name}-{label}-similarity.json"
     for i in exact:
-        rows, what = (pairs[i], "超過差距門檻") if on_gpu else (exact[i], "不完全相同")
-        problems += [f"第 1 次和第 {i} 次{what}：{r['item']} {r['value']}" for r in rows if not r["ok"]]
+        if not on_gpu:
+            problems += [f"第 1 次和第 {i} 次不完全相同：{r['item']} {r['value']}" for r in exact[i] if not r["ok"]]
+        else:
+            problems += [f"第 1 次和第 {i} 次：{m}" for m in floor_check(pairs[i], floor_path)]
     pair = pairs.get(2, [])
-    if runs >= 2 and not exact:
-        problems.append("少於兩次成功的執行，沒有做穩定性比對")
-    quality = {i: C.quality(base / f"run{i}") for i in ok_runs}
+    if not exact:
+        problems.append("少於兩次有效的執行，沒有做穩定性比對")
+    quality = {}
+    for i in ok_runs:
+        try:
+            quality[i] = C.quality(base / f"run{i}")
+        except Exception as e:  # noqa: BLE001
+            problems.append(f"第 {i} 次和標準答案比時出錯：{type(e).__name__}: {e}"[:300])
     rj = json.loads((base / f"run{ok_runs[0]}" / "run.json").read_text("utf-8")) if ok_runs else {}
     mach = machine()
     tool = _git("rev-parse", "--short", "HEAD").strip()
@@ -273,8 +325,8 @@ def main() -> int:  # noqa: C901
         *(used(base / f"run{ok_runs[0]}", {f"第 {i} 次": logs[i] for i in ok_runs}) if ok_runs
           else ["（沒有成功的執行）"]),
         "",
-        "穩定性判斷：" + ("有步驟在顯示卡上跑，用差距表的門檻（逐檔核對只供參考）" if on_gpu
-                          else "全部在 CPU 上，各次輸出要逐檔完全相同"),
+        "穩定性判斷：" + ("有步驟實際在顯示卡上跑：和同一台電腦錄的相似度下限比（逐檔核對、固定門檻只供參考）"
+                          if on_gpu else "全部在 CPU 上，各次輸出要逐檔完全相同"),
         "",
         "## 同一版各次輸出逐檔核對（和第 1 次比）",
         "",
@@ -314,6 +366,7 @@ def main() -> int:  # noqa: C901
     if why:
         problems.append(why)
         (base / "numeric-report.md").write_text("\n".join(rep) + f"\n\n## 摘要沒有寫入\n\n- {why}\n", "utf-8")
+        print(f"摘要沒有寫入（{out_json} 不是這一次的結果）：{why}")
     print("\n".join(rep))
     print(f"報告：{base / 'numeric-report.md'}；摘要：{out_json}")
     return 1 if problems else 0
