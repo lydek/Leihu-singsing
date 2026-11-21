@@ -13,7 +13,7 @@ r"""錄一個版本在這台電腦上的數值基準（docs/refactor-port-plan.m
 
 用法（repo 根目錄，用已安裝版本的內嵌 Python）：
   <python> tests/numeric/baseline.py [git 參照，預設 v2.3.2] [--label=<這台電腦的名稱，例如 desktop-cpu>] [--runs=2] [--songs]
-  [--timeout=<每次執行的秒數上限，預設 7200>] [--device=auto|cpu]
+  [--timeout=<每次執行的秒數上限，預設 7200>] [--device=auto|cpu] [--floor-version=<上游版本，預設 v2.3.2>]
 --device=cpu：強制只用 CPU（CUDA_VISIBLE_DEVICES=-1），例如在有 NVIDIA 顯示卡的筆電上錄 CPU 基準；不能只靠 --label 區分。
 穩定性：所有步驟實際都在 CPU 上（看 [device]）時，各次輸出要逐檔完全相同；有任何一步在顯示卡上時，
   浮點運算順序本來就可能不同，改用差距表的門檻判斷，逐檔核對只列出來參考。
@@ -37,7 +37,7 @@ ROOT = HERE.parents[1]
 sys.path[:0] = [str(HERE), str(ROOT / "tests" / "contract")]
 
 import compare as C  # noqa: E402
-from compare_upstream import EXPORT_NOTES, write_summary, tools_dirty, LOG_ALERTS, OUT, _git, commit_of, export  # noqa: E402
+from compare_upstream import BASE, EXPORT_NOTES, write_summary, tools_dirty, LOG_ALERTS, OUT, _git, commit_of, export  # noqa: E402
 
 INPUTS = ROOT / "tests" / "private" / "numeric" / "inputs"
 MODELS = ROOT / "tests" / "private" / "models"
@@ -168,13 +168,44 @@ def valid_runs(base: Path, logs: dict) -> list[int]:
     return out
 
 
-def floor_check(rows: list[dict], floor_path: Path) -> list[str]:
-    """顯示卡路徑的穩定性：每一項不能比同一台電腦錄的相似度下限（上游自己跑多次的最差值）還差。
-    沒有下限檔、下限沒有這一項都算沒判定（列進異常），固定門檻不拿來判斷。"""
+FLOOR_PACKAGES = ("torch", "onnxruntime", "onnxruntime-gpu", "audio-separator", "faster-whisper", "ctranslate2",
+                  "torchcrepe")
+
+
+def floor_source(floor_path: Path, expect: dict) -> tuple[dict | None, list[str]]:
+    """讀相似度下限，核對它能不能拿來判斷這一次：上游版本、固定條件（similarity.py --fixed）、標準模型、
+    錄的時候沒有異常，以及電腦、套件版本、模型、素材都和這一次一樣。回傳 (下限, 不能用的原因)。"""
     if not floor_path.exists():
-        return [f"顯示卡路徑沒有同一台電腦的相似度下限（{floor_path.name}），穩定性沒有判定："
-                "先用同一個 --label 跑 tests/numeric/similarity.py"]
-    floor = json.loads(floor_path.read_text("utf-8")).get("floor", {})
+        return None, [f"顯示卡路徑沒有同一台電腦的相似度下限（{floor_path.name}），穩定性沒有判定："
+                      "先在這台電腦用同一個 --label 跑 tests/numeric/similarity.py v2.3.2 --fixed"]
+    f = json.loads(floor_path.read_text("utf-8"))
+    why = []
+    if f.get("mode") != "fixed":
+        why.append(f"下限是 {f.get('mode') or '平常'} 條件錄的，數值基準是固定條件（要用 --fixed 錄）")
+    if f.get("quality") != "standard":
+        why.append(f"下限的分離品質是 {f.get('quality')}，數值基準固定用標準模型")
+    if f.get("problems"):
+        why.append(f"下限錄的時候有 {len(f['problems'])} 項異常")
+    for key in ("cpu", "gpus"):
+        if (f.get("machine") or {}).get(key) != (expect.get("machine") or {}).get(key):
+            why.append(f"下限是在別台電腦錄的（{key} 不同）")
+    fe, ee = f.get("environment") or {}, expect.get("environment") or {}
+    why += [f"套件 {k} 版本不同：{fe.get(k)} vs {ee.get(k)}" for k in FLOOR_PACKAGES if fe.get(k) != ee.get(k)]
+    if f.get("models") != expect.get("models"):
+        why.append("模型檔的 sha256 和這一次不同")
+    if (f.get("inputs") or {}).get("sha256") != (expect.get("inputs") or {}).get("sha256"):
+        why.append("素材的 sha256 和這一次不同")
+    return f, [f"相似度下限 {floor_path.name} 不能用：{w}" for w in why]
+
+
+def floor_check(rows: list[dict], floor_path: Path, expect: dict) -> list[str]:
+    """顯示卡路徑的穩定性：每一項不能比同一台電腦、同樣條件錄的相似度下限（上游自己跑多次的最差值）還差。
+    下限不存在、不能用、沒有這一項都算沒判定（列進異常），固定門檻不拿來判斷；沒有數字的項目（相同／不同）
+    是硬性條件，一定要通過。"""
+    f, why = floor_source(floor_path, expect)
+    if f is None or why:
+        return why
+    floor = f.get("floor", {})
     out = []
     for r in rows:
         if r.get("num") is None:
@@ -297,6 +328,7 @@ def main() -> int:  # noqa: C901
     ok_runs = valid_runs(base, logs)
     # 穩定性：第 2 次起每一次都和第 1 次比。全部在 CPU 上要逐檔完全相同；有用到顯示卡改看差距表的門檻
     on_gpu = gpu_used({f"第 {i} 次": logs[i] for i in ok_runs})
+    rj0 = json.loads((base / f"run{ok_runs[0]}" / "run.json").read_text("utf-8")) if ok_runs else {}
     exact: dict[int, list] = {}
     pairs: dict[int, list] = {}
     for i in (i for i in ok_runs if i != 1 and 1 in ok_runs):
@@ -304,12 +336,15 @@ def main() -> int:  # noqa: C901
             exact[i], pairs[i] = C.exact(base / "run1", base / f"run{i}"), C.pair(base / "run1", base / f"run{i}")
         except Exception as e:  # noqa: BLE001  比對本身出錯也要寫出報告
             problems.append(f"第 1 次和第 {i} 次比對時出錯：{type(e).__name__}: {e}"[:300])
-    floor_path = SUMMARY / f"{name}-{label}-similarity.json"
+    # 下限一律用上游（--floor-version，預設 v2.3.2）在這台電腦錄的，不用被測版本自己的
+    floor_path = SUMMARY / f"{opt.get('floor-version', BASE)}-{label}-similarity-fixed.json"
+    expect = {"machine": machine(), "environment": rj0.get("environment"), "models": rj0.get("models"),
+              "inputs": rj0.get("inputs")}
     for i in exact:
         if not on_gpu:
             problems += [f"第 1 次和第 {i} 次不完全相同：{r['item']} {r['value']}" for r in exact[i] if not r["ok"]]
         else:
-            problems += [f"第 1 次和第 {i} 次：{m}" for m in floor_check(pairs[i], floor_path)]
+            problems += [f"第 1 次和第 {i} 次：{m}" for m in floor_check(pairs[i], floor_path, expect)]
     pair = pairs.get(2, [])
     if not exact:
         problems.append("少於兩次有效的執行，沒有做穩定性比對")

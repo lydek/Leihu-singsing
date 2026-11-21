@@ -14,7 +14,9 @@ r"""錄一個版本在這台電腦上的相似度基準（docs/refactor-port-pla
 
 用法（repo 根目錄，用已安裝版本的內嵌 Python）：
   <python> tests/numeric/similarity.py [git 參照，預設 v2.3.2] [--label=<這台電腦的名稱>] [--runs=3] [--quality=standard|auto]
-  [--timeout=<每次執行的秒數上限，預設 7200>] [--device=auto|cpu]
+  [--timeout=<每次執行的秒數上限，預設 7200>] [--device=auto|cpu] [--fixed]
+--fixed：用和數值基準一樣的固定條件（單執行緒、關抖動、固定亂數種子）跑，記下的差距給顯示卡的數值基準當下限；
+  摘要是 <版本>-<標籤>-similarity-fixed.json。不加是平常條件（第二階段效能調整的門檻下限）。
 有異常時結束代碼是 1。
 """
 
@@ -73,6 +75,7 @@ def main() -> int:  # noqa: C901
         print("--runs 至少要 2：相似度要兩兩比較")
         return 2
     quality = opt.get("quality", "standard")
+    fixed = "fixed" in opt  # 固定條件（和數值基準一樣）：顯示卡數值基準的下限要用這種錄的
     if not (INPUTS / "manifest.json").exists() or not MODELS.exists():
         print(f"找不到 {INPUTS / 'manifest.json'} 或 {MODELS}（見計畫 3.8）")
         return 2
@@ -90,7 +93,8 @@ def main() -> int:  # noqa: C901
 
             shutil.rmtree(out)
         print(f"第 {i} 次：{name} → {out}", flush=True)
-        cmd = [sys.executable, "-I", str(HERE / "run.py"), str(code), str(INPUTS), str(MODELS), str(out), "--normal",
+        cmd = [sys.executable, "-I", str(HERE / "run.py"), str(code), str(INPUTS), str(MODELS), str(out),
+               *([] if fixed else ["--normal"]),
                f"--quality={quality}", f"--device={opt.get('device', 'auto')}"] + ([f"--songs={SONGS}"] if has_songs else [])
         t0 = time.time()
         rc, late, stopped = run_logged(cmd, base / f"run{i}.log", float(opt.get("timeout", TIMEOUT)))
@@ -125,6 +129,9 @@ def main() -> int:  # noqa: C901
             it["values"].append(number(r))
             it["raw"].append(r["value"])
             it["over"] += 0 if r["ok"] else 1
+    for rows in pairs.values():  # 結構壞掉、缺檔、算不出來不是自然差異
+        problems += [f"{r['item']}：{r['value']}" for r in rows if not r["ok"] and r.get("num") is None
+                     and r["limit"] in ("必要欄位都在、型別正確", "有音高", "取樣率、聲道、長度相同", "兩邊都有", "")]
     for item, it in items.items():  # 算不出來的值（NaN）不是自然差異
         if any(v is not None and v != v for v in it["values"]):
             problems.append(f"{item} 有算不出來的值（NaN），這一項的下限無效")
@@ -156,7 +163,7 @@ def main() -> int:  # noqa: C901
               "|---|" + "---|" * len(quality_runs)]
     qtable += [f"| {k} | " + " | ".join(v) + " |" for k, v in qitems.items()]
     rep = [
-        f"# 相似度基準：{name}（{label}）",
+        f"# 相似度基準：{name}（{label}，{'固定條件' if fixed else '平常條件'}）",
         "",
         f"- 被測程式：`{name}`（commit {commit_of(code)}；{code}）",
         f"- 測試工具：commit `{tool}`" + ("，`tests/` 有未 commit 的修改" if dirty else ""),
@@ -204,6 +211,7 @@ def main() -> int:  # noqa: C901
         "environment": {k: v for k, v in (rj.get("environment") or {}).items() if k != "executable"},
         "conditions": rj.get("conditions"),
         "quality": quality,
+        "mode": "fixed" if fixed else "normal",
         "commit": commit_of(code),
         "inputs": rj.get("inputs"),
         "models": rj.get("models"),
@@ -215,7 +223,7 @@ def main() -> int:  # noqa: C901
         "truth": {str(i): q for i, q in quality_runs.items()},
         "wall_seconds": wall,
     }
-    out_json = SUMMARY / f"{name}-{label}-similarity.json"
+    out_json = SUMMARY / f"{name}-{label}-similarity{'-fixed' if fixed else ''}.json"
     why = write_summary(out_json, summary)
     if why:
         problems.append(why)

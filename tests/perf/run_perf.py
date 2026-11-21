@@ -123,9 +123,11 @@ def main() -> None:
         time.sleep(5)
     meta = json.loads((d / "meta.json").read_text("utf-8"))
     take = json.loads((td / "take01.json").read_text("utf-8"))
-    problems += BOX.problems(out)
-    # 讓這一次不能當效能資料的問題（父程式的 ok_run 看這個）
-    invalid = []
+    box = BOX.problems(out)
+    problems += box
+    # 讓這一次不能當效能資料的問題（父程式的 ok_run 看這個）：沙盒查到的都算（模型被改、連網、子程式沒開、
+    # 被測程式記下的錯誤），只有清理上一次殘留的訊息不算
+    invalid = [p for p in box if not p.startswith(("清掉上一次", "保留 ", "清理 "))]
     if take.get("status") != "done":
         invalid.append(f"評分沒有完成：{take.get('status')} {take.get('error', '')}")
     notes = [x for x in meta.get("notes", []) if "沒有完成" in x or "失敗" in x]
