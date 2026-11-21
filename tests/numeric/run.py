@@ -39,7 +39,7 @@ AUDIO = (".flac", ".wav", ".mp3", ".m4a", ".ogg")
 SONG_FILES = sorted(x for x in Path(opt["songs"]).glob("*") if x.suffix.lower() in AUDIO) if opt.get("songs") else []
 if opt.get("songs") and not SONG_FILES:  # 明確要求真實歌曲卻一首都沒有：不要默默只跑合成素材
     sys.exit(f"--songs={opt['songs']} 裡沒有音檔（{'、'.join(AUDIO)}）")
-BOX = Sandbox(code, models, "[numeric]", deterministic="normal" not in opt)
+BOX = Sandbox(code, models, "[numeric]", deterministic="normal" not in opt, device=opt.get("device", "auto"))
 P, SH = BOX.P, BOX.SH
 cond = BOX.cond
 

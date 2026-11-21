@@ -65,6 +65,7 @@ LOG_ALERTS = [
     ("逾時", "逾時"),
     ("out of memory", "記憶體不足"),
     ("暫存資料夾刪不掉", "測試工具的暫存資料夾沒有刪乾淨"),
+    ("could not activate requested provider", "ONNX 沒有啟用要求的執行裝置（例如顯示卡），改用別的"),
 ]
 # 案例本身故意造成的 log 訊息：(訊息片段, 原因)。報告照樣列出，但不算異常
 LOG_EXPECTED = [
@@ -96,9 +97,26 @@ def scrub(x):
         return x
     places = [(str(ROOT), "<repo>"), (tempfile.gettempdir(), "<tmp>"), (os.path.expanduser("~"), "<home>")]
     for p, tag in sorted(places, key=lambda t: -len(t[0])):  # 長的先換（repo 可能在 home 底下）
-        for form in {p, p.replace("\\", "/"), p.replace("\\", "\\\\")}:
-            x = re.sub(re.escape(form), tag, x, flags=re.IGNORECASE)
+        parts = [re.escape(s) for s in re.split(r"[\\/]+", p) if s]
+        x = re.sub(r"[\\/]+".join(parts), tag, x, flags=re.IGNORECASE)  # 分隔符號：任意數量的 / 或 \（混用、多層跳脫）
     return x
+
+
+def user_leaks(text: str) -> list[str]:
+    """scrub 之後還看得到使用者名稱的地方（例如路徑寫法沒想到的形式）。"""
+    user = os.path.basename(os.path.expanduser("~"))
+    return [m.group(0) for m in re.finditer(rf"(?i).{{0,30}}\b{re.escape(user)}\b.{{0,30}}", text)] if user else []
+
+
+def write_summary(path: Path, summary: dict) -> str:
+    """寫要進 git 的摘要：先 scrub，再確認沒有使用者名稱、沒有 inf／nan。有問題就不寫，回傳原因（呼叫端列為異常）。"""
+    text = json.dumps(scrub(summary), ensure_ascii=False, allow_nan=False, indent=1)
+    leaks = user_leaks(text)
+    if leaks:
+        return f"摘要裡還有使用者名稱，沒有寫入 {path.name}：{leaks[0]!r}"
+    path.parent.mkdir(exist_ok=True)
+    path.write_text(text, "utf-8")
+    return ""
 
 
 def tools_dirty() -> bool:

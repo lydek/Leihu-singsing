@@ -1,10 +1,11 @@
 """顯示卡子程式裡的紀錄：每一步實際用的裝置與模型，各印一行 [device]，報告直接引用，不從顯示卡探測結果推定。
 
 只包一層印訊息，不改行為。sandbox.py 把 `import child_hook` 插在子程式啟動命令前面（在 gpu_worker.serve 之前）。
-- separate：audio-separator 載入模型後的 torch_device、onnx_execution_provider（實際要求的執行裝置）；
+- separate：audio-separator 載入模型後的 torch_device、要求的 onnx provider，以及 ONNX session 建好後
+  實際啟用的 provider（get_providers()；要求的沒啟用時 audio-separator 會印 warning，報告列為異常）；
 - pitch：torchcrepe.predict 收到的 model、device；
-- whisper：pipeline._whisper_model 回傳的 CTranslate2 模型的 device、compute_type
-  （t_whisper 遇到 RuntimeError 時會自己改用 CPU 重建模型，那條路徑沒經過這裡，由 log 的 Traceback 列為異常）。
+- whisper：每次建立 faster_whisper.WhisperModel 都記 device、compute_type（含 pipeline 改用 CPU、
+  t_whisper 遇到 RuntimeError 自己重建 CPU 模型的情況，所以退回 CPU 時會看到兩行）。
 """
 
 import gpu_worker as G
@@ -26,6 +27,18 @@ def _separate(orig):
         _source(P)
         from audio_separator.separator import Separator
 
+        import onnxruntime as ort
+
+        if not getattr(ort, "_leihu_hooked", False):
+            base = ort.InferenceSession
+
+            class Session(base):
+                def __init__(self, *x, **y):
+                    super().__init__(*x, **y)
+                    _say(f"separate onnx session：要求 {y.get('providers')}、實際 {self.get_providers()}")
+
+            ort.InferenceSession = Session
+            ort._leihu_hooked = True
         if not getattr(Separator, "_leihu_hooked", False):
             load = Separator.load_model
 
@@ -65,17 +78,19 @@ def _pitch(orig):
 def _whisper(orig):
     def run(P, progress, *a, **k):
         _source(P)
-        if not getattr(P, "_leihu_hooked", False):
-            load = P._whisper_model
+        import faster_whisper
 
-            def whisper_model(cfg):
-                m = load(cfg)
-                inner = getattr(m, "model", None)
-                _say(f"whisper：device={getattr(inner, 'device', '?')}、compute_type={getattr(inner, 'compute_type', '?')}")
-                return m
+        if not getattr(faster_whisper.WhisperModel, "_leihu_hooked", False):
+            init = faster_whisper.WhisperModel.__init__
 
-            P._whisper_model = whisper_model
-            P._leihu_hooked = True
+            def hooked(self, *x, **y):
+                init(self, *x, **y)
+                inner = getattr(self, "model", None)
+                _say(f"whisper 建立模型：device={getattr(inner, 'device', '?')}、"
+                     f"compute_type={getattr(inner, 'compute_type', '?')}（要求 device={y.get('device')}）")
+
+            faster_whisper.WhisperModel.__init__ = hooked
+            faster_whisper.WhisperModel._leihu_hooked = True
         return orig(P, progress, *a, **k)
 
     return run

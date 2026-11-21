@@ -119,8 +119,8 @@ def make_tmp() -> Path:
 
 
 class Sandbox:
-    def __init__(self, code: Path, models: Path, tag: str, deterministic: bool):
-        self.models, self.tag = models, tag
+    def __init__(self, code: Path, models: Path, tag: str, deterministic: bool, device: str = "auto"):
+        self.models, self.tag = Path(models).resolve(), tag  # 之後會 chdir 到沙盒：相對路徑要先轉成絕對路徑
         self.conditions: list[str] = []
         self.stale = clean_stale()  # 先清上一次被強制結束留下的（problems() 會列出來）
         self.tmp = make_tmp()
@@ -129,7 +129,7 @@ class Sandbox:
         self.spawns = 0
         atexit.register(self.cleanup)  # 建好暫存資料夾就登記：複製到一半失敗也會清
         shutil.copytree(
-            code, self.root,
+            Path(code).resolve(), self.root,
             # config.json 是使用者設定：library_dir、models_dir 會把資料導到沙盒外，不複製（用預設值）
             ignore=shutil.ignore_patterns("library", "models", "logs", "tests", "__pycache__", ".git", "config.json"),
         )
@@ -137,13 +137,19 @@ class Sandbox:
         import _winapi  # Windows 的目錄 junction（一般使用者就能建，不需要開發人員模式）
 
         for sub in ("uvr", "whisper"):
-            if (models / sub).is_dir():
-                _winapi.CreateJunction(str(models / sub), str(self.root / "models" / sub))
+            if (self.models / sub).is_dir():
+                _winapi.CreateJunction(str(self.models / sub), str(self.root / "models" / sub))
                 self.junctions.append(self.root / "models" / sub)
         self.models_before = self.model_files()
         self.models_sha = self.model_hashes()  # 模型的指紋：寫進 run.json，兩台電腦、前後兩次可以核對
         # LIANTAI_DATA 只給 netblock 寫擋下的連線（tmp/net_blocked.log）；上游不認這個變數。子程式會繼承這些設定
         os.environ.update(LIANTAI_DATA=str(self.tmp), HF_HUB_OFFLINE="1")
+        print(f"{tag} 沙盒 {self.root}", flush=True)  # 報告檢查子程式載入的程式都在這個資料夾裡
+        if device == "cpu":  # 一定要在 import torch 之前；子程式繼承
+            os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
+            self.cond("強制只用 CPU（CUDA_VISIBLE_DEVICES=-1，主程式與子程式）")
+        elif device != "auto":
+            raise SystemExit(f"--device 只能是 auto 或 cpu：{device}")
         if deterministic:
             os.environ.update(OMP_NUM_THREADS="1", MKL_NUM_THREADS="1")
             self.cond("OMP_NUM_THREADS、MKL_NUM_THREADS＝1（主程式與子程式）；處理時間不是效能基準")
@@ -235,6 +241,8 @@ class Sandbox:
     def problems(self, out: Path) -> list[str]:
         """執行完要回報的問題：模型檔被改、想對外連線（log 複製到 out）、被測程式的 logs/、沒開過顯示卡子程式。"""
         now = self.model_files()
+        if now == self.models_before and self.model_hashes() != self.models_sha:  # 大小和 mtime 沒變但內容變了
+            now = {**now, "（內容）": "sha256 和執行前不同"}
         bad = [f"模型資料夾的檔案在執行中有變動：{k}" for k in sorted(self.models_before.keys() | now.keys())
                if self.models_before.get(k) != now.get(k)]
         blocked = self.tmp / "net_blocked.log"
