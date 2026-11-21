@@ -93,7 +93,7 @@ def main() -> int:  # noqa: C901
         cmd = [sys.executable, "-I", str(HERE / "run.py"), str(code), str(INPUTS), str(MODELS), str(out), "--normal",
                f"--quality={quality}", f"--device={opt.get('device', 'auto')}"] + ([f"--songs={SONGS}"] if has_songs else [])
         t0 = time.time()
-        rc, late = run_logged(cmd, base / f"run{i}.log", float(opt.get("timeout", TIMEOUT)))
+        rc, late, stopped = run_logged(cmd, base / f"run{i}.log", float(opt.get("timeout", TIMEOUT)))
         wall[i] = round(time.time() - t0, 1)
         logs[i] = (base / f"run{i}.log").read_text("utf-8", errors="replace")
         problems += [f"第 {i} 次：{p}" for p in late]
@@ -106,6 +106,9 @@ def main() -> int:  # noqa: C901
         problems += log_alerts(logs[i], f"第 {i} 次")
         if (out / "run.json").exists():  # 缺檔是執行失敗，不是自然差異
             problems += [f"第 {i} 次輸出不完整：{p}" for p in C.required(out)]
+        if not stopped:  # 殘留的行程可能還在用沙盒、吃 CPU：後面的執行不能信
+            problems.append(f"第 {i} 次逾時後沒確認行程都停了，後面的執行取消")
+            break
     ok_runs = valid_runs(base, logs)
     if len(ok_runs) < 2:
         problems.append("少於兩次成功的執行，沒有相似度可以算")

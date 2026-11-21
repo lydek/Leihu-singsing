@@ -136,6 +136,16 @@ def clean_stale(parent: Path | None = None, pattern: str | None = None, allowed:
                 state = owner_state(d)
                 if state == "alive":
                     continue  # 建立它的行程還在跑（例如另一個基準），不要動
+                keep = d / "keep.json"
+                if state == "dead" and keep.exists():  # 上次逾時沒確認停止：裡面記的行程都停了才刪
+                    import json
+
+                    tree = [tuple(x) for x in json.loads(keep.read_text("utf-8")).get("tree", [])]
+                    left = still_alive(tree) if tree else []
+                    if left or not tree:
+                        out.append(f"保留 {d.name}：上次逾時沒確認停止，" + (f"PID {left} 還在跑或查不到" if left
+                                   else "沒有記到行程清單，無法確認") + "（確認沒有在跑再手動刪）")
+                        continue
                 if state != "dead":
                     out.append(f"保留 {d.name}：{state}")
                     continue
@@ -167,8 +177,9 @@ def make_tmp() -> Path:
     raise AssertionError("不會到這裡")
 
 
-def tree_with_start(root: int) -> list[tuple[int, int]]:
-    """root 和它所有子孫行程的 (PID, 建立時間)；之後用來確認是不是真的都結束了（PID 重用也分得出來）。"""
+def tree_with_start(root: int) -> list[tuple[int, int | str]] | None:
+    """root 和它所有子孫行程的 (PID, 建立時間)；之後用來確認是不是真的都結束了（PID 重用也分得出來）。
+    查不到建立時間的行程記成 "unknown"（不能當成已經停止）；行程快照建不起來回傳 None。"""
     import ctypes
     from ctypes import wintypes
 
@@ -181,6 +192,8 @@ def tree_with_start(root: int) -> list[tuple[int, int]]:
     k = ctypes.windll.kernel32
     k.CreateToolhelp32Snapshot.restype = wintypes.HANDLE
     snap = k.CreateToolhelp32Snapshot(0x2, 0)
+    if not snap or snap == wintypes.HANDLE(-1).value:
+        return None
     e = Entry()
     e.dwSize = ctypes.sizeof(e)
     kids: dict[int, list[int]] = {}
@@ -193,7 +206,7 @@ def tree_with_start(root: int) -> list[tuple[int, int]]:
     while todo:
         pid = todo.pop()
         start = process_start(pid)
-        if isinstance(start, int):
+        if start is not None:  # 已經不在的不用記；查不到的記 "unknown"
             out.append((pid, start))
         for c in kids.get(pid, []):
             if c not in seen:
@@ -202,9 +215,32 @@ def tree_with_start(root: int) -> list[tuple[int, int]]:
     return out
 
 
-def still_alive(tree: list[tuple[int, int]]) -> list[int]:
-    """tree_with_start 記下的行程裡，還在跑的 PID（建立時間相同才算同一個行程）。"""
-    return [pid for pid, start in tree if process_start(pid) == start]
+def still_alive(tree: list[tuple[int, int | str]]) -> list[int]:
+    """tree_with_start 記下的行程裡，還在跑或無法確認的 PID（建立時間相同才算同一個行程；
+    當初或現在查不到狀態的都算無法確認）。"""
+    out = []
+    for pid, start in tree:
+        now = process_start(pid)
+        if now == "unknown" or start == "unknown" and now is not None or now == start:
+            out.append(pid)
+    return out
+
+
+def mark_keep(log_text: str, tree, why: str) -> str:
+    """逾時後沒確認全部停止：在那次的沙盒裡寫 keep.json（還在跑的行程和原因），之後任何 clean_stale 都不會只因為
+    建立者死了就刪掉它；要等 keep.json 裡的行程都停了才刪。回傳寫在哪裡（找不到沙盒路徑就說明）。"""
+    import json
+    import re
+
+    m = re.search(r"\[(?:numeric|perf)\] 沙盒 (.+)", log_text)
+    if not m:
+        return "log 裡沒有沙盒路徑，沒辦法標記保留（如果還有行程在跑，下一次清理可能刪掉它的沙盒）"
+    d = Path(m.group(1).strip()).parent
+    try:
+        (d / "keep.json").write_text(json.dumps({"why": why, "tree": tree or []}, ensure_ascii=False), "utf-8")
+    except OSError as err:
+        return f"寫不進 {d / 'keep.json'}（{err}）"
+    return f"已在 {d.name} 寫 keep.json，行程都停了才會被清掉"
 
 
 class Sandbox:
@@ -234,6 +270,8 @@ class Sandbox:
         # LIANTAI_DATA 只給 netblock 寫擋下的連線（tmp/net_blocked.log）；上游不認這個變數。子程式會繼承這些設定
         os.environ.update(LIANTAI_DATA=str(self.tmp), HF_HUB_OFFLINE="1")
         print(f"{tag} 沙盒 {self.root}", flush=True)  # 報告檢查子程式載入的程式都在這個資料夾裡
+        self.cond("顯示卡子程式裡裝了 child_hook（記錄實際裝置）：ONNX session 的 run() 多包一層、每次呼叫後讀一次"
+                  " get_providers()，在計時範圍內；參數與回傳值不變")
         if device == "cpu":  # 一定要在 import torch 之前；子程式繼承
             os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
             self.cond("強制只用 CPU（CUDA_VISIBLE_DEVICES=-1，主程式與子程式）")
@@ -253,6 +291,12 @@ class Sandbox:
             torchcrepe.convert.dither = lambda cents: cents
             nodither = "import torchcrepe.convert as _c; _c.dither = lambda cents: cents; "
             self.cond("torchcrepe 隨機抖動關掉（主程式與子程式）")
+            # Whisper 解碼品質不夠時會改用溫度取樣重試，用到 CTranslate2 的亂數：固定種子，兩次結果才會一樣
+            import ctranslate2
+
+            ctranslate2.set_random_seed(0)
+            nodither += "import ctranslate2 as _ct; _ct.set_random_seed(0); "
+            self.cond("CTranslate2 亂數種子固定為 0（主程式與子程式；Whisper 溫度取樣重試時才會用到）")
         t0 = time.time()
         import pipeline as P
         import share as SH

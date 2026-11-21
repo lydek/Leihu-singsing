@@ -37,7 +37,7 @@ HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[1]
 sys.path[:0] = [str(ROOT / "tests" / "numeric"), str(ROOT / "tests" / "contract")]
 
-from baseline import TIMEOUT, device_report, kill_tree, log_alerts, machine  # noqa: E402  tests/numeric/baseline.py
+from baseline import KILL, TIMEOUT, device_report, kill_tree, log_alerts, machine  # noqa: E402  tests/numeric/baseline.py
 from compare_upstream import EXPORT_NOTES, write_summary, tools_dirty, OUT, _git, commit_of, export  # noqa: E402
 
 PRIVATE = ROOT / "tests" / "private"
@@ -270,11 +270,13 @@ def main() -> int:  # noqa: C901
             if rc is None:
                 from sandbox import clean_stale
 
+                from sandbox import mark_keep
+
                 stopped = RUN_STATE["stopped"]
                 problems += [f"{sid} 第 {i} 次超過 {opt.get('timeout', TIMEOUT)} 秒沒有結束，"
                              + ("已結束整個行程樹" if stopped else "未確認全部停止，沙盒保留") + "，結果不完整",
                              *([RUN_STATE["kill_note"]] if RUN_STATE["kill_note"] else []),
-                             *(clean_stale() if stopped else [])]
+                             *(clean_stale() if stopped else [mark_keep(log, KILL["tree"], RUN_STATE["kill_note"])])]
             label_i = f"{sid} 第 {i} 次"
             all_logs[label_i] = log
             if rc:
@@ -292,7 +294,12 @@ def main() -> int:  # noqa: C901
             (out / "samples.json").write_text(json.dumps({"mem": mems, "gpu": gpus}), "utf-8")
             if first_run is None and ok_run(r):
                 first_run, first_log = rj, log
+            if not RUN_STATE["stopped"]:  # 這首後面的次數也取消（外層再停掉後面的歌）
+                break
         results[sid] = rec
+        if not RUN_STATE["stopped"]:  # 殘留的行程會吃 CPU／顯示卡，後面的效能數字不能信
+            problems.append(f"{sid} 逾時後沒確認行程都停了，後面的歌曲和次數全部取消")
+            break
     mach = machine()
     tool = _git("rev-parse", "--short", "HEAD").strip()
     dirty = tools_dirty()
