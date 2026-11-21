@@ -29,35 +29,50 @@ PREFIX = "leihu-numeric-"
 _REPARSE = 0x400  # FILE_ATTRIBUTE_REPARSE_POINT：junction、符號連結
 
 
-def remove_tree(d: Path) -> str:
-    """刪掉這個工具建立的暫存資料夾：先把裡面所有 junction／符號連結只拆連結（不跟進去），全部拆掉才 rmtree，
-    不可能刪到模型資料夾。只接受系統暫存資料夾底下、名稱是 PREFIX 開頭、本身不是連結的資料夾。
-    回傳空字串＝刪乾淨；否則是沒刪掉的原因（資料夾保留）。"""
-    if not os.path.lexists(d):
-        return ""
-    if Path(d).parent.resolve() != Path(tempfile.gettempdir()).resolve() or not Path(d).name.startswith(PREFIX):
-        return f"{d} 不是這個工具建立的暫存資料夾，不刪"
-    if getattr(os.lstat(d), "st_file_attributes", 0) & _REPARSE:
-        return f"{d} 本身是 junction／連結，不跟進去，不刪"
-    stack = [Path(d)]
+STAGE = "leihu-nstage-"  # make_tmp 還沒改名前的名稱（只有 owner.pid）
+
+
+def remove_tree(d: Path, allowed: tuple[Path, ...] = ()) -> str:
+    """刪掉這個工具建立的資料夾：先把裡面所有 junction／符號連結只拆連結（不跟進去），全部拆掉才 rmtree，
+    不可能刪到模型資料夾。只接受系統暫存資料夾底下 PREFIX／STAGE 開頭的資料夾（或 allowed 裡的上層資料夾底下的），
+    而且本身不能是連結。回傳空字串＝刪乾淨（或本來就不在）；否則是沒刪掉的原因（資料夾保留）。"""
+    d = Path(d)
+    try:
+        if not os.path.lexists(d):
+            return ""
+        parent = d.parent.resolve()
+        in_tmp = parent == Path(tempfile.gettempdir()).resolve() and d.name.startswith((PREFIX, STAGE))
+        if not in_tmp and parent not in [Path(a).resolve() for a in allowed]:
+            return f"{d} 不是這個工具建立的資料夾，不刪"
+        if getattr(os.lstat(d), "st_file_attributes", 0) & _REPARSE:
+            return f"{d} 本身是 junction／連結，不跟進去，不刪"
+    except FileNotFoundError:
+        return ""  # 剛被別的清理刪掉
+    except OSError as err:
+        return f"讀不到 {d} 的屬性（{err}），保留不刪"
+    stack = [d]
     while stack:
         cur = stack.pop()
         try:
             entries = list(os.scandir(cur))
+        except FileNotFoundError:
+            continue
         except OSError as err:
             return f"讀不到 {cur}（{err}），整個資料夾保留不刪"
         for e in entries:
-            st = e.stat(follow_symlinks=False)
-            if getattr(st, "st_file_attributes", 0) & _REPARSE:
-                try:
+            try:
+                st = e.stat(follow_symlinks=False)
+                if getattr(st, "st_file_attributes", 0) & _REPARSE:
                     try:
                         os.rmdir(e.path)  # 目錄 junction／目錄連結：只拆連結
                     except NotADirectoryError:
                         os.unlink(e.path)  # 檔案連結
-                except OSError as err:
-                    return f"連結 {e.path} 拆不掉（{err}），整個資料夾保留不刪"
-            elif e.is_dir(follow_symlinks=False):
-                stack.append(Path(e.path))
+                elif e.is_dir(follow_symlinks=False):
+                    stack.append(Path(e.path))
+            except FileNotFoundError:
+                continue
+            except OSError as err:
+                return f"{e.path} 處理不了（{err}），整個資料夾保留不刪"
     for _ in range(20):  # 子程式被結束後要一點時間才放掉檔案
         shutil.rmtree(d, ignore_errors=True)
         if not d.exists():
@@ -88,34 +103,108 @@ def process_start(pid: int) -> int | None | str:
         k.CloseHandle(wintypes.HANDLE(h))
 
 
-def clean_stale() -> list[str]:
-    """上一次被強制結束（工作管理員、逾時）留下的暫存資料夾：確定建立它的行程已經不在（PID 不存在，
-    或 PID 被別的行程重用、建立時間不同）才刪。沒有 owner、讀不到、查不到行程狀態的都保留，只寫進報告。"""
+def owner_text() -> str:
+    """寫進 owner.pid 的內容：PID 和建立時間。查不到自己的建立時間就直接失敗（寫了也沒辦法分辨）。"""
+    start = process_start(os.getpid())
+    if not isinstance(start, int):
+        raise RuntimeError(f"查不到自己的行程建立時間（{start}），無法寫 owner.pid")
+    return f"{os.getpid()} {start}"
+
+
+def owner_state(d: Path) -> str:
+    """'alive'＝建立它的行程還在；'dead'＝確定不在了；其他字串＝無法判斷的原因（保留）。"""
+    try:
+        pid, start = (int(x) for x in (Path(d) / "owner.pid").read_text("utf-8").split())
+    except (OSError, ValueError):
+        return "沒有可讀的 owner.pid，無法確定是不是別的工作正在用（確認沒有在跑再手動刪）"
+    now = process_start(pid)
+    if now == "unknown":
+        return f"查不到 PID {pid} 的狀態（權限不足），無法確定是不是還在用"
+    return "alive" if now is not None and now == start else "dead"
+
+
+def clean_stale(parent: Path | None = None, pattern: str | None = None, allowed: tuple[Path, ...] = ()) -> list[str]:
+    """被強制結束（工作管理員、逾時）留下的資料夾：確定建立它的行程已經不在（PID 不存在，或 PID 被別的行程重用、
+    建立時間不同）才刪。沒有 owner、讀不到、查不到行程狀態的都保留，只寫進報告。預設清系統暫存資料夾裡的
+    PREFIX、STAGE；parent／pattern 用來清別的地方（例如 export() 的 exports/）。"""
     out = []
-    for d in sorted(Path(tempfile.gettempdir()).glob(PREFIX + "*")):
-        try:
-            pid, start = (int(x) for x in (d / "owner.pid").read_text("utf-8").split())
-        except (OSError, ValueError):
-            out.append(f"保留暫存資料夾 {d.name}：沒有可讀的 owner.pid，無法確定是不是別的工作正在用（確認沒有在跑再手動刪）")
-            continue
-        now = process_start(pid)
-        if now == "unknown":
-            out.append(f"保留暫存資料夾 {d.name}：查不到 PID {pid} 的狀態（權限不足），無法確定是不是還在用")
-            continue
-        if now is not None and now == start:
-            continue  # 建立它的行程還在跑（例如另一個基準），不要動
-        why = remove_tree(d)
-        out.append(f"清掉上一次留下的暫存資料夾 {d.name}" + (f"：沒刪成功，{why}" if why else ""))
+    targets = [(Path(parent), pattern)] if parent else [(Path(tempfile.gettempdir()), PREFIX + "*"),
+                                                         (Path(tempfile.gettempdir()), STAGE + "*")]
+    for base, pat in targets:
+        for d in sorted(base.glob(pat)):
+            try:
+                state = owner_state(d)
+                if state == "alive":
+                    continue  # 建立它的行程還在跑（例如另一個基準），不要動
+                if state != "dead":
+                    out.append(f"保留 {d.name}：{state}")
+                    continue
+                why = remove_tree(d, allowed)
+                out.append(f"清掉上一次留下的 {d.name}" + (f"：沒刪成功，{why}" if why else ""))
+            except Exception as e:  # noqa: BLE001  清理出錯不能讓整個基準中止
+                out.append(f"清理 {d.name} 時出錯，保留不刪：{type(e).__name__}: {e}")
     return out
 
 
 def make_tmp() -> Path:
-    """先在別的名稱底下建好資料夾、寫好 owner.pid，再改名成 PREFIX 開頭：clean_stale 不會看到沒有 owner 的空窗。"""
-    stage = Path(tempfile.mkdtemp(prefix="leihu-nstage-"))
-    (stage / "owner.pid").write_text(f"{os.getpid()} {process_start(os.getpid())}", "utf-8")
-    final = stage.with_name(PREFIX + stage.name[len("leihu-nstage-"):])
-    stage.rename(final)
-    return final
+    """先在 STAGE 名稱底下建好資料夾、寫好 owner.pid，再改名成 PREFIX 開頭：clean_stale 不會看到沒有 owner 的空窗。
+    改名失敗（例如防毒軟體暫時鎖住）重試幾次；最後還是失敗就刪掉 stage 並丟出例外。"""
+    stage = Path(tempfile.mkdtemp(prefix=STAGE))
+    try:
+        (stage / "owner.pid").write_text(owner_text(), "utf-8")
+        final = stage.with_name(PREFIX + stage.name[len(STAGE):])
+        for n in range(10):
+            try:
+                stage.rename(final)
+                return final
+            except PermissionError:
+                if n == 9:
+                    raise
+                time.sleep(0.5)
+    except BaseException:
+        shutil.rmtree(stage, ignore_errors=True)  # 只有 owner.pid，沒有連結
+        raise
+    raise AssertionError("不會到這裡")
+
+
+def tree_with_start(root: int) -> list[tuple[int, int]]:
+    """root 和它所有子孫行程的 (PID, 建立時間)；之後用來確認是不是真的都結束了（PID 重用也分得出來）。"""
+    import ctypes
+    from ctypes import wintypes
+
+    class Entry(ctypes.Structure):  # PROCESSENTRY32W
+        _fields_ = [("dwSize", wintypes.DWORD), ("cntUsage", wintypes.DWORD), ("th32ProcessID", wintypes.DWORD),
+                    ("th32DefaultHeapID", ctypes.c_size_t), ("th32ModuleID", wintypes.DWORD),
+                    ("cntThreads", wintypes.DWORD), ("th32ParentProcessID", wintypes.DWORD),
+                    ("pcPriClassBase", ctypes.c_long), ("dwFlags", wintypes.DWORD), ("szExeFile", ctypes.c_wchar * 260)]
+
+    k = ctypes.windll.kernel32
+    k.CreateToolhelp32Snapshot.restype = wintypes.HANDLE
+    snap = k.CreateToolhelp32Snapshot(0x2, 0)
+    e = Entry()
+    e.dwSize = ctypes.sizeof(e)
+    kids: dict[int, list[int]] = {}
+    ok = k.Process32FirstW(wintypes.HANDLE(snap), ctypes.byref(e))
+    while ok:
+        kids.setdefault(e.th32ParentProcessID, []).append(e.th32ProcessID)
+        ok = k.Process32NextW(wintypes.HANDLE(snap), ctypes.byref(e))
+    k.CloseHandle(wintypes.HANDLE(snap))
+    out, todo, seen = [], [root], {root}
+    while todo:
+        pid = todo.pop()
+        start = process_start(pid)
+        if isinstance(start, int):
+            out.append((pid, start))
+        for c in kids.get(pid, []):
+            if c not in seen:
+                seen.add(c)
+                todo.append(c)
+    return out
+
+
+def still_alive(tree: list[tuple[int, int]]) -> list[int]:
+    """tree_with_start 記下的行程裡，還在跑的 PID（建立時間相同才算同一個行程）。"""
+    return [pid for pid, start in tree if process_start(pid) == start]
 
 
 class Sandbox:

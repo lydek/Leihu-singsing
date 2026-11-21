@@ -38,7 +38,7 @@ ROOT = HERE.parents[1]
 sys.path[:0] = [str(ROOT / "tests" / "numeric"), str(ROOT / "tests" / "contract")]
 
 from baseline import TIMEOUT, device_report, kill_tree, log_alerts, machine  # noqa: E402  tests/numeric/baseline.py
-from compare_upstream import write_summary, tools_dirty, OUT, _git, commit_of, export  # noqa: E402
+from compare_upstream import EXPORT_NOTES, write_summary, tools_dirty, OUT, _git, commit_of, export  # noqa: E402
 
 PRIVATE = ROOT / "tests" / "private"
 MODELS = PRIVATE / "models"
@@ -149,6 +149,9 @@ def synth_song() -> Path:
     return dst
 
 
+RUN_STATE = {"stopped": True, "kill_note": ""}  # run_one 最後一次逾時處理的結果
+
+
 def ok_run(r: dict) -> bool:
     """成功的一次：結束代碼 0、有 run.json、不是中途中斷寫的 run.json。統計、啟動時間、摘要都用這個條件。"""
     return r["rc"] == 0 and bool(r["run"]) and not r["run"].get("incomplete")
@@ -177,17 +180,22 @@ def run_one(code: Path, song: Path, out: Path, quality: str, timeout: float, dev
         t0 = time.time()
         kill_note = ""
         timed_out = False
+        stopped = True
         while p.poll() is None:
             if time.time() - t0 > timeout:
                 timed_out = True
-                kill_note = kill_tree(p)
+                stopped, kill_note = kill_tree(p)
                 break
             mems.append(sample(p.pid))
             time.sleep(0.25)
         stop.set()
         th.join(timeout=5)
-    text = log.read_text("utf-8", errors="replace") + (f"\n[perf] 結束行程樹：{kill_note}\n" if kill_note else "")
-    return (None if timed_out else p.returncode), mems, gpus, text
+    if timed_out:  # 結束行程樹的結果寫回 log 檔（報告另外列在異常）
+        with open(log, "a", encoding="utf-8") as f:
+            f.write(f"\n[baseline] 逾時，{'已結束整個行程樹' if stopped else '未確認全部停止'}"
+                    f"{'：' + kill_note if kill_note else ''}\n")
+    RUN_STATE["stopped"], RUN_STATE["kill_note"] = stopped, kill_note
+    return (None if timed_out else p.returncode), mems, gpus, log.read_text("utf-8", errors="replace")
 
 
 def per_phase(phases: list[dict], mems: list[dict], gpus: list[dict]) -> dict:
@@ -240,7 +248,7 @@ def main() -> int:  # noqa: C901
     base.mkdir(parents=True, exist_ok=True)
     songs = [("synth", synth_song())]
     songs += [(f"song{i + 1:02d}", p) for i, p in enumerate(sorted(x for x in SONGS.glob("*") if x.suffix.lower() in AUDIO))]
-    problems: list[str] = []
+    problems: list[str] = list(EXPORT_NOTES)
     results: dict[str, dict] = {}
     first_log = ""
     first_run = None
@@ -260,8 +268,11 @@ def main() -> int:  # noqa: C901
             if rc is None:
                 from sandbox import clean_stale
 
-                problems += [f"{sid} 第 {i} 次超過 {opt.get('timeout', TIMEOUT)} 秒沒有結束，已結束整個行程樹，結果不完整",
-                             *clean_stale()]
+                stopped = RUN_STATE["stopped"]
+                problems += [f"{sid} 第 {i} 次超過 {opt.get('timeout', TIMEOUT)} 秒沒有結束，"
+                             + ("已結束整個行程樹" if stopped else "未確認全部停止，沙盒保留") + "，結果不完整",
+                             *([RUN_STATE["kill_note"]] if RUN_STATE["kill_note"] else []),
+                             *(clean_stale() if stopped else [])]
             label_i = f"{sid} 第 {i} 次"
             all_logs[label_i] = log
             if rc:
