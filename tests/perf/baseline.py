@@ -36,7 +36,7 @@ HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[1]
 sys.path[:0] = [str(ROOT / "tests" / "numeric"), str(ROOT / "tests" / "contract")]
 
-from baseline import log_alerts, machine  # noqa: E402  tests/numeric/baseline.py
+from baseline import device_lines, log_alerts, machine  # noqa: E402  tests/numeric/baseline.py
 from compare_upstream import OUT, _git, export  # noqa: E402
 
 PRIVATE = ROOT / "tests" / "private"
@@ -226,6 +226,7 @@ def main() -> int:  # noqa: C901
     results: dict[str, dict] = {}
     first_log = ""
     first_run = None
+    all_logs: list[str] = []  # 每一次的 log：實際裝置取所有次的聯集（有一次退回 CPU 也看得到）
     for sid, song in songs:
         sha = hashlib.sha256(song.read_bytes()).hexdigest()
         rec = {"sha256": sha, "source": "合成（sing.flac × 7）" if sid == "synth" else "tests/private/songs", "runs": []}
@@ -233,6 +234,7 @@ def main() -> int:  # noqa: C901
             out = base / f"{sid}-run{i}"
             print(f"{sid} 第 {i} 次 → {out}", flush=True)
             rc, mems, gpus, log = run_one(code, song, out, quality)
+            all_logs.append(log)
             label_i = f"{sid} 第 {i} 次"
             if rc:
                 problems.append(f"{label_i} run_perf.py 結束代碼 {rc}（log：{out.with_suffix('.log')}）")
@@ -276,12 +278,12 @@ def main() -> int:  # noqa: C901
         "",
         "## 實際使用的裝置與模型",
         "",
-        f"- 顯示卡探測（子程式）：{json.dumps(probe, ensure_ascii=False) if probe else '沒有探測結果'}",
-        "- " + ("分離、音高、語音辨識在顯示卡上跑" if probe.get("ok") else
-                "沒有可用的顯示卡：log 裡的「[gpu] 顯示卡處理程式」實際上是在 CPU 上跑的子程式"),
-        f"- ONNX Runtime provider：{env.get('onnx_providers')}",
+        f"- 顯示卡探測（子程式）：{json.dumps(probe, ensure_ascii=False) if probe else '沒有探測結果'}"
+        "（只代表探測用的小運算能不能在顯示卡上跑；每一步實際用的裝置看下面的「實際裝置」，是所有次的聯集）",
+        *device_lines("\n".join(all_logs)),
+        f"- ONNX Runtime 可用的 provider：{env.get('onnx_providers')}",
         "- 套件：" + "、".join(f"{k} {v}" for k, v in env.items() if k not in ("onnx_providers", "gpu_probe", "executable")),
-        f"- 音高模型：{'torchcrepe full（顯示卡）' if probe.get('ok') else 'torchcrepe tiny（CPU）'}（pitch_model＝auto）",
+        "- log 的「[gpu] 顯示卡處理程式」是子程式的名稱，不代表一定用顯示卡",
     ]
     for sid, rec in results.items():
         songs_used = {json.dumps((r["run"] or {}).get("song", {}), ensure_ascii=False) for r in rec["runs"]}

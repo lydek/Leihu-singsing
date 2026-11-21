@@ -72,8 +72,10 @@ class Sandbox:
         assert Path(P.__file__).resolve().parent == self.root, f"import 到別的 pipeline：{P.__file__}"
         self.P, self.SH = P, SH
         prefix = (
-            f"import sys; sys.path[:0] = [{str(self.root)!r}, {str(NETBLOCK_DIR)!r}]; import netblock; " + nodither
+            f"import sys; sys.path[:0] = [{str(self.root)!r}, {str(NETBLOCK_DIR)!r}, {str(HERE)!r}]; import netblock; "
+            + nodither
             + f"import gpu_worker as _g; print('{tag} 子程式載入', _g.__file__, flush=True); "
+            + "import child_hook; "  # 每一步實際用的裝置印成 [device]（child_hook.py）
         )
         box = self
 
@@ -114,7 +116,7 @@ class Sandbox:
         }
 
     def problems(self, out: Path) -> list[str]:
-        """執行完要回報的問題：模型檔被改、想對外連線（log 複製到 out）、沒開過顯示卡子程式。"""
+        """執行完要回報的問題：模型檔被改、想對外連線（log 複製到 out）、被測程式的 logs/、沒開過顯示卡子程式。"""
         now = self.model_files()
         bad = [f"模型資料夾的檔案在執行中有變動：{k}" for k in sorted(self.models_before.keys() | now.keys())
                if self.models_before.get(k) != now.get(k)]
@@ -122,6 +124,15 @@ class Sandbox:
         if blocked.exists():
             shutil.copy2(blocked, out / "net_blocked.log")
             bad.append(f"有程式想對外連線（已擋下），見 {out / 'net_blocked.log'}")
+        logs = self.root / "logs"
+        if logs.is_dir() and any(logs.iterdir()):
+            # 被測程式自己的錯誤紀錄（log_error 寫 logs/lyrics.log：例如混合精度分離失敗後改用一般精度重做）
+            shutil.copytree(logs, out / "app-logs", dirs_exist_ok=True)
+            for f in sorted(logs.glob("*.log")):
+                lines = [x for x in f.read_text("utf-8", errors="replace").splitlines() if x.strip()]
+                bad += [f"被測程式記錄的錯誤（logs/{f.name}）：{x[:200]}" for x in lines[:5]]
+                if len(lines) > 5:
+                    bad.append(f"logs/{f.name} 還有 {len(lines) - 5} 行，見 {out / 'app-logs'}")
         if self.spawns == 0:
             bad.append("沒有開過顯示卡子程式：分離、音高、語音辨識可能都在主程式裡做")
         return bad

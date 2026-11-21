@@ -2,11 +2,12 @@ r"""錄一個版本在這台電腦上的數值基準（docs/refactor-port-plan.m
 
 從 git 匯出指定的版本，用 run.py 處理合成素材 N 次（預設 2），然後寫報告：
 - 執行條件：run.py 為了讓結果可重現而改掉的設定，逐項列出；
-- 實際使用的裝置與模型：顯示卡探測結果、ONNX 可用的 provider、各首歌實際用的分離模型、音高模型、子程式載入的程式路徑；
+- 實際使用的裝置與模型：子程式每一步回報的裝置（child_hook.py 的 [device]）、各首歌實際用的分離模型、
+  子程式載入的程式路徑；顯示卡探測結果只列出來，不拿來推定每一步用的裝置；
 - 異常：結束代碼不是 0、run.py 回報的問題（素材 sha256 不符、模型檔被改、想對外連線、沒開過子程式）、
-  log 裡的 Traceback／改用 CPU／改在主程式裡執行／退回／卡住／逾時／記憶體不足、子程式載入了別份程式、
-  同一版兩次結果超過門檻。沒有就寫「無」；
-- 兩次結果的差距（compare.pair）與每次和標準答案的差距（compare.quality）。
+  被測程式 logs/ 裡的錯誤紀錄）、log 裡的 Traceback／改用 CPU／改用標準模型／改在主程式裡執行／退回／卡住／逾時／
+  記憶體不足、子程式載入了別份程式、同一版各次輸出不完全相同（compare.exact，第 2 次起都和第 1 次比）。沒有就寫「無」；
+- 第 1、2 次的差距表（compare.pair，參考用）與每次和標準答案的差距（compare.quality）。
 報告和輸出在 tests/private/upstream/<版本>/numeric/<標籤>/（不進 git）；
 摘要（不含音檔）寫到 tests/numeric/baselines/<版本>-<標籤>.json（進 git，給另一台電腦、之後的重構版對照）。
 
@@ -67,10 +68,22 @@ def log_alerts(log: str, label: str) -> list[str]:
             if needle in line:
                 out.append(f"{label} log（{what}）：{line.strip()[:200]}")
                 break
-    for m in re.finditer(r"\[numeric\] 子程式載入 (.+)", log):
+    for m in re.finditer(r"\[(?:numeric|perf)\] 子程式載入 (.+)", log):
         p = m.group(1).strip()
         if "leihu-numeric-" not in p or not p.endswith(os.path.join("app", "gpu_worker.py")):
             out.append(f"{label} 子程式載入了暫存資料夾以外的程式：{p}")
+    return out
+
+
+def device_lines(log: str) -> list[str]:
+    """子程式回報的每一步實際裝置（child_hook.py）；有做的步驟卻沒有回報就寫「未確認」。"""
+    seen = sorted({ln.strip()[len("[device] "):] for ln in log.splitlines() if ln.startswith("[device] ")})
+    out = [f"- 實際裝置：{x}" for x in seen]
+    for step in ("separate", "pitch", "whisper"):
+        if f"[gpu] {step} 完成" in log and not any(x.startswith(step) for x in seen):
+            out.append(f"- 實際裝置：{step} 未確認（子程式做了這一步，但沒有 [device] 紀錄）")
+    if "改在主程式裡執行" in log:
+        out.append("- 有工作改在主程式裡執行：那些工作的裝置沒有 [device] 紀錄（見異常）")
     return out
 
 
@@ -79,22 +92,21 @@ def used(run_dir: Path, log: str) -> list[str]:
     rj = json.loads((run_dir / "run.json").read_text("utf-8"))
     env = rj["environment"]
     probe = env.get("gpu_probe") or {}
-    gpu = bool(probe.get("ok"))
     lines = [
-        f"- 顯示卡探測（子程式）：{json.dumps(probe, ensure_ascii=False) if probe else '沒有探測結果'}",
-        "- " + ("分離、音高、語音辨識在顯示卡上跑" if gpu else
-                "沒有可用的顯示卡：log 裡的「[gpu] 顯示卡處理程式」實際上是在 CPU 上跑的子程式"),
-        f"- ONNX Runtime provider：{env.get('onnx_providers')}",
+        f"- 顯示卡探測（子程式）：{json.dumps(probe, ensure_ascii=False) if probe else '沒有探測結果'}"
+        "（只代表探測用的小運算能不能在顯示卡上跑；每一步實際用的裝置看下面的「實際裝置」）",
+        *device_lines(log),
+        f"- ONNX Runtime 可用的 provider：{env.get('onnx_providers')}",
         "- 套件：" + "、".join(f"{k} {v}" for k, v in env.items() if k not in ("onnx_providers", "gpu_probe", "executable")),
-        f"- 音高模型：{'torchcrepe full（顯示卡）' if gpu else 'torchcrepe tiny（CPU）'}（pitch_model＝auto 時由顯示卡探測決定）",
-        f"- 顯示卡子程式開了 {rj['worker_spawns']} 次",
+        f"- 顯示卡子程式開了 {rj['worker_spawns']} 次（log 的「[gpu] 顯示卡處理程式」是子程式的名稱，不代表一定用顯示卡）",
     ]
     for sid in C.SONGS:
         m = C._json(run_dir / sid / "meta.json") or {}
         lines.append(f"- {sid}：separation＝{m.get('separation')}、vocal_model＝{m.get('vocal_model')}、karaoke＝{m.get('karaoke')}")
     loads = sorted(set(re.findall(r"\[numeric\] 子程式載入 (.+)", log)))
     lines.append(f"- 子程式載入的 gpu_worker：{'、'.join(p.strip() for p in loads) or '（log 裡沒有）'}")
-    dev = sorted({ln.strip()[:160] for ln in log.splitlines() if re.search(r"(?i)execution provider|\[lyrics\]|\[cuda\]|\[ctranslate2\].*warning", ln)})
+    dev = sorted({ln.strip()[:160] for ln in log.splitlines()
+                  if re.search(r"(?i)\[lyrics\]|\[cuda\]|\[separate\]|\[ctranslate2\].*warning", ln)})
     lines += [f"- log：{d}" for d in dev[:12]]
     return lines
 
@@ -139,9 +151,12 @@ def main() -> int:  # noqa: C901
             problems.append(f"第 {i} 次沒有產生 run.json，結果不完整")
         problems += log_alerts(logs[i], f"第 {i} 次")
     ok_runs = [i for i in logs if (base / f"run{i}" / "run.json").exists()]
+    # 穩定性：第 2 次起每一次都和第 1 次逐檔核對（CPU、固定條件下要完全相同）；差距表只是參考
+    exact = {i: C.exact(base / "run1", base / f"run{i}") for i in ok_runs if i != 1 and 1 in ok_runs}
+    for i, rows in exact.items():
+        problems += [f"第 1 次和第 {i} 次不完全相同：{r['item']} {r['value']}" for r in rows if not r["ok"]]
     pair = C.pair(base / "run1", base / "run2") if {1, 2} <= set(ok_runs) else []
-    problems += [f"同一版兩次結果超過門檻：{r['item']} {r['value']}（門檻 {r['limit']}）" for r in pair if not r["ok"]]
-    if runs >= 2 and not pair:
+    if runs >= 2 and not exact:
         problems.append("少於兩次成功的執行，沒有做穩定性比對")
     quality = {i: C.quality(base / f"run{i}") for i in ok_runs}
     rj = json.loads((base / f"run{ok_runs[0]}" / "run.json").read_text("utf-8")) if ok_runs else {}
@@ -173,7 +188,12 @@ def main() -> int:  # noqa: C901
         "",
         *(used(base / f"run{ok_runs[0]}", logs[ok_runs[0]]) if ok_runs else ["（沒有成功的執行）"]),
         "",
-        "## 同一版兩次結果的差距",
+        "## 同一版各次輸出逐檔核對（和第 1 次比）",
+        "",
+        *[x for i, rows in exact.items()
+          for x in (f"第 {i} 次：{sum(r['ok'] for r in rows)}／{len(rows)} 個檔案完全相同", "", *C.table(rows), "")],
+        *([] if exact else ["（沒有做）", ""]),
+        "## 第 1、2 次的差距表（參考：逐檔核對通過時這裡一定全部通過）",
         "",
         *(C.table(pair) if pair else ["（沒有做）"]),
         "",
@@ -192,6 +212,7 @@ def main() -> int:  # noqa: C901
         "conditions": rj.get("conditions"),
         "inputs": rj.get("inputs"),
         "problems": problems,
+        "exact": {str(i): rows for i, rows in exact.items()},
         "stability": pair,
         "quality": {str(i): q for i, q in quality.items()},
         "wall_seconds": wall,
