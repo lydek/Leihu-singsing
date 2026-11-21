@@ -37,7 +37,7 @@ ROOT = HERE.parents[1]
 sys.path[:0] = [str(ROOT / "tests" / "numeric"), str(ROOT / "tests" / "contract")]
 
 from baseline import device_lines, log_alerts, machine  # noqa: E402  tests/numeric/baseline.py
-from compare_upstream import OUT, _git, commit_of, export  # noqa: E402
+from compare_upstream import tools_dirty, OUT, _git, commit_of, export  # noqa: E402
 
 PRIVATE = ROOT / "tests" / "private"
 MODELS = PRIVATE / "models"
@@ -260,7 +260,7 @@ def main() -> int:  # noqa: C901
         results[sid] = rec
     mach = machine()
     tool = _git("rev-parse", "--short", "HEAD").strip()
-    dirty = bool(_git("status", "--porcelain", "--", "tests").strip())
+    dirty = tools_dirty()
     env = (first_run or {}).get("environment") or {}
     probe = env.get("gpu_probe") or {}
     rep = [
