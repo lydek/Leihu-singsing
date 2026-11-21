@@ -281,23 +281,13 @@ shim 要補的地方：
 **CPU 和顯示卡要分開錄：**
 - CPU 路徑可以做到逐位元組相同，是第一階段的主要依據。
 - 顯示卡路徑就算是上游自己連跑兩次也不一定逐位元組相同（浮點運算順序、混合精度），所以顯示卡的功能基準要用相似度比對，門檻取上游自己跑多次的差異。
-- 上游 2.3.2 只支援 NVIDIA（CUDA）。這台開發機是 AMD Radeon RX 9070 XT，所有推論都會走 CPU，**顯示卡基準在有 RTX 3060 的筆電上錄**。
+- 上游 2.3.2 只支援 NVIDIA（CUDA）。這台開發機是 AMD Radeon RX 9070 XT，所有推論都會走 CPU；目前只錄 CPU 基準（3.10）。
 
-**錄基準的兩台電腦：**
+**錄基準的電腦：**
 
 | 用途 | CPU | 顯示卡 | 記憶體 |
 |---|---|---|---|
 | CPU 基準（開發機） | AMD Ryzen 9 9900X3D（12 核） | AMD Radeon RX 9070 XT（上游不支援，推論走 CPU） | 31 GB |
-| 顯示卡基準（筆電） | Intel Core i7-11370H（4 核 8 緒） | NVIDIA GeForce RTX 3060 Laptop GPU（筆電版 6 GB） | 待記錄 |
-
-兩台的 CPU 差很多，CPU 數字不能跨電腦比；筆電也要錄一份自己的 CPU 基準，顯示卡和 CPU 的差異才比得出來。筆電版 3060 的功耗上限依機型不同（大約 60–130 W），要記下機型和功耗設定。
-
-**RTX 3060 筆電要注意的（以下是讀程式碼的判斷，沒有實測）：**
-- 架構（Ampere）在 CUDA 12.6／12.8 版 PyTorch 的支援範圍內，驅動要支援 CUDA 12.6 以上。安裝程式會跑顯示卡運算測試，失敗會依序退到 CUDA 12.6、CPU 版，結果寫在 `logs/install.log`。
-- 筆電版 3060 多半是 6 GB 顯示卡記憶體。上游沒有最低記憶體門檻（舊分支的 6 GB 門檻是 fork 自己加的，2.3.2 沒有）；不到 10 GB 時不會兩首同時分離（`pipeline.py:3405` 的 `PARALLEL_MIN_VRAM`），一次只跑一個顯示卡工作。
-- 高品質模型（BS-Roformer）在 6 GB 放不放得下不確定。放不下時上游會先改一般精度、再退回標準模型（`pipeline.py:2063` 起），歌曲仍會處理完，但**用的模型不同**。所以每首歌都要記錄實際用的分離模型（看歌曲的 meta 和 `logs/app.log`），不然效能數字沒辦法比。
-- 筆電的效能會受電源和散熱影響：要插電、Windows 電源模式設「最佳效能」，並在 Windows 顯示設定把內嵌 Python（`%LOCALAPPDATA%\LeihuLiantai\python\python.exe`）指定用獨立顯示卡；量測時記下這些設定，每項多跑幾次看變異。
-- 先確認跑得起來再錄基準：裝好原版 2.3.2 後，`/api/status` 的 `modules.cuda` 是 `true`，處理一首歌時 `logs/app.log` 有 `[gpu]` 子程式啟動的訊息，而且沒有「改在主程式裡執行」或「改用 CPU」。
 
 **每份基準都要記錄：** 程式的 commit、測試工具的 commit、電腦規格（CPU、記憶體、顯示卡、驅動）、Python 和主要套件版本（torch、onnxruntime、faster-whisper、audio-separator）、模型檔的 sha256、歌曲清單和 sha256、執行次數。基準結果和本機素材放 `tests/private/`，不進 git；git 裡只放工具、歌曲清單和錄製方法。
 
@@ -354,39 +344,11 @@ shim 要補的地方：
   - 數值：跑 3 次，第 2、3 次各 14／14 個檔案和第 1 次完全相同；子程式回報每一步實際都在 CPU（MDX 兩個 ONNX session、Whisper VAD 都是 `CPUExecutionProvider`，torchcrepe tiny，Whisper float32）。
   - 效能（中位數，秒／private 尖峰 MiB）：匯入 2.6／1994、分離 87.2／8397、音高 7.4／3990、歌詞 15.5／7383、移調 8.3／6054、評分 13.4／4178、匯出 1.3／4838、閒置 1720 MiB。
   - 相似度（平常條件 3 次）：語音那首音符數差 2～3 個、沒配對到的音符 5～6 個、音高不同 5～6 個；匯出檔 SDR 在評分 offset 差 0.01 秒時約 -2 dB（3 組有 2 組）。
-- **還沒做**：筆電的 CPU 與顯示卡基準（步驟見 3.10）、真實歌曲（`fetch.py` 下載後加 `--songs` 重跑）。`test_contract_snapshot` 需要 `conftest` 和 S28，目前不能用 pytest 跑。
+- **還沒做**：顯示卡基準（3.10）；真實歌曲（`fetch.py` 下載後加 `--songs` 重跑）。`test_contract_snapshot` 需要 `conftest` 和 S28，目前不能用 pytest 跑。
 
-### 3.10 筆電（RTX 3060 Laptop）執行步驟
-開發機的 CPU 基準錄好之後，工具要在有 NVIDIA 顯示卡的筆電上第一次實跑。顯示卡路徑在開發機上完全沒有跑過，以下是第一次的步驟；遇到報告「異常」不是「無」，先看是工具還是環境的問題，再決定要不要錄進 git。
-
-**準備**
-1. 筆電裝好原版 2.3.2（安裝程式會選 CUDA 版 PyTorch）。打開練唱台確認 `/api/status` 的 `modules.cuda` 是 `true`，處理一首歌時 `logs/app.log` 有 `[gpu]` 子程式的訊息、沒有「改用 CPU」。
-2. 這個分支在筆電上要能用：`test/upstream-baseline` 還沒 push，要先 push（使用者決定），或把整個 worktree 複製過去。
-3. 從開發機複製 `tests/private/models`、`tests/private/numeric/inputs`、`tests/private/songs`（有的話）到筆電同樣的位置。不要在筆電上重新產生合成素材：語音合成的聲音每台不一定一樣，`run.py` 會核對 `manifest.json` 的 sha256。
-4. 插電、Windows 電源模式設「最佳效能」，在顯示設定把內嵌 Python（`%LOCALAPPDATA%\LeihuLiantai\python\python.exe`）指定用高效能顯示卡；記下筆電型號與功耗設定。
-5. 高品質主唱分離模型（Roformer karaoke）不在模型資料夾：顯示卡上 `auto` 品質會改用標準模型（報告的條件會寫）。要量高品質的效能，先讓練唱台在背景下載好，再複製進 `tests/private/models/uvr`。
-
-**錄製順序**（repo 根目錄，PowerShell）
-```powershell
-$py = "$env:LOCALAPPDATA\LeihuLiantai\python\python.exe"; $env:PYTHONUTF8 = "1"
-```
-1. 筆電自己的 CPU 基準（和顯示卡比用；CPU 數字不能和開發機比）：
-   `& $py tests/numeric/baseline.py v2.3.2 --label=laptop-3060-cpu --device=cpu`、
-   `& $py tests/perf/baseline.py v2.3.2 --label=laptop-3060-cpu --device=cpu`
-2. 顯示卡的固定條件下限（數值基準在顯示卡上要用它判斷穩定性）：
-   `& $py tests/numeric/similarity.py v2.3.2 --label=laptop-3060-gpu --fixed --runs=3`
-3. 顯示卡數值基準：`& $py tests/numeric/baseline.py v2.3.2 --label=laptop-3060-gpu --runs=3`
-4. 顯示卡平常條件的相似度（第二階段門檻）：`& $py tests/numeric/similarity.py v2.3.2 --label=laptop-3060-gpu --runs=3`
-5. 顯示卡效能：`& $py tests/perf/baseline.py v2.3.2 --label=laptop-3060-gpu --runs=3`
-有真實歌曲時，數值基準加 `--songs`，標籤加 `-songs`（不要蓋掉只用合成素材的摘要）。
-
-**每份報告要看的**
-- 「異常」是「無」。有「could not activate requested provider」「Falling back to」「改用 CPU」「改在主程式裡執行」「改用標準模型」，表示顯示卡路徑沒有完整生效。
-- 「實際使用的裝置與模型」：每一步的「實際=」是不是 `cuda`（MDX 的 ONNX session、torchcrepe full、Whisper）。
-- 數值基準的「穩定性判斷」寫的是和相似度下限比；下限不能用時會寫原因（例如條件、套件、模型、歌曲不同）。
-- 效能報告的顯示卡記憶體欄位有數字（要有 nvidia-smi）。
-
-**帶回來的東西**：只有 `tests/numeric/baselines/`、`tests/perf/baselines/` 裡標籤是 `laptop-3060-*` 的摘要要 commit；報告和原始輸出留在筆電的 `tests/private/`。
+### 3.10 顯示卡基準：目前不錄
+- 第一階段只靠開發機的 CPU 基準證明行為沒變。顯示卡路徑（`gpu_worker` 的顯示卡分支、CUDA 失敗時的退回、高品質模型 BS-Roformer、顯示卡記憶體不足時的行為與效能）沒有基準，重構時改到這些地方要特別小心，並在 PR 寫明沒有驗證。
+- 工具已經支援顯示卡的部分：`--device=cpu|auto`、`similarity.py --fixed`（顯示卡數值基準要用的固定條件下限）、`child_hook.py` 回報每一步的實際裝置、數值基準在顯示卡上改用下限判斷穩定性。都只在 CPU 上跑過，顯示卡分支沒有實際執行過。
 
 ## 4. 要先決定的事
 - 舊分支要留著（唯讀）還是封存成 tag，`claude/original-refactor-behavior-comparison-d469de` 也一樣。在搬完之前不要刪。
@@ -396,3 +358,4 @@ $py = "$env:LOCALAPPDATA\LeihuLiantai\python\python.exe"; $env:PYTHONUTF8 = "1"
 ## 5. 沒有驗證的部分
 - 初判只看了 commit 標題、檔案清單，以及 M1、M2、M5、S19 四處抽查，其他 commit 都還沒看 diff。
 - 「上游 2.3.2 也有這些問題」只根據 commit 說明，還沒有在 `v2.3.2` 上重現。
+- 顯示卡路徑沒有任何基準（3.10），測試工具的顯示卡分支也沒有實際執行過。
