@@ -343,9 +343,50 @@ shim 要補的地方：
   - 報告：「改用標準模型」和被測程式 `logs/` 的錯誤列為異常；每一步實際用的裝置由子程式回報（`tests/numeric/child_hook.py` 的 `[device]`），不再從顯示卡探測推定；子程式的 `pipeline` 來源也回報並檢查。
   - 契約快照格式改變（用 `--rebase` 重建）：只有執行當下 3 天內的數字才當動態時間（fixture 固定時間保留），音檔記 RMS、峰值與 16 段 RMS，圖片記像素雜湊，其他二進位記 sha256。和舊快照差的 29 個案例全部是這些格式改變。
   - 其他：`export()` 每次從 git 重新匯出並記完整 commit；模型記 sha256；沙盒不複製 `config.json`，檢查 `pipeline`、`share`、`app` 從沙盒載入；`--songs` 沒有音檔時失敗；執行次數下限；效能每次清空輸出、只統計成功的幾次；`tools_dirty()` 不把快照、摘要算成工具修改。
-  - 重錄結果（契約 `1493613`，其他 `33bca48`，異常都是「無」）：契約 141 個案例兩次相同；數值第 2 次 14／14 個檔案完全相同；子程式回報四步都在 CPU（MDX 兩個模型 `CPUExecutionProvider`、torchcrepe tiny、Whisper float32）。效能（中位數，秒／private 尖峰 MB）：匯入 2.7／2140、分離 89.1／8395、音高 7.4／3988、歌詞 15.5／7461、移調 8.4／6055、評分 13.4／4176、匯出 1.3／4838、閒置 1719 MB。相似度下限：語音那首音符數差最多 2 個、音符音高不同 5 個（3 組都超過數值基準門檻）；匯出檔 SDR 在 offset 差 0.01 秒時約 -2 dB（3 組有 2 組）。
-  - 還沒修（第三批）：#19 中途失敗或被強制結束時暫存資料夾殘留且報告不知道（這次停掉重錄時就留下一個，已手動只拆 junction 再刪）、#20 外層沒有整體逾時、#21 異常訊息裡的絕對路徑可能進摘要、#22 記憶體單位其實是 MiB。
-- **還沒做**：筆電的顯示卡與 CPU 數值、效能基準（複製 `tests/private/numeric/inputs` 和 `tests/private/models` 過去，`tests/numeric/baseline.py --label=laptop-3060-gpu`、`tests/perf/baseline.py --label=laptop-3060-gpu`；顯示卡路徑兩次不一定逐位元組相同，看兩次差距表決定門檻）、真實歌曲的效能與相似度基準（`fetch.py` 下載後重跑）、筆電上的相似度基準（`--quality=auto` 會用 BS-Roformer）。`test_contract_snapshot` 需要 `conftest` 和 S28，目前不能用 pytest 跑。
+- **Codex CLI 第二到第五次審查（2026-11-21）**：報告在 `tests/private/reviews/codex-test-review{2,3,4,5}-2026-11-21.md`（不進 git）。每輪修完都重錄，主要修正：
+  - 清理與結束行程：暫存資料夾記 owner（PID＋建立時間），只刪確定沒人用的；`remove_tree` 先只拆 junction、不跟進連結；逾時後確認整棵行程樹都停了才清理，沒確認就寫 `keep.json`、停止後面的執行，下一次錄製看到行程還在就不開始；`export()` 每個行程一個資料夾。
+  - 比對：`required()` 檢查必要產物、結構和有限值，壞的那次不拿來比；音符一對一配對；評分補比 frames、逐句、錄音音高，`key_hint` 可以是 null；靜音、NaN 有明確定義；契約音訊加解碼取樣雜湊；`--rebase` 依完整 commit 判斷。
+  - 顯示卡路徑：子程式回報每一步最後的實際裝置（「實際=」，含 ONNX 執行中改用、Whisper 重建 CPU 模型）；數值基準有步驟在顯示卡上時，和同一台電腦用 `similarity.py --fixed` 錄的下限比，並核對條件、套件、模型、素材、真實歌曲；`compare.py --similar` 一定要給 `--floor`。
+  - 數值基準實際抓到的不穩定：Whisper 對沒有人聲的合成旋律做溫度取樣重試時用了 CTranslate2 亂數，兩次 `lyrics_quality` 不同；固定條件下改成 `set_random_seed(0)`。
+  - 刻意沒修的小問題：`user_leaks()` 會誤擋 URL 裡的 `/users/<名稱>`（N42）；其他列在第五次報告的小問題清單（都要特定的失敗組合才會發生）。
+- **目前的開發機 CPU 基準（測試工具 `fe9431f`，契約快照用 `--rebase` 重建，異常都是「無」）**：
+  - 契約：141 個案例兩次相同。
+  - 數值：跑 3 次，第 2、3 次各 14／14 個檔案和第 1 次完全相同；子程式回報每一步實際都在 CPU（MDX 兩個 ONNX session、Whisper VAD 都是 `CPUExecutionProvider`，torchcrepe tiny，Whisper float32）。
+  - 效能（中位數，秒／private 尖峰 MiB）：匯入 2.6／1994、分離 87.2／8397、音高 7.4／3990、歌詞 15.5／7383、移調 8.3／6054、評分 13.4／4178、匯出 1.3／4838、閒置 1720 MiB。
+  - 相似度（平常條件 3 次）：語音那首音符數差 2～3 個、沒配對到的音符 5～6 個、音高不同 5～6 個；匯出檔 SDR 在評分 offset 差 0.01 秒時約 -2 dB（3 組有 2 組）。
+- **還沒做**：筆電的 CPU 與顯示卡基準（步驟見 3.10）、真實歌曲（`fetch.py` 下載後加 `--songs` 重跑）。`test_contract_snapshot` 需要 `conftest` 和 S28，目前不能用 pytest 跑。
+
+### 3.10 筆電（RTX 3060 Laptop）執行步驟
+開發機的 CPU 基準錄好之後，工具要在有 NVIDIA 顯示卡的筆電上第一次實跑。顯示卡路徑在開發機上完全沒有跑過，以下是第一次的步驟；遇到報告「異常」不是「無」，先看是工具還是環境的問題，再決定要不要錄進 git。
+
+**準備**
+1. 筆電裝好原版 2.3.2（安裝程式會選 CUDA 版 PyTorch）。打開練唱台確認 `/api/status` 的 `modules.cuda` 是 `true`，處理一首歌時 `logs/app.log` 有 `[gpu]` 子程式的訊息、沒有「改用 CPU」。
+2. 這個分支在筆電上要能用：`test/upstream-baseline` 還沒 push，要先 push（使用者決定），或把整個 worktree 複製過去。
+3. 從開發機複製 `tests/private/models`、`tests/private/numeric/inputs`、`tests/private/songs`（有的話）到筆電同樣的位置。不要在筆電上重新產生合成素材：語音合成的聲音每台不一定一樣，`run.py` 會核對 `manifest.json` 的 sha256。
+4. 插電、Windows 電源模式設「最佳效能」，在顯示設定把內嵌 Python（`%LOCALAPPDATA%\LeihuLiantai\python\python.exe`）指定用高效能顯示卡；記下筆電型號與功耗設定。
+5. 高品質主唱分離模型（Roformer karaoke）不在模型資料夾：顯示卡上 `auto` 品質會改用標準模型（報告的條件會寫）。要量高品質的效能，先讓練唱台在背景下載好，再複製進 `tests/private/models/uvr`。
+
+**錄製順序**（repo 根目錄，PowerShell）
+```powershell
+$py = "$env:LOCALAPPDATA\LeihuLiantai\python\python.exe"; $env:PYTHONUTF8 = "1"
+```
+1. 筆電自己的 CPU 基準（和顯示卡比用；CPU 數字不能和開發機比）：
+   `& $py tests/numeric/baseline.py v2.3.2 --label=laptop-3060-cpu --device=cpu`、
+   `& $py tests/perf/baseline.py v2.3.2 --label=laptop-3060-cpu --device=cpu`
+2. 顯示卡的固定條件下限（數值基準在顯示卡上要用它判斷穩定性）：
+   `& $py tests/numeric/similarity.py v2.3.2 --label=laptop-3060-gpu --fixed --runs=3`
+3. 顯示卡數值基準：`& $py tests/numeric/baseline.py v2.3.2 --label=laptop-3060-gpu --runs=3`
+4. 顯示卡平常條件的相似度（第二階段門檻）：`& $py tests/numeric/similarity.py v2.3.2 --label=laptop-3060-gpu --runs=3`
+5. 顯示卡效能：`& $py tests/perf/baseline.py v2.3.2 --label=laptop-3060-gpu --runs=3`
+有真實歌曲時，數值基準加 `--songs`，標籤加 `-songs`（不要蓋掉只用合成素材的摘要）。
+
+**每份報告要看的**
+- 「異常」是「無」。有「could not activate requested provider」「Falling back to」「改用 CPU」「改在主程式裡執行」「改用標準模型」，表示顯示卡路徑沒有完整生效。
+- 「實際使用的裝置與模型」：每一步的「實際=」是不是 `cuda`（MDX 的 ONNX session、torchcrepe full、Whisper）。
+- 數值基準的「穩定性判斷」寫的是和相似度下限比；下限不能用時會寫原因（例如條件、套件、模型、歌曲不同）。
+- 效能報告的顯示卡記憶體欄位有數字（要有 nvidia-smi）。
+
+**帶回來的東西**：只有 `tests/numeric/baselines/`、`tests/perf/baselines/` 裡標籤是 `laptop-3060-*` 的摘要要 commit；報告和原始輸出留在筆電的 `tests/private/`。
 
 ## 4. 要先決定的事
 - 舊分支要留著（唯讀）還是封存成 tag，`claude/original-refactor-behavior-comparison-d469de` 也一樣。在搬完之前不要刪。

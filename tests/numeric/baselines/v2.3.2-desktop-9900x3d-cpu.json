@@ -1,7 +1,7 @@
 {
  "version": "v2.3.2",
  "label": "desktop-9900x3d-cpu",
- "tool_commit": "33bca48",
+ "tool_commit": "fe9431f",
  "machine": {
   "os": "Windows-10-10.0.26200-SP0",
   "cpu": "AMD Ryzen 9 9900X3D 12-Core Processor",
@@ -31,8 +31,10 @@
   }
  },
  "conditions": [
+  "顯示卡子程式裡裝了 child_hook（記錄實際裝置）：ONNX session 的 run() 多包一層、每次呼叫後讀一次 get_providers()，在計時範圍內；參數與回傳值不變",
   "OMP_NUM_THREADS、MKL_NUM_THREADS＝1（主程式與子程式）；處理時間不是效能基準",
   "torchcrepe 隨機抖動關掉（主程式與子程式）",
+  "CTranslate2 亂數種子固定為 0（主程式與子程式；Whisper 溫度取樣重試時才會用到）",
   "pipeline.search_lyrics_later：不搜尋線上歌詞（要連網，和推論無關）",
   "pipeline._running_apps：直播軟體偵測固定回傳沒有",
   "pipeline._sample_gpu_load：不跑 nvidia-smi（顯示卡被其他程式佔用時結果會不同）",
@@ -70,32 +72,33 @@
   "whisper/models--mobiuslabsgmbh--faster-whisper-large-v3-turbo/trees/0a363e9161cbc7ed1431c9597a8ceaf0c4f78fcf.json": "7d08abef5876605d66d3fc4f95b3bb53a0a73aca8b03faa15c57a9282275e988"
  },
  "problems": [],
+ "on_gpu": false,
  "exact": {
   "2": [
    {
     "item": "songsing01/back.flac",
-    "value": "每個取樣都相同",
+    "value": "解碼後每個取樣逐位元相同",
     "limit": "完全相同",
     "ok": true,
     "num": null
    },
    {
     "item": "songsing01/export.wav",
-    "value": "每個取樣都相同",
+    "value": "解碼後每個取樣逐位元相同",
     "limit": "完全相同",
     "ok": true,
     "num": null
    },
    {
     "item": "songsing01/inst.flac",
-    "value": "每個取樣都相同",
+    "value": "解碼後每個取樣逐位元相同",
     "limit": "完全相同",
     "ok": true,
     "num": null
    },
    {
     "item": "songsing01/lead.flac",
-    "value": "每個取樣都相同",
+    "value": "解碼後每個取樣逐位元相同",
     "limit": "完全相同",
     "ok": true,
     "num": null
@@ -109,7 +112,7 @@
    },
    {
     "item": "songsing01/meta.json",
-    "value": "相同（不比 combo_lufs_sig）",
+    "value": "相同（combo_lufs_sig 只比欄位與格式）",
     "limit": "完全相同",
     "ok": true,
     "num": null
@@ -130,21 +133,21 @@
    },
    {
     "item": "songspeech01/back.flac",
-    "value": "每個取樣都相同",
+    "value": "解碼後每個取樣逐位元相同",
     "limit": "完全相同",
     "ok": true,
     "num": null
    },
    {
     "item": "songspeech01/inst.flac",
-    "value": "每個取樣都相同",
+    "value": "解碼後每個取樣逐位元相同",
     "limit": "完全相同",
     "ok": true,
     "num": null
    },
    {
     "item": "songspeech01/lead.flac",
-    "value": "每個取樣都相同",
+    "value": "解碼後每個取樣逐位元相同",
     "limit": "完全相同",
     "ok": true,
     "num": null
@@ -158,7 +161,107 @@
    },
    {
     "item": "songspeech01/meta.json",
-    "value": "相同（不比 combo_lufs_sig）",
+    "value": "相同（combo_lufs_sig 只比欄位與格式）",
+    "limit": "完全相同",
+    "ok": true,
+    "num": null
+   },
+   {
+    "item": "songspeech01/pitch.json",
+    "value": "相同",
+    "limit": "完全相同",
+    "ok": true,
+    "num": null
+   }
+  ],
+  "3": [
+   {
+    "item": "songsing01/back.flac",
+    "value": "解碼後每個取樣逐位元相同",
+    "limit": "完全相同",
+    "ok": true,
+    "num": null
+   },
+   {
+    "item": "songsing01/export.wav",
+    "value": "解碼後每個取樣逐位元相同",
+    "limit": "完全相同",
+    "ok": true,
+    "num": null
+   },
+   {
+    "item": "songsing01/inst.flac",
+    "value": "解碼後每個取樣逐位元相同",
+    "limit": "完全相同",
+    "ok": true,
+    "num": null
+   },
+   {
+    "item": "songsing01/lead.flac",
+    "value": "解碼後每個取樣逐位元相同",
+    "limit": "完全相同",
+    "ok": true,
+    "num": null
+   },
+   {
+    "item": "songsing01/lyrics_auto.lrc",
+    "value": "位元組相同",
+    "limit": "完全相同",
+    "ok": true,
+    "num": null
+   },
+   {
+    "item": "songsing01/meta.json",
+    "value": "相同（combo_lufs_sig 只比欄位與格式）",
+    "limit": "完全相同",
+    "ok": true,
+    "num": null
+   },
+   {
+    "item": "songsing01/pitch.json",
+    "value": "相同",
+    "limit": "完全相同",
+    "ok": true,
+    "num": null
+   },
+   {
+    "item": "songsing01/take_take01.json",
+    "value": "相同",
+    "limit": "完全相同",
+    "ok": true,
+    "num": null
+   },
+   {
+    "item": "songspeech01/back.flac",
+    "value": "解碼後每個取樣逐位元相同",
+    "limit": "完全相同",
+    "ok": true,
+    "num": null
+   },
+   {
+    "item": "songspeech01/inst.flac",
+    "value": "解碼後每個取樣逐位元相同",
+    "limit": "完全相同",
+    "ok": true,
+    "num": null
+   },
+   {
+    "item": "songspeech01/lead.flac",
+    "value": "解碼後每個取樣逐位元相同",
+    "limit": "完全相同",
+    "ok": true,
+    "num": null
+   },
+   {
+    "item": "songspeech01/lyrics_auto.lrc",
+    "value": "位元組相同",
+    "limit": "完全相同",
+    "ok": true,
+    "num": null
+   },
+   {
+    "item": "songspeech01/meta.json",
+    "value": "相同（combo_lufs_sig 只比欄位與格式）",
     "limit": "完全相同",
     "ok": true,
     "num": null
@@ -199,7 +302,7 @@
    "value": "0.01 vs 0.01",
    "limit": "相同",
    "ok": true,
-   "num": null
+   "num": 0.0
   },
   {
    "item": "songsing01 有聲判斷一致率",
@@ -219,6 +322,13 @@
    "item": "songsing01 音符數",
    "value": "25 vs 25",
    "limit": "差 <= max(1, 2%)",
+   "ok": true,
+   "num": 0.0
+  },
+  {
+   "item": "songsing01 沒有配對到的音符",
+   "value": "A 多 0 個、B 多 0 個",
+   "limit": "各 <= max(1, 2%)",
    "ok": true,
    "num": 0.0
   },
@@ -276,7 +386,7 @@
    "value": "0.01 vs 0.01",
    "limit": "相同",
    "ok": true,
-   "num": null
+   "num": 0.0
   },
   {
    "item": "songspeech01 有聲判斷一致率",
@@ -296,6 +406,13 @@
    "item": "songspeech01 音符數",
    "value": "41 vs 41",
    "limit": "差 <= max(1, 2%)",
+   "ok": true,
+   "num": 0.0
+  },
+  {
+   "item": "songspeech01 沒有配對到的音符",
+   "value": "A 多 0 個、B 多 0 個",
+   "limit": "各 <= max(1, 2%)",
    "ok": true,
    "num": 0.0
   },
@@ -356,6 +473,13 @@
    "num": 0.0
   },
   {
+   "item": "評分影格數差",
+   "value": "0（2508 vs 2508）",
+   "limit": "<= 2%",
+   "ok": true,
+   "num": 0.0
+  },
+  {
    "item": "評分 key_hint.shift",
    "value": "0 vs 0",
    "limit": "相同",
@@ -401,6 +525,34 @@
    "item": "評分 offset 差",
    "value": "0.000 秒（-0.21 vs -0.21）",
    "limit": "<= 0.02 秒",
+   "ok": true,
+   "num": 0.0
+  },
+  {
+   "item": "評分錄音音高 hop",
+   "value": "0.01 vs 0.01",
+   "limit": "相同",
+   "ok": true,
+   "num": 0.0
+  },
+  {
+   "item": "評分錄音音高 t0",
+   "value": "-0.21 vs -0.21",
+   "limit": "差 <= 0.02 秒",
+   "ok": true,
+   "num": 0.0
+  },
+  {
+   "item": "評分錄音有聲判斷一致率",
+   "value": "1.0000",
+   "limit": ">= 0.98",
+   "ok": true,
+   "num": 1.0
+  },
+  {
+   "item": "評分錄音音高差中位數",
+   "value": "0.00 cents",
+   "limit": "< 10 cents",
    "ok": true,
    "num": 0.0
   },
@@ -500,14 +652,14 @@
    },
    {
     "item": "songsing01 處理時間（不是效能基準；執行緒數見執行條件）",
-    "value": "process 54.8 秒、score 5.1 秒",
+    "value": "process 54.8 秒、score 5.0 秒",
     "limit": "",
     "ok": null,
     "num": null
    },
    {
     "item": "songspeech01 處理時間（不是效能基準；執行緒數見執行條件）",
-    "value": "process 43.5 秒",
+    "value": "process 42.5 秒",
     "limit": "",
     "ok": null,
     "num": null
@@ -593,14 +745,107 @@
    },
    {
     "item": "songsing01 處理時間（不是效能基準；執行緒數見執行條件）",
-    "value": "process 53.9 秒、score 5.1 秒",
+    "value": "process 52.2 秒、score 5.0 秒",
     "limit": "",
     "ok": null,
     "num": null
    },
    {
     "item": "songspeech01 處理時間（不是效能基準；執行緒數見執行條件）",
-    "value": "process 47.4 秒",
+    "value": "process 41.5 秒",
+    "limit": "",
+    "ok": null,
+    "num": null
+   }
+  ],
+  "3": [
+   {
+    "item": "sing lead 和正確音軌的 SDR",
+    "value": "11.5 dB",
+    "limit": "",
+    "ok": null,
+    "num": null
+   },
+   {
+    "item": "sing inst 和正確音軌的 SDR",
+    "value": "8.1 dB",
+    "limit": "",
+    "ok": null,
+    "num": null
+   },
+   {
+    "item": "sing back（應該是空的）RMS",
+    "value": "-32.8 dBFS",
+    "limit": "",
+    "ok": null,
+    "num": null
+   },
+   {
+    "item": "sing 有聲影格找到的比例",
+    "value": "1.0000",
+    "limit": "",
+    "ok": null,
+    "num": null
+   },
+   {
+    "item": "sing 音和音之間判為有聲的比例（程式會把有聲段落往前後延伸最多 0.25 秒，空隙正好 0.25 秒）",
+    "value": "0.3815",
+    "limit": "",
+    "ok": null,
+    "num": null
+   },
+   {
+    "item": "sing 音高誤差中位數",
+    "value": "6.0 cents",
+    "limit": "",
+    "ok": null,
+    "num": null
+   },
+   {
+    "item": "sing 音符數（旋律 20 個音）",
+    "value": 25,
+    "limit": "",
+    "ok": null,
+    "num": null
+   },
+   {
+    "item": "評分狀態／準確率",
+    "value": "done／1.0",
+    "limit": "",
+    "ok": null,
+    "num": null
+   },
+   {
+    "item": "評分偵測到的偏差（答案 +30 cents）",
+    "value": "21.1 cents",
+    "limit": "",
+    "ok": null,
+    "num": null
+   },
+   {
+    "item": "評分偵測到的時間差 offset（錄音晚 0.2 秒；正負號依程式定義）",
+    "value": "-0.21 秒",
+    "limit": "",
+    "ok": null,
+    "num": null
+   },
+   {
+    "item": "speech 歌詞和原句的字元錯誤率",
+    "value": "0.000（辨識 53 字／原句 53 字）",
+    "limit": "",
+    "ok": null,
+    "num": null
+   },
+   {
+    "item": "songsing01 處理時間（不是效能基準；執行緒數見執行條件）",
+    "value": "process 50.7 秒、score 5.0 秒",
+    "limit": "",
+    "ok": null,
+    "num": null
+   },
+   {
+    "item": "songspeech01 處理時間（不是效能基準；執行緒數見執行條件）",
+    "value": "process 42.2 秒",
     "limit": "",
     "ok": null,
     "num": null
@@ -608,7 +853,8 @@
   ]
  },
  "wall_seconds": {
-  "1": 107.9,
-  "2": 112.4
+  "1": 108.5,
+  "2": 104.4,
+  "3": 103.6
  }
 }

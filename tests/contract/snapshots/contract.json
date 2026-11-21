@@ -10,6 +10,7 @@
    "channels": 2,
    "format": "FLAC",
    "frames": 88200,
+   "pcm_sha256": "da86fe53dc0384ae",
    "peak_db": -14.0,
    "rms_db": -17.0,
    "rms_db_16": [
@@ -59,6 +60,7 @@
    "channels": 2,
    "format": "WAV",
    "frames": 88200,
+   "pcm_sha256": "e3320158637ce928",
    "peak_db": -14.0,
    "rms_db": -17.0,
    "rms_db_16": [
@@ -2689,6 +2691,7 @@
      "channels": 1,
      "format": "WAV",
      "frames": 48000,
+     "pcm_sha256": "53e996b5d780c1e4",
      "peak_db": -20.0,
      "rms_db": -23.0,
      "rms_db_16": [
@@ -3688,6 +3691,7 @@
    "channels": 1,
    "format": "WAV",
    "frames": 88200,
+   "pcm_sha256": "495042f0d437d479",
    "peak_db": -14.0,
    "rms_db": -17.0,
    "rms_db_16": [
@@ -3845,6 +3849,7 @@
      "channels": 1,
      "format": "WAV",
      "frames": 88200,
+     "pcm_sha256": "d4687b41650d38d4",
      "peak_db": -1.9,
      "rms_db": -10.8,
      "rms_db_16": [
@@ -3884,6 +3889,7 @@
      "channels": 2,
      "format": "WAV",
      "frames": 88200,
+     "pcm_sha256": "e3e0c66503063349",
      "peak_db": -9.6,
      "rms_db": -16.9,
      "rms_db_16": [
@@ -3917,6 +3923,7 @@
    "channels": 2,
    "format": "WAV",
    "frames": 88200,
+   "pcm_sha256": "e3e0c66503063349",
    "peak_db": -9.6,
    "rms_db": -16.9,
    "rms_db_16": [
@@ -3978,6 +3985,7 @@
      "channels": 1,
      "format": "WAV",
      "frames": 48000,
+     "pcm_sha256": "53e996b5d780c1e4",
      "peak_db": -20.0,
      "rms_db": -23.0,
      "rms_db_16": [
