@@ -355,14 +355,19 @@ def test_o14_install_ps1_download_flow(tmp_path, fn, url, sha):
         "function Get-File($u, $out) { $script:n++; [IO.File]::WriteAllBytes($out, [Convert]::FromBase64String($env:PAYLOAD)) }",
         func,
         '$out = Join-Path $env:DEST "file.bin"',
-        f'try {{ {fn} $out; "ok $script:n $(Test-Path -LiteralPath $out)" }} catch {{ "fail $script:n $(Test-Path -LiteralPath $out)" }}',
+        f'try {{ {fn} $out; "ok $script:n $(Test-Path -LiteralPath $out)" }} '
+        f'catch {{ "fail $script:n $(Test-Path -LiteralPath $out) | $($_.Exception.Message)" }}',
     ]), "utf-8-sig")
 
     def run(payload: bytes) -> str:
-        env = {**os.environ, "PAYLOAD": base64.b64encode(payload).decode(), "DEST": str(dest)}
+        # 不帶 PSModulePath：在 PowerShell 7 裡跑 pytest 時（GitHub Actions 的預設），它指向 7 的模組，
+        # Windows PowerShell 5.1 會載到不相容的 Microsoft.PowerShell.Utility，Get-FileHash 就失敗
+        env = {k: v for k, v in os.environ.items() if k.upper() != "PSMODULEPATH"}
+        env.update(PAYLOAD=base64.b64encode(payload).decode(), DEST=str(dest))
         r = subprocess.run(["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", str(driver)],
                            capture_output=True, text=True, timeout=120, env=env)
-        return r.stdout.strip().splitlines()[-1]
+        return r.stdout.strip().splitlines()[-1] + (f" ｜stderr：{r.stderr.strip()[-300:]}" if r.stderr.strip() else "")
 
     assert run(good) == "ok 1 True"
-    assert run(b"tampered") == "fail 2 False"  # 重下一次，還是不符就停止，檔案刪掉（不會被執行）
+    got = run(b"tampered")
+    assert got.startswith("fail 2 False | "), got  # 重下一次，還是不符就停止，檔案刪掉（不會被執行）
