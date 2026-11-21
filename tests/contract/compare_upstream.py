@@ -46,13 +46,35 @@ BASE = "v2.3.2"  # 第一階段的基準（refactor-port-plan.md 3.8）
 # "+ /路徑=值"（基準沒有、目前有）、"- /路徑=值"（基準有、目前沒有）、"~ /路徑: 基準 -> 目前"
 # 從空的開始：舊分支的 S15、D1、R2、D2/D4 是 2.0.0 重構版的差異，D1 還用案例名稱字首整個放行，留著會蓋掉真的差異。
 # 每加一條都要寫明問題編號和原因；判斷式只放行那個差異本身，不要用案例名稱整個放行。
-RULES: list[tuple[str, str, object]] = []
+RULES: list[tuple[str, str, object]] = [
+    (
+        "F1",
+        "fork：GitHub 專案與更新連結改指向 lydek/Leihu-singsing，開啟網址的白名單不再有上游專案網址"
+        "（docs/refactor-port-plan.md 3.15）",
+        lambda c, d: c == "open_url",
+    ),
+]
 
 # 刻意不移植的上游名稱 → 原因（refactor 從 v2.3.2 開始，目前沒有）
 NOT_PORTED: dict[str, str] = {}
 # 目前這一邊對前端、安裝檔的改動：(檔案, 改動行要符合的 regex)；和上游比，其他改動行都算漏移
 FRONT = ["static", "hotkeys.py", "VERSION", "installer/leihu.nsi"]
-OWN_CHANGES: list[tuple[str, str]] = []
+OWN_CHANGES: list[tuple[str, str]] = [
+    # fork 版號 2.3.2.1（3.15）
+    ("VERSION", r"-2\.3\.2"),
+    ("VERSION", r"\+2\.3\.2\.1"),
+    ("static/help.html", r"[-+].*2\.3\.2.*"),  # 標題、版號、安裝檔名
+    ("static/index.html", r"[-+].*id=\"ver\">2\.3\.2(\.1)?<.*"),
+    # 更新提示改連 fork 的 release（3.15）
+    ("static/index.html", r"[-+].*href=\"https://github\.com/(LeihuTW|lydek)/Leihu-singsing/releases/latest\".*"),
+    # 安裝檔：版號與測試版開關（3.14、3.15）
+    ("installer/leihu.nsi", r"[-+]\s*!define (APPNAME|VERSION|REGKEY|INSTNAME|OUTNAME) .*"),
+    ("installer/leihu.nsi", r"\+!(ifdef TEST_BUILD|else|endif)"),
+    ("installer/leihu.nsi", r"\+\s*;.*"),
+    ("installer/leihu.nsi", r"[-+](OutFile|InstallDir|VIProductVersion) .*"),
+    ("installer/leihu.nsi", r"\+\s*File(Open|Write|Close) \$0.*"),
+    ("installer/leihu.nsi", r"\+\s*Delete \"\$INSTDIR\\\.test-install\""),
+]
 
 # 伺服器 log 裡代表「這次執行條件和平常不同」的訊息：一律列進報告，不然結果會被誤解
 LOG_ALERTS = [

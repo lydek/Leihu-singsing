@@ -35,7 +35,7 @@ def test_default_identity_matches_upstream():
     d = _defines(test=False)
     assert d["APPNAME"] == "雷虎練唱台"
     assert d["REGKEY"] == r"Software\Microsoft\Windows\CurrentVersion\Uninstall\LeihuLiantai"
-    assert d["OUTNAME"] == "雷虎練唱台2.3.2.exe"
+    assert d["OUTNAME"] == "雷虎練唱台2.3.2.1.exe"
     assert 'InstallDir "$LOCALAPPDATA\\${INSTNAME}"' in NSI and d["INSTNAME"] == "LeihuLiantai"
 
 

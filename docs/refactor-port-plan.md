@@ -434,6 +434,16 @@ Codex 第 7 次審查後補的（同類問題和繞過路徑）：
 - 測試：`tests/test_installer_identity.py` 讀 `leihu.nsi` 的定義確認預設值不變、測試版每一項都不同，以及 `.test-install` 關掉程式內更新。
 - 沒驗證：這台電腦沒有 makensis，兩種安裝檔都沒有實際建出來、安裝過。
 
+### 3.15 fork 的版號與更新來源（2026-11-22 決定）
+這是使用者決定的刻意差異（不是 3.1 的行為等價）：fork 自己發版，程式內更新改查 fork。
+- 版號：上游版本加第 4 段 fork 序號，目前 `2.3.2.1`（之後跟上游 2.4.0 就是 `2.4.0.1`）。改了 `VERSION`、`app.VERSION`、`leihu.nsi` 的 `VERSION`／`VIProductVersion`、`pipeline.USER_AGENT`、說明頁與標題列的初始值。
+- `app._ver` 改成看 4 段數字：只看前 3 段的話，fork 的新版（`2.3.2.2`）會被當成和 `2.3.2` 一樣、不提示更新。
+- 更新來源與連結改成 `lydek/Leihu-singsing`：查最新版本的 API、`ASSET_PREFIX`（只接受 fork 的安裝檔）、`RELEASES_URL`、開啟網址白名單裡的專案網址、前端的更新提示連結。
+- 保留原專案網址：`LICENSE.md`、`installer/license.txt`、說明頁的授權說明。授權（附加許可第 2 點）要求散布修改版時註明原作來源並保留授權檔。
+- 發版時：tag 用 `v2.3.2.1` 這種格式；安裝檔名稱要以 `-Setup.exe` 結尾（例如 `LeihuLiantai-2.3.2.1-Setup.exe`，`build.sh` 產生的 `雷虎練唱台2.3.2.1.exe` 上傳時改名）；GitHub 會自動提供 SHA-256，程式內更新靠它核對。
+- 契約快照：`open_url` 案例送的是上游專案網址，現在不在白名單裡（200 → 400），登記成 `RULES` 的 `F1` 後用 `--record` 重錄。前端與安裝檔的改動登記在 `OWN_CHANGES`（`--leak` 檢查為空）。
+- 測試：`tests/test_fork_update.py`（版號、4 段比較、只查 fork 的 release、不接受上游的安裝檔、白名單、授權檔仍指向原專案）。
+
 ## 4. 要先決定的事
 - 舊分支要留著（唯讀）還是封存成 tag，`claude/original-refactor-behavior-comparison-d469de` 也一樣。在搬完之前不要刪。
 - 測試歌曲的清單和授權（3.8）。
