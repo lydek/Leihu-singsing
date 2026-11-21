@@ -65,6 +65,7 @@ LOG_ALERTS = [
     ("逾時", "逾時"),
     ("out of memory", "記憶體不足"),
     ("暫存資料夾刪不掉", "測試工具的暫存資料夾沒有刪乾淨"),
+    ("上一次逾時留下的行程可能還在跑", "上一次逾時的行程可能還在，這次沒有開始量測"),
     ("could not activate requested provider", "ONNX 沒有啟用要求的執行裝置（例如顯示卡），改用別的"),
     ("Falling back to", "onnxruntime 執行失敗，改用別的執行裝置重試"),
     ("執行中改用", "ONNX session 執行中改用別的執行裝置"),

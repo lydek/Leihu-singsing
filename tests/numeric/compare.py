@@ -9,9 +9,11 @@ quality(d)：一份輸出和標準答案的差距，只記數值、不判斷通�
   語音句子、伴奏都是已知的（make_inputs.py），所以 CPU 和顯示卡的結果可以各自和答案比，不必互相比。
   （CPU 的音高分析用 torchcrepe tiny、顯示卡用 full，兩台電腦的數值本來就不會逐值相同。）
 
-用法：<python> tests/numeric/compare.py <輸出 A> <輸出 B> [--similar]
+用法：<python> tests/numeric/compare.py <輸出 A> <輸出 B> [--similar --floor=<上游的相似度摘要>]
   預設先逐檔核對（exact）再印差距表（pair），兩者有一項不通過結束代碼就是 1；
-  --similar 只看差距表（顯示卡、第二階段用）。
+  --similar 不要求完全相同（顯示卡、第二階段用），一定要給 --floor：上游在同一台電腦、同樣條件錄的
+  similarity 摘要（固定條件用 -similarity-fixed.json、第二階段用 -similarity.json）；每項不能比上游自己跑多次的
+  最差值還差，固定門檻只印出來參考。A 是上游的輸出（核對下限來源用它的 run.json），B 是要比的版本。
 """
 
 from __future__ import annotations
@@ -536,9 +538,28 @@ def table(rows: list[dict], with_limit: bool = True) -> list[str]:
 if __name__ == "__main__":
     sys.stdout.reconfigure(encoding="utf-8")
     a, b = Path(sys.argv[1]), Path(sys.argv[2])
-    ex = [] if "--similar" in sys.argv else exact(a, b)
+    opt = dict(x[2:].split("=", 1) if "=" in x else (x[2:], "1") for x in sys.argv[3:] if x.startswith("--"))
+    bad = [f"{w}：{m}" for w, d in (("A", a), ("B", b)) for m in required(d)]
+    if bad:  # 輸出不完整或格式不對：不比，直接失敗
+        print("## 輸出不完整\n\n" + "\n".join(f"- {m}" for m in bad))
+        sys.exit(1)
+    if "similar" in opt and "floor" not in opt:
+        print("--similar 要給 --floor=<上游的相似度摘要>：沒有下限就沒辦法判斷，固定門檻只供參考")
+        sys.exit(2)
+    ex = [] if "similar" in opt else exact(a, b)
     if ex:
         print("## 逐檔核對\n\n" + "\n".join(table(ex)) + "\n\n## 差距\n")
     rs = pair(a, b)
     print("\n".join(table(rs)))
-    sys.exit(0 if all(r["ok"] for r in ex + rs) else 1)
+    if "similar" not in opt:
+        sys.exit(0 if all(r["ok"] for r in ex + rs) else 1)
+    from baseline import floor_check, machine
+
+    floor = Path(opt["floor"])
+    rj = json.loads((a / "run.json").read_text("utf-8"))
+    mode = json.loads(floor.read_text("utf-8")).get("mode", "normal") if floor.exists() else "fixed"
+    expect = {"machine": machine(), "environment": rj.get("environment"), "models": rj.get("models"),
+              "inputs": rj.get("inputs"), "songs": rj.get("songs")}
+    msgs = floor_check(rs, floor, expect, mode=mode, quality=None)
+    print("\n## 和上游的相似度下限比\n\n" + ("\n".join(f"- {m}" for m in msgs) or "全部在下限以內"))
+    sys.exit(1 if msgs else 0)
