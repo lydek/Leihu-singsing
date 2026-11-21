@@ -23,11 +23,24 @@ $PyZipSha = "009d6bf7e3b2ddca3d784fa09f90fe54336d5b60f0e0f305c37f400bf83cfd3b"
 function Get-Python($out) {
   for ($i = 1; $i -le 2; $i++) {
     Get-File $PyZipUrl $out
-    if ((Get-FileHash -Path $out -Algorithm SHA256).Hash -eq $PyZipSha) { return }
+    if ((Get-FileHash -LiteralPath $out -Algorithm SHA256).Hash -eq $PyZipSha) { return }
     Say "  Python 安裝檔檢查碼不符（下載不完整或被換掉），重新下載…"
-    Remove-Item $out -Force -ErrorAction SilentlyContinue
+    Remove-Item -LiteralPath $out -Force -ErrorAction SilentlyContinue
   }
   throw "Python 安裝檔檢查碼不符，請確認網路連線後重新執行安裝程式"
+}
+
+# get-pip.py 會被直接執行：釘住 pypa/get-pip 的 commit（pip 26.3，2026-11-21 下載核對過），核對 SHA-256 才執行
+$GetPipUrl = "https://raw.githubusercontent.com/pypa/get-pip/c7135ee10cd1b1fcb8fbf63d5d0004885cba7aa4/public/get-pip.py"
+$GetPipSha = "356e0d0de21cdc348c3394084d90939b85e4246c4d14c76aee6ca4f46646ea98"
+function Get-GetPip($out) {
+  for ($i = 1; $i -le 2; $i++) {
+    Get-File $GetPipUrl $out
+    if ((Get-FileHash -LiteralPath $out -Algorithm SHA256).Hash -eq $GetPipSha) { return }
+    Say "  get-pip.py 檢查碼不符（下載不完整或被換掉），重新下載…"
+    Remove-Item -LiteralPath $out -Force -ErrorAction SilentlyContinue
+  }
+  throw "get-pip.py 檢查碼不符，請確認網路連線後重新執行安裝程式"
 }
 
 try {
@@ -71,7 +84,7 @@ try {
   if (-not $pipOk) {
     Say "安裝 pip…"
     $gp = Join-Path $AppDir "python\get-pip.py"
-    Get-File "https://bootstrap.pypa.io/get-pip.py" $gp
+    Get-GetPip $gp
     & $py $gp --no-warn-script-location 2>&1 | ForEach-Object { "$_" } | Add-Content -Path $log -Encoding UTF8
     if ($LASTEXITCODE -ne 0) { throw "pip 安裝失敗" }
   }

@@ -132,7 +132,31 @@ def load_config() -> dict:
     return cfg
 
 
+def keep_corrupt(path: Path, valid) -> None:
+    """要覆寫 path 之前呼叫（防止資料遺失）：內容壞掉時改名成 <檔名>.<時間>.bad 保留；
+    檔案在但讀不到（例如被其他程式鎖住）時丟 UserError，不覆寫。不存在就什麼都不做。"""
+    try:
+        text = path.read_text("utf-8")
+    except FileNotFoundError:
+        return
+    except OSError as e:
+        raise UserError(f"{path.name} 讀不到，這次沒有存檔（{e}）") from e
+    try:
+        ok = valid(json.loads(text))
+    except ValueError:
+        ok = False
+    if not ok:
+        bad = path.with_name(f"{path.name}.{time.strftime('%Y%m%d-%H%M%S')}-{uuid.uuid4().hex[:6]}.bad")
+        try:
+            path.replace(bad)
+        except OSError as e:
+            raise UserError(f"{path.name} 內容壞掉、無法改名保留，這次沒有存檔（{e}）") from e
+        log_error(f"{path.name} 內容壞掉，已改名保留成 {bad.name}", ValueError(text[:200]))
+
+
 def save_config(cfg: dict) -> None:
+    # 壞掉的 config.json 讀起來是預設值，直接存會蓋掉原本的金鑰與設定：先改名保留
+    keep_corrupt(CONFIG_PATH, lambda d: isinstance(d, dict))
     atomic_write_text(CONFIG_PATH, json.dumps(cfg, ensure_ascii=False, indent=2))
 
 
@@ -1480,9 +1504,12 @@ def hq_ready() -> bool:
 
 def _files_ready(files: dict) -> bool:
     uvr = MODELS / "uvr"
-    for name, (size, _, _) in files.items():
+    for name, (size, sha, _) in files.items():
         p = uvr / name
         if not p.exists() or (size and p.stat().st_size != size) or p.stat().st_size == 0:
+            return False
+        if sha and size and size < (1 << 20) and _sha256(p) != sha:
+            p.unlink(missing_ok=True)   # O12：小的設定檔也核對內容（舊版沒核對就下載過）；刪掉讓下載重抓
             return False
     return True
 
@@ -1666,16 +1693,15 @@ def ensure_model_data() -> None:
     uvr = MODELS / "uvr"
     for name, (size, sha, urls) in MODEL_DATA.items():
         p = uvr / name
-        if p.exists():
-            try:
-                json.loads(p.read_text("utf-8"))
-                continue
-            except Exception:
-                p.unlink(missing_ok=True)
+        if p.exists() and _sha256(p) == sha:
+            continue
+        p.unlink(missing_ok=True)   # 舊版從 main 抓的、下載到一半的、內容不符的：都改抓固定版本（O12）
         try:
             fetch_file(urls, p, size, sha)
         except Exception as e:
-            log_error(f"model data {name}", e)   # 讓 audio-separator 自己再試一次
+            log_error(f"model data {name}", e)
+            # 不交給 audio-separator 自己下載：它從 main 抓、不核對檢查碼（O12）
+            raise UserError(f"下載分離模型的設定檔失敗（{name}），請確認網路連線後再試") from e
 
 
 _model_locks: dict = {}

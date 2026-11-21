@@ -1573,6 +1573,12 @@ def _setlist_read() -> dict:
     return {"started": None, "items": []}
 
 
+def _setlist_save_current(d: dict) -> None:
+    # 壞掉的 setlist.json 讀起來是空歌單，直接寫會蓋掉原本的場次：先改名保留（防止資料遺失）
+    P.keep_corrupt(SETLIST_PATH, lambda x: isinstance(x, dict) and isinstance(x.get("items"), list))
+    P.atomic_write_text(SETLIST_PATH, json.dumps(d, ensure_ascii=False))
+
+
 def _setlist_archive(d: dict) -> None:
     """把一場歌單存進 setlists\（檔名是開始時間），之後還能回顧、匯出。"""
     if not d.get("items"):
@@ -1606,7 +1612,7 @@ def _setlist_write(name: str | None, d: dict) -> None:
         _setlist_load(name)   # 檢查檔名
         P.atomic_write_text(SETLIST_DIR / name, json.dumps(d, ensure_ascii=False))
     else:
-        P.atomic_write_text(SETLIST_PATH, json.dumps(d, ensure_ascii=False))
+        _setlist_save_current(d)
 
 
 @app.post("/api/setlist/remove")
@@ -1639,7 +1645,7 @@ def setlist_delete():
             _setlist_load(name)
             (SETLIST_DIR / name).unlink(missing_ok=True)
         else:
-            P.atomic_write_text(SETLIST_PATH, json.dumps({"started": None, "items": []}))
+            _setlist_save_current({"started": None, "items": []})
     return jsonify(ok=True)
 
 
@@ -1737,7 +1743,7 @@ def setlist_add():
                     P.write_meta(sd, m)
             except Exception:
                 pass   # 歌曲已刪除或編號不對：只記在歌單裡
-        P.atomic_write_text(SETLIST_PATH, json.dumps(d, ensure_ascii=False))
+        _setlist_save_current(d)
     return jsonify(ok=True)
 
 
@@ -1745,7 +1751,7 @@ def setlist_add():
 def setlist_clear():
     with _SETLIST_LOCK:
         _setlist_archive(_setlist_read())   # 清空前先存起來，之後還能回顧
-        P.atomic_write_text(SETLIST_PATH, json.dumps({"started": None, "items": []}))
+        _setlist_save_current({"started": None, "items": []})
     return jsonify(ok=True)
 
 
