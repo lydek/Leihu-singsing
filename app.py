@@ -359,7 +359,7 @@ def sheet_template():
     out = P.downloads_dir() / P.APP_NAME / "歌單範本.csv"
     out.parent.mkdir(parents=True, exist_ok=True)
     shutil.copyfile(P.ROOT / "static" / "song-list-template.csv", out)
-    if sys.platform == "win32":
+    if sys.platform == "win32" and not P.spawned("reveal", str(out)):
         import subprocess
         subprocess.Popen(["explorer", "/select,", str(out)])
     return jsonify(path=str(out))
@@ -1516,7 +1516,7 @@ def upgrade_separation():
 def hotkeys_get():
     cfg = P.load_config()
     try:
-        status = json.loads((P.ROOT / "hotkeys_status.json").read_text("utf-8"))
+        status = json.loads((P.DATA / "hotkeys_status.json").read_text("utf-8"))
     except (OSError, ValueError):
         status = None   # 不是用桌面版開的（瀏覽器），或還沒註冊過
     return jsonify(actions=[{"id": a, "label": l, "default": d} for a, l, d in HK.ACTIONS],
@@ -1548,7 +1548,7 @@ def hotkeys_set():
 @app.post("/api/hotkeys/pause")
 def hotkeys_pause():
     """設定畫面錄新按鍵時，請桌面程式暫時放開全部快捷鍵（不然按下去會直接觸發，畫面收不到）。"""
-    f = P.ROOT / ".hotkeys_pause"
+    f = P.DATA / ".hotkeys_pause"
     if (request.get_json(force=True) or {}).get("on"):
         f.write_text("1", "utf-8")
     else:
@@ -1557,8 +1557,8 @@ def hotkeys_pause():
 
 
 # ---------------------------------------------------------------- 本場歌單（1.7）
-SETLIST_PATH = P.ROOT / "setlist.json"
-SETLIST_DIR = P.ROOT / "setlists"   # 2.3.0：過去場次的歌單（開始新的一場時把上一場存起來）
+SETLIST_PATH = P.DATA / "setlist.json"
+SETLIST_DIR = P.DATA / "setlists"   # 2.3.0：過去場次的歌單（開始新的一場時把上一場存起來）
 _SETLIST_LOCK = threading.Lock()
 SETLIST_GAP = 6 * 3600   # 距離上一首超過 6 小時就當成新的一場
 
@@ -1705,7 +1705,7 @@ def export_songlist():
 
 
 def _reveal(p: Path) -> None:
-    if sys.platform == "win32":
+    if sys.platform == "win32" and not P.spawned("reveal", str(p)):
         import subprocess
         subprocess.Popen(["explorer", "/select,", str(p)])
 
@@ -1757,7 +1757,9 @@ def open_overlay():
     import webbrowser
     if not re.fullmatch(r"[A-Za-z0-9=&%._-]*", q):
         raise P.UserError("網址格式不正確")
-    webbrowser.open(f"http://{HOST}:{PORT}/overlay?{q}")
+    url = f"http://{HOST}:{PORT}/overlay?{q}"
+    if not P.spawned("browser", url):
+        webbrowser.open(url)
     return jsonify(ok=True)
 
 
@@ -1785,15 +1787,17 @@ def open_app():
     url = f"http://{HOST}:{PORT}/"
     exe = _app_browser()
     if exe:
-        prof = P.ROOT / ".appwin"
+        prof = P.DATA / ".appwin"
         prof.mkdir(exist_ok=True)
-        subprocess.Popen([exe, f"--app={url}", f"--user-data-dir={prof}", "--window-size=1380,920",
-                          "--no-first-run", "--no-default-browser-check", "--disable-extensions", "--disable-sync",
-                          "--autoplay-policy=no-user-gesture-required"],
-                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        if not P.spawned("app-window", url):
+            subprocess.Popen([exe, f"--app={url}", f"--user-data-dir={prof}", "--window-size=1380,920",
+                              "--no-first-run", "--no-default-browser-check", "--disable-extensions",
+                              "--disable-sync", "--autoplay-policy=no-user-gesture-required"],
+                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     else:
         import webbrowser
-        webbrowser.open(url)
+        if not P.spawned("browser", url):
+            webbrowser.open(url)
     return jsonify(ok=True, app=bool(exe))
 
 
@@ -1873,7 +1877,8 @@ def open_url():
     if url not in EXTERNAL_URLS:
         raise P.UserError("不允許開啟這個網址")
     import webbrowser
-    webbrowser.open(url)
+    if not P.spawned("browser", url):
+        webbrowser.open(url)
     return jsonify(ok=True)
 
 
@@ -1885,7 +1890,9 @@ def reveal():
     if base not in path.parents or not path.exists():
         raise P.UserError("找不到這個檔案")
     import subprocess
-    if sys.platform == "win32":
+    if P.spawned("reveal", str(path)):
+        pass
+    elif sys.platform == "win32":
         subprocess.Popen(["explorer", "/select,", str(path)])
     elif sys.platform == "darwin":
         subprocess.Popen(["open", "-R", str(path)])
@@ -1925,7 +1932,7 @@ def remove_duet_leftovers() -> None:
     """1.7.0 測試版的「男女對唱」已經拿掉：清掉它留下的模型（約 530 MB）、每首歌的男聲／女聲軌與聲部標記。
     只需要做一次，做完留一個記號，之後啟動不用再掃整個歌曲庫。"""
     import shutil
-    flag = P.ROOT / ".duet_cleaned"
+    flag = P.DATA / ".duet_cleaned"
     if flag.exists():
         return
     for pat in ("model_chorus_bs_roformer_ep_267_sdr_24.1275.ckpt*", "config_chorus_male_female_bs_roformer.yaml*"):
@@ -2120,6 +2127,8 @@ def _download_and_install() -> None:
         # /S＝安靜模式（沿用已下載的套件與模型，只更新需要的部分）；/D 一定要放最後、不能加引號
         cmd = f'"{exe}" /S /D={P.ROOT}'
         flags = 0x00000008 | 0x00000200   # DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP：程式關閉時安裝檔不會跟著結束
+        if P.spawned("installer", cmd):
+            return
         try:
             subprocess.Popen(cmd, creationflags=flags | 0x01000000, close_fds=True)   # CREATE_BREAKAWAY_FROM_JOB
         except OSError:
@@ -2145,17 +2154,18 @@ def update_install():
 def main():
     P.LIB.mkdir(exist_ok=True)
     watch_parent()
-    resume_downloads()
-    threading.Thread(target=prefetcher, daemon=True, name="prefetch").start()
-    threading.Thread(target=loudness_backfill, daemon=True, name="loudness").start()
-    threading.Thread(target=live_light_upgrade, daemon=True, name="live-light").start()
-    threading.Thread(target=lead_fix_sweep, daemon=True, name="lead-fix").start()
-    threading.Thread(target=remove_duet_leftovers, daemon=True, name="cleanup").start()
-    threading.Thread(target=P.clear_false_recheck, daemon=True, name="recheck").start()
-    threading.Thread(target=check_update, daemon=True, name="update").start()
+    if not P.NO_BACKGROUND:
+        resume_downloads()
+        threading.Thread(target=prefetcher, daemon=True, name="prefetch").start()
+        threading.Thread(target=loudness_backfill, daemon=True, name="loudness").start()
+        threading.Thread(target=live_light_upgrade, daemon=True, name="live-light").start()
+        threading.Thread(target=lead_fix_sweep, daemon=True, name="lead-fix").start()
+        threading.Thread(target=remove_duet_leftovers, daemon=True, name="cleanup").start()
+        threading.Thread(target=P.clear_false_recheck, daemon=True, name="recheck").start()
+        threading.Thread(target=check_update, daemon=True, name="update").start()
     url = f"http://{HOST}:{PORT}"
     print(f"\n  {P.APP_NAME} {VERSION} 已啟動：{url}\n  關閉這個視窗就會結束程式。\n")
-    if "--no-browser" not in sys.argv:
+    if "--no-browser" not in sys.argv and not P.spawned("browser", url):
         threading.Timer(1.2, lambda: webbrowser.open(url)).start()
     app.run(host=HOST, port=PORT, debug=False, threaded=True)
 

@@ -154,8 +154,12 @@ class Api:
 
 # 全域快捷鍵（練唱台不在最前面也能用，Stream Deck／巨集鍵盤可以直接綁）。
 # 按鍵定義在 hotkeys.py；設定改了（config.json）或設定畫面正在錄新按鍵時，會自動重新註冊，不用重開
-HOTKEY_STATUS = ROOT / "hotkeys_status.json"
-HOTKEY_PAUSE = ROOT / ".hotkeys_pause"
+# S28：和 pipeline.DATA 同一個規則（伺服器的環境變數由這裡傳下去，兩邊一定對得上）
+if os.environ.get("LIANTAI_DATA"):   # 相對路徑先轉成絕對路徑寫回，伺服器（cwd 是 ROOT）繼承後才對得上
+    os.environ["LIANTAI_DATA"] = str(Path(os.environ["LIANTAI_DATA"]).resolve())
+DATA = Path(os.environ["LIANTAI_DATA"]) if os.environ.get("LIANTAI_DATA") else ROOT
+HOTKEY_STATUS = DATA / "hotkeys_status.json"
+HOTKEY_PAUSE = DATA / ".hotkeys_pause"
 
 
 def global_hotkeys(window) -> None:
@@ -174,7 +178,7 @@ def global_hotkeys(window) -> None:
 
     def register():
         try:
-            cfg = json.loads((ROOT / "config.json").read_text("utf-8"))
+            cfg = json.loads((DATA / "config.json").read_text("utf-8"))
         except (OSError, ValueError):
             cfg = {}
         ok, failed = [], []
@@ -207,7 +211,7 @@ def global_hotkeys(window) -> None:
         if now - last > 0.4:
             last = now
             try:
-                cfg_m = (ROOT / "config.json").stat().st_mtime_ns
+                cfg_m = (DATA / "config.json").stat().st_mtime_ns
             except OSError:
                 cfg_m = 0
             try:   # 設定畫面正在錄新按鍵：暫時放開全部快捷鍵，按下的組合才傳得到畫面（兩分鐘後自動恢復）
