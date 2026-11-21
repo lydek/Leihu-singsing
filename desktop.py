@@ -15,6 +15,7 @@ import threading
 import time
 import traceback
 import urllib.request
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
@@ -101,6 +102,24 @@ def running_instance(port: int) -> bool:
         return os.path.normcase(data.get("root", "")) == os.path.normcase(str(ROOT))   # 必須是同一份安裝
     except Exception:
         return False
+
+
+def _listening(port: int) -> bool:
+    """這個埠有沒有程式在聽。Windows 連沒人聽的埠不會馬上失敗，要等到逾時（running_instance 的 2 秒）。"""
+    try:
+        with socket.create_connection(("127.0.0.1", port), timeout=0.5):
+            return True
+    except OSError:
+        return False
+
+
+def find_instance(preferred: int, count: int = 10) -> int | None:
+    """preferred 起 count 個埠裡，第一個跑著這份練唱台的埠；沒有就是 None。
+    先同時檢查哪些埠有程式在聽，只對有在聽的埠依序呼叫 running_instance（逐一檢查 10 個空埠要 20 秒）。"""
+    ports = list(range(preferred, preferred + count))
+    with ThreadPoolExecutor(len(ports)) as ex:
+        up = list(ex.map(_listening, ports))
+    return next((p for p, u in zip(ports, up, strict=True) if u and running_instance(p)), None)
 
 
 class Api:
@@ -241,12 +260,9 @@ def main():
 
     preferred = int(os.environ.get("LIANTAI_PORT", "8765"))
     # 已有同一份練唱台在跑就共用；別的程式（或別份安裝）占用時改用其他連接埠
-    for p in range(preferred, preferred + 10):
-        if running_instance(p):
-            preferred = p
-            break
-    if running_instance(preferred):
-        port, proc = preferred, _Existing()
+    found = find_instance(preferred)
+    if found is not None:
+        port, proc = found, _Existing()
         print(f"{time.strftime('%Y-%m-%d %H:%M:%S')} 使用已在執行的練唱台伺服器")
     else:
         port = pick_port(preferred)

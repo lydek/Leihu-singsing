@@ -458,6 +458,12 @@ Codex 第 7 次審查後補的（同類問題和繞過路徑）：
 - `.gitattributes`：`*.sh` 一律 LF。Windows 上 `core.autocrlf` 會把 `build.sh` 轉成 CRLF，`sh` 執行時會因為 `\r` 失敗。
 - 本機跑過 `sh installer/build.sh`：複製檔案的步驟正常，停在沒有 makensis；`leihu.nsi` 能不能編譯，要看這個 workflow 第一次跑的結果。
 
+### 3.18 桌面版開啟：找已在跑的練唱台（2026-11-22 決定這版做）
+- 上游就有的問題：`desktop.main()` 開伺服器前，依序對 8765～8774 呼叫 `running_instance()`（`/api/status`，逾時 2 秒），最後再查一次第一個埠。Windows 連沒人聽的埠要等到逾時才失敗，沒有練唱台在跑時要 22 秒。
+- 改法：`find_instance()` 先同時檢查 10 個埠有沒有程式在聽（TCP 連線，逾時 0.5 秒），只對有在聽的埠依序呼叫 `running_instance()`，取第一個是這份練唱台的埠。判斷哪一份、用哪個埠都和原本一樣。
+- 速度修正，依 3.1 本來要延後；開啟太慢影響使用，決定這版做。
+- 2026-11-22 量測：沒有練唱台在跑時從 22.01 秒變 0.51 秒；練唱台在 8767 時 0.53 秒找到。測試在 `tests/test_desktop_ports.py`。
+
 ## 4. 要先決定的事
 - 舊分支要留著（唯讀）還是封存成 tag，`claude/original-refactor-behavior-comparison-d469de` 也一樣。在搬完之前不要刪。
 - 測試歌曲的清單和授權（3.8）。
