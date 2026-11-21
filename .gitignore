@@ -11,6 +11,7 @@ installed.json
 __pycache__/
 *.pyc
 .venv/
+.pytest_cache/
 python/
 # 安裝檔建置
 installer/payload/

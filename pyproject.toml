@@ -1,0 +1,43 @@
+# 開發與 CI 用的環境定義（uv）。使用者端仍以 requirements-win.txt 安裝，這裡不影響安裝程式。
+# 兩邊都有的套件版本必須相同，tests/test_requirements_sync.py 會檢查。
+[project]
+name = "leihu-singsing"
+version = "0"   # 不使用：程式版本以 VERSION 檔為準，發佈時不用改這裡
+requires-python = "==3.11.*"
+
+[dependency-groups]
+# requirements-win.txt 扣掉推論（torch 系列、onnxruntime、audio-separator、faster-whisper、
+# ctranslate2、torchcrepe、onnx2torch-py313）和視窗（pywebview、pythonnet）的套件
+test = [
+    "pytest>=8",
+    "flask==3.1.3",
+    "numpy==2.4.6",
+    "scipy==1.17.1",
+    "soundfile==0.14.0",
+    "librosa==0.11.0",
+    "audioread==3.1.0",
+    "numba==0.68.0",
+    "llvmlite==0.50.0",
+    "pedalboard==0.9.26",
+    "opencc-python-reimplemented==0.1.7",
+    "anthropic==1.13.0",
+    "imageio-ffmpeg==0.6.0",
+    "yt-dlp",
+    "pillow==11.3.0",
+    "sudachipy==0.7.0",
+    "sudachidict_small==20261015",
+]
+
+[tool.uv]
+package = false
+default-groups = ["test"]
+# 程式只支援 Windows（ctypes.windll、具名 mutex 等），lock 只解 Windows 的套件
+environments = ["sys_platform == 'win32'"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+markers = ["models: 需要模型（torch、onnxruntime 與模型檔），用 uv run pytest -m models 手動跑"]
+# tests/private 放本機資料（匯出的基準版程式碼含它自己的測試）；
+# test_contract_snapshot 要 S28 的 LIANTAI_DATA 和 tests/contract/serve.py，S28 完成前不收集
+addopts = "-m 'not models' --ignore=tests/private --deselect tests/contract/test_contract.py::test_contract_snapshot"
