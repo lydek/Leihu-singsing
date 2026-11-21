@@ -409,19 +409,20 @@ shim 要補的地方：
 | M5 `usage.json` 壞掉被覆寫 | `_load` 吞掉所有例外，`record` 接著覆寫成只剩一筆 | 做：壞掉時改名成 `usage.json.<時間>.bad` 保留；讀不到（`OSError`）時這次不記、不覆寫，Claude 的回覆照常回傳（舊 commit 是往上丟，會讓已計費的回覆丟掉）；`summary` 和原本一樣當成沒有紀錄 |
 | M4 匯出檔名被 `with_suffix` 截斷 | 歌名有「.」時，不同錄音、不同歌匯出成同一個檔名、互相覆寫 | 做：`share.out_path`，`app.py` 回傳的檔名清單一起改 |
 | O12 模型設定檔 | 高品質主唱模型的 yaml 沒有大小和 SHA-256；三個模型設定 JSON 抓 main 分支 | 做：yaml 釘大小與 SHA-256；JSON 改用固定 commit 的網址並核對 SHA-256。數值都下載或用本機檔案核對過 |
-| O13 PyTorch 套件清單沒有檢查碼 | 直接下載、不核對 | 做：沒有檢查碼就改走 pip |
+| O13 PyTorch 套件清單沒有檢查碼 | 直接下載、不核對 | 做：清單抓不到或沒有檢查碼就停止；清單有檢查碼、直接下載失敗時，才改走強制核對檢查碼的 pip |
 | O14 `install.ps1` 下載 Python | 沒有核對 | 做：核對 SHA-256（下載核對過），不符重下一次，再不符就停止安裝 |
 
 驗證：`tests/test_security.py`；`uv run pytest` 22 個通過；`check_snapshot.py` 141 個案例兩次都和快照相同（契約案例沒有歌名含「.」的匯出，M4 只靠單元測試）。數值基準沒有重跑：這幾項不碰分離、音高、歌詞、評分。
 
 Codex 第 7 次審查後補的（同類問題和繞過路徑）：
 - M5：壞檔改名失敗（例如被鎖住）時也保留原檔、這次不記，回覆照常回傳。
-- 同類的資料遺失：`config.json`、`setlist.json` 壞掉時讀起來是預設值／空歌單，下一次存檔會蓋掉原本的金鑰與場次。新增 `pipeline.keep_corrupt`：覆寫前內容壞掉就改名成 `.bad` 保留，讀不到就不存（回錯誤）。`save_config`、目前這一場歌單的寫入都先經過它。
-- O12：已經存在的模型設定 JSON、小於 1 MB 的設定檔（yaml）也核對 SHA-256，不符就刪掉重抓；自己下載失敗時停止這次分離，不再交給 audio-separator 從 main 下載。本機現有的檔案都核對過和釘住的值相同。
-- O13：清單沒有檢查碼時停止安裝 PyTorch，不改走 pip（pip 用同一份清單，也沒辦法核對）；其他原因的直接下載失敗仍改走 pip，pip 會核對清單裡的檢查碼。
-- O14：`Get-FileHash` 改用 `-LiteralPath`（暫存路徑含 `[`、`]` 時不會被當成萬用字元）。下載後直接執行的 `get-pip.py`（上游既有）改抓 pypa/get-pip 固定 commit `c7135ee`（pip 26.3）並核對 SHA-256，和當天 `bootstrap.pypa.io` 的檔案相同；新安裝拿到的 pip 版本因此固定。
+- 同類的資料遺失：`config.json`、`setlist.json` 壞掉時讀起來是預設值／空歌單，下一次存檔會蓋掉原本的金鑰與場次。新增 `pipeline.keep_corrupt`：覆寫前內容壞掉（含不是有效的 UTF-8）就改名成 `.bad` 保留，讀不到就不存（回錯誤）；log 只記檔名，不記內容（`config.json` 有 API 金鑰）。`save_config`、目前這一場歌單的寫入都先經過它。
+- O12：已經存在的模型設定 JSON、小於 1 MB 的設定檔（yaml）也核對 SHA-256，不符就刪掉重抓（yaml 在 `ensure_model` 的模型鎖裡重抓；狀態輪詢用的 `_files_ready` 只讀、不刪檔）；自己下載失敗時停止這次分離，不再交給 audio-separator 從 main 下載。本機現有的檔案都核對過和釘住的值相同。
+- O13：清單抓不到（重試 3 次）或沒有檢查碼時停止安裝 PyTorch，不改走 pip：pip 預設遇到沒有檢查碼的連結也會安裝。清單有檢查碼、直接下載失敗時才改走 pip，並用清單的檢查碼加 `--require-hashes`。
+- O14：`Get-FileHash` 改用 `-LiteralPath`（暫存路徑含 `[`、`]` 時不會被當成萬用字元）。下載後直接執行的 `get-pip.py`（上游既有）改抓 pypa/get-pip 固定 commit `c7135ee` 並核對 SHA-256，和當天 `bootstrap.pypa.io` 的檔案相同。它執行時仍會從 PyPI 安裝 pip，所以 pip 版本沒有固定（`b181dd9` 的 commit 訊息寫「pip 26.3」不準確）。
 - 測試工具：`check_snapshot.py` 設了 `LIANTAI_SNAPSHOT_UPDATE`／`REBASE` 就拒絕執行（原本會直接覆寫快照），並補上路由涵蓋檢查（和 `test_contract_snapshot` 共用 `uncovered_routes`）；`run_contract` 不帶入 `LEIHU_NET_LOG`，擋下的連線一定寫在沙盒裡。
 - 測試：`tests/test_security.py` 補上這幾項的回歸測試，installer 改從暫存副本載入（不再寫到 repo 的 `logs/`）；`test_without_env_still_opens_programs` 改成看有沒有新的 `Jobs._run` 執行緒（CPU 很忙時其他執行緒的增減會讓計數不準）。`uv run pytest` 30 個通過；`check_snapshot.py` 141 個案例兩次相同、92 條路由都有案例。
+- Codex 第 8 次審查後再修：上面 O12、O13、`keep_corrupt` 的說明是修正後的版本；O14 補上實際執行 `install.ps1` 下載函式的測試（假的下載、含 `[ ]` 的路徑、檢查碼不符兩次就停止並刪檔）。第 9 次審查後再補：O13 重試次數的測試、`_files_ready` 只 stat 一次（檔案剛好被 `ensure_model` 刪掉時當成還沒好，狀態 API 不會 500）。`uv run pytest` 36 個通過。
 
 其他項目不是安全或資料遺失，依 3.1 延後：M3（installer 的 probe 把路徑嵌進程式碼字串）、M6（旋律譜切點無限迴圈）、M7（錄音刪除後才寫回的 JSON）、S8（yt-dlp 取消與逾時）、O21（installer 整體逾時）、S19（三份 `safe_name`）。
 

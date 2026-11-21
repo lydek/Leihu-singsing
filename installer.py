@@ -379,9 +379,24 @@ def check_gpu_kernels(tag: str) -> str:
     return tag
 
 
-def _download_wheels(tag: str) -> list[Path]:
+def _verified_links(tag: str) -> list[tuple[str, str, str]]:
+    """套件清單（含檢查碼）。連不上重試 3 次；沒有檢查碼（NoChecksum）不重試。"""
+    for attempt in range(3):
+        try:
+            return _wheel_links(tag)
+        except NoChecksum:
+            raise
+        except Exception as e:
+            LOG.write(f"wheel links {tag} attempt {attempt + 1}: {e}\n")
+            if attempt == 2:
+                raise
+            time.sleep(3)
+    raise AssertionError("unreachable")
+
+
+def _download_wheels(links: list[tuple[str, str, str]]) -> list[Path]:
     files = []
-    for i, (url, fname, sha) in enumerate(_wheel_links(tag)):
+    for i, (url, fname, sha) in enumerate(links):
         # torch 本體佔了絕大部分，給它進度條的 85%
         part = (0, 0.85) if i == 0 else (0.85 + 0.05 * (i - 1), 0.85 + 0.05 * i)
         files.append(download(url, DL / fname, sha, fname.split("-")[0], part))
@@ -399,18 +414,25 @@ def install_torch(tag: str) -> bool:
         say("  PyTorch 檔案不完整（可能是上次安裝中斷），重新安裝…")
     say(f"  下載 PyTorch {TORCH['torch']}（{tag}）{'，約 2.8 GB' if tag != 'cpu' else '，約 200 MB'}…")
     try:
-        files = _download_wheels(tag)
-    except NoChecksum as e:
-        say(f"  ! {e}，下載的檔案沒辦法核對，停止安裝 PyTorch")
+        links = _verified_links(tag)
+    except Exception as e:   # O13：拿不到含檢查碼的清單，直接下載和 pip 都沒辦法核對：停止
+        say(f"  ! 取得 PyTorch 套件清單失敗（{e}），沒有檢查碼就不安裝。請確認網路連線後重新執行")
         return False
+    try:
+        files = _download_wheels(links)
     except Exception as e:
-        say(f"  直接下載失敗（{e}），改由 pip 下載…")
+        say(f"  直接下載失敗（{e}），改由 pip 下載（核對同樣的檢查碼）…")
         files = []
     progress(0.95, "安裝 PyTorch 套件")
     if files:
         code = pip("install", "--force-reinstall", "--no-deps", *map(str, files))
     else:
-        code = pip("install", "--force-reinstall", "--no-deps", *[f"{k}=={v}" for k, v in TORCH.items()],
+        # O13：pip 預設遇到沒有檢查碼的連結也會安裝，所以用清單的檢查碼加 --require-hashes
+        req = DL / f"torch-{tag}-hashes.txt"
+        req.parent.mkdir(parents=True, exist_ok=True)
+        req.write_text("".join(f"{k}=={v}+{tag} --hash=sha256:{sha}\n"
+                               for (k, v), (_, _, sha) in zip(TORCH.items(), links, strict=True)), "utf-8")
+        code = pip("install", "--force-reinstall", "--no-deps", "--require-hashes", "-r", str(req),
                    "--index-url", f"https://download.pytorch.org/whl/{tag}",
                    on_line=lambda l: progress(0.5, l.strip()[:46]) if "Downloading" in l else None)
     if code and tag == "cu128":

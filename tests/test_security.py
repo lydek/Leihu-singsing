@@ -2,11 +2,15 @@
 
 from __future__ import annotations
 
+import base64
 import hashlib
 import importlib.util
 import io
 import json
+import os
+import re
 import shutil
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -107,12 +111,28 @@ def test_corrupt_config_is_kept(config):
     assert json.loads(P.CONFIG_PATH.read_text("utf-8"))["font"] == "kai"
 
 
+def test_corrupt_config_is_not_logged(config):
+    P = config
+    log = P.DATA / "logs" / "lyrics.log"
+    P.CONFIG_PATH.write_text('{"anthropic_key": "sk-secret-123", 壞', "utf-8")
+    P.save_config({"a": 1})
+    assert "sk-secret-123" not in (log.read_text("utf-8") if log.exists() else "")  # log 不能有壞檔內容（金鑰）
+
+
+def test_non_utf8_config_is_kept(config):
+    P = config
+    P.CONFIG_PATH.write_bytes(b'{"a": "\xff\xfe"}')  # 不是有效的 UTF-8：也算內容壞掉
+    P.save_config({"a": 1})
+    assert [b.read_bytes() for b in P.CONFIG_PATH.parent.glob("config.json.*.bad")] == [b'{"a": "\xff\xfe"}']
+    assert json.loads(P.CONFIG_PATH.read_text("utf-8")) == {"a": 1}
+
+
 def test_unreadable_config_is_not_overwritten(config, monkeypatch):
     P = config
     P.CONFIG_PATH.write_text('{"a": 1}', "utf-8")
-    real = Path.read_text
-    monkeypatch.setattr(Path, "read_text", lambda self, *a, **k: _raise(PermissionError("被鎖住"))
-                        if self == P.CONFIG_PATH else real(self, *a, **k))
+    real = Path.read_bytes
+    monkeypatch.setattr(Path, "read_bytes", lambda self: _raise(PermissionError("被鎖住"))
+                        if self == P.CONFIG_PATH else real(self))
     with pytest.raises(P.UserError):
         P.save_config({"a": 2})
     monkeypatch.undo()
@@ -207,7 +227,18 @@ def test_o12_small_config_file_is_checked_by_sha(tmp_path, monkeypatch, app_modu
     assert P._files_ready(files)
     (tmp_path / "uvr" / "c.yaml").write_bytes(b"model: b\n")  # 同樣大小、內容不同
     assert not P._files_ready(files)
-    assert not (tmp_path / "uvr" / "c.yaml").exists()  # 刪掉，下載時重抓
+    assert (tmp_path / "uvr" / "c.yaml").exists()  # 唯讀：狀態輪詢會呼叫，不刪檔
+
+    # 重抓在 ensure_model（模型鎖裡）：大小對但內容不符的先刪掉，fetch_file 才不會因為大小相同就略過
+    monkeypatch.setattr(P, "MODEL_FILES", files)
+    monkeypatch.setattr(P, "ensure_model_data", lambda: None)
+    calls = []
+    monkeypatch.setattr(P, "fetch_file", lambda urls, p, size, sha, progress=None: calls.append(p.exists()))
+    P.ensure_model("c.yaml")
+    assert calls == [False]
+    (tmp_path / "uvr" / "c.yaml").write_bytes(body)
+    P.ensure_model("c.yaml")
+    assert calls == [False]  # 內容相符就不重抓
 
 
 # ---------------------------------------------------------------- O13：PyTorch 套件沒有檢查碼就不直接下載
@@ -233,18 +264,56 @@ def test_o13_wheel_without_checksum_is_refused(installer, monkeypatch):
     assert [sha for _, _, sha in inst._wheel_links("cpu")] == ["a" * 64] * len(inst.TORCH)
 
 
-def test_o13_install_torch_stops_instead_of_pip(installer, monkeypatch):
+def test_o13_install_torch_needs_checksums(installer, monkeypatch):
     inst = installer
     calls = []
     monkeypatch.setattr(inst, "installed_versions", lambda: {})
     monkeypatch.setattr(inst, "pip", lambda *a, **k: calls.append(a) or 0)
-    monkeypatch.setattr(inst, "_wheel_links", lambda tag: _raise(inst.NoChecksum("清單裡的 torch 沒有檢查碼")))
-    assert inst.install_torch("cpu") is False
-    assert calls == []  # pip 用同一份清單，也沒辦法核對：不能改走 pip
-    # 其他原因（例如連不上）直接下載失敗：照舊改走 pip（pip 會核對清單裡的檢查碼）
-    monkeypatch.setattr(inst, "_wheel_links", lambda tag: _raise(OSError("連不上")))
+    monkeypatch.setattr(inst.time, "sleep", lambda s: None)
+    # 清單沒有檢查碼（不重試）、或清單一直抓不到（重試 3 次）：停止，不改走 pip
+    # （pip 預設遇到沒有檢查碼的連結也會安裝）
+    for err, tries in ((inst.NoChecksum("清單裡的 torch 沒有檢查碼"), 1), (OSError("連不上"), 3)):
+        n = []
+        monkeypatch.setattr(inst, "_wheel_links", lambda tag, err=err, n=n: n.append(1) or _raise(err))
+        assert inst.install_torch("cpu") is False
+        assert len(n) == tries
+    assert calls == []
+    # 清單有檢查碼、但直接下載失敗：改走 pip，帶同樣的檢查碼加 --require-hashes
+    links = [(f"https://x/{k}.whl", f"{k}-{v}.whl", c * 64) for (k, v), c in zip(inst.TORCH.items(), "abc", strict=True)]
+    monkeypatch.setattr(inst, "_wheel_links", lambda tag: links)
+    monkeypatch.setattr(inst, "download", lambda *a, **k: _raise(OSError("下載中斷")))
     assert inst.install_torch("cpu") is True
-    assert "--index-url" in calls[0]
+    args = calls[0]
+    assert "--require-hashes" in args
+    req = Path(args[args.index("-r") + 1]).read_text("utf-8").splitlines()
+    assert req == [f"{k}=={v}+cpu --hash=sha256:{c * 64}" for (k, v), c in zip(inst.TORCH.items(), "abc", strict=True)]
+
+
+def test_o13_wheel_links_retry_recovers(installer, monkeypatch):
+    inst = installer
+    monkeypatch.setattr(inst.time, "sleep", lambda s: None)
+    n = []
+    links = [("https://x/torch.whl", "torch.whl", "a" * 64)]
+    monkeypatch.setattr(inst, "_wheel_links", lambda tag: n.append(1) or (links if len(n) == 3 else _raise(OSError("暫時連不上"))))
+    assert inst._verified_links("cpu") == links  # 前兩次失敗、第三次成功
+    assert len(n) == 3
+
+
+def test_files_ready_when_file_disappears(tmp_path, monkeypatch, app_module):
+    import pipeline as P
+
+    monkeypatch.setattr(P, "MODELS", tmp_path)
+    (tmp_path / "uvr").mkdir()
+    (tmp_path / "uvr" / "c.yaml").write_bytes(b"x")
+    real = Path.stat
+
+    def stat(self, *a, **k):  # 存在檢查之後、讀大小時剛好被 ensure_model 刪掉
+        if self.name == "c.yaml":
+            raise FileNotFoundError(self)
+        return real(self, *a, **k)
+
+    monkeypatch.setattr(Path, "stat", stat)
+    assert P._files_ready({"c.yaml": (1, None, ["u"])}) is False  # 當成還沒好，/api/status 不會 500
 
 
 # ---------------------------------------------------------------- O14：install.ps1 核對 Python 安裝檔
@@ -264,3 +333,36 @@ def test_o14_install_ps1_checks_get_pip():
     assert "356e0d0de21cdc348c3394084d90939b85e4246c4d14c76aee6ca4f46646ea98" in ps1
     assert "Get-GetPip $gp" in ps1
     assert "bootstrap.pypa.io" not in ps1  # 會變動的網址、下載完直接執行
+
+
+@pytest.mark.skipif(shutil.which("powershell") is None, reason="要 Windows PowerShell")
+@pytest.mark.parametrize("fn, url, sha", [("Get-Python", "PyZipUrl", "PyZipSha"), ("Get-GetPip", "GetPipUrl", "GetPipSha")])
+def test_o14_install_ps1_download_flow(tmp_path, fn, url, sha):
+    """實際執行 install.ps1 裡的下載函式（Get-File 換成寫固定內容的假函式，不連網）：
+    檢查碼相符才回來、兩次不符就停止並刪掉檔案；路徑含 [ ] 也能核對。"""
+    body = (ROOT / "setup" / "install.ps1").read_text("utf-8-sig")
+    func = re.search(r"^function " + fn + r"\(\$out\) \{.*?^\}$", body, re.S | re.M).group(0)
+    good = b"print('ok')\n"
+    dest = tmp_path / "a[1]"
+    dest.mkdir()
+    driver = tmp_path / "driver.ps1"
+    driver.write_text("\n".join([
+        '$ErrorActionPreference = "Stop"',
+        f'${url} = "https://example.invalid/x"',
+        f'${sha} = "{hashlib.sha256(good).hexdigest()}"',
+        "$script:n = 0",
+        "function Say($m) {}",
+        "function Get-File($u, $out) { $script:n++; [IO.File]::WriteAllBytes($out, [Convert]::FromBase64String($env:PAYLOAD)) }",
+        func,
+        '$out = Join-Path $env:DEST "file.bin"',
+        f'try {{ {fn} $out; "ok $script:n $(Test-Path -LiteralPath $out)" }} catch {{ "fail $script:n $(Test-Path -LiteralPath $out)" }}',
+    ]), "utf-8-sig")
+
+    def run(payload: bytes) -> str:
+        env = {**os.environ, "PAYLOAD": base64.b64encode(payload).decode(), "DEST": str(dest)}
+        r = subprocess.run(["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", str(driver)],
+                           capture_output=True, text=True, timeout=120, env=env)
+        return r.stdout.strip().splitlines()[-1]
+
+    assert run(good) == "ok 1 True"
+    assert run(b"tampered") == "fail 2 False"  # 重下一次，還是不符就停止，檔案刪掉（不會被執行）
