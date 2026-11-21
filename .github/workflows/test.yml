@@ -14,8 +14,11 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 30   # 測試卡住時，不要等預設的 6 小時
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v6
+      # action 釘 commit SHA（tag 可以被改）；版本在註解。都是 Node.js 24 的版本
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
+        with:
+          persist-credentials: false   # 只跑測試，不需要把 token 留在 .git/config
+      - uses: astral-sh/setup-uv@1db35dd8eee11c5894872e0b383ae6c406cf738d   # v10.4.0
       # Python 版本讀 .python-version；--locked：uv.lock 和 pyproject.toml 對不上就失敗
       - run: uv sync --locked --group test
       - run: uv run pytest
