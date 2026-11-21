@@ -67,7 +67,11 @@ def record(model: str, usage, purpose: str, song: str) -> dict:
         except ValueError as e:
             # M5：壞掉的舊檔改名保留，不覆寫
             from datetime import datetime
-            USAGE_PATH.replace(USAGE_PATH.with_name(f"usage.json.{datetime.now():%Y%m%d-%H%M%S-%f}.bad"))
+            try:
+                USAGE_PATH.replace(USAGE_PATH.with_name(f"usage.json.{datetime.now():%Y%m%d-%H%M%S-%f}.bad"))
+            except OSError as e2:   # 改名失敗（例如被其他程式鎖住）：保留原檔，這次不記
+                P.log_error("usage.json 內容壞掉、改名失敗，這次的用量沒有記錄", e2)
+                return entry
             P.log_error("usage.json 內容壞掉，已改名保留", e)
             data = {"calls": []}
         except OSError as e:

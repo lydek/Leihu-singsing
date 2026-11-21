@@ -331,6 +331,10 @@ def download(url: str, dest: Path, sha256: str = "", label: str = "", part: tupl
     return dest
 
 
+class NoChecksum(RuntimeError):
+    """PyTorch 套件清單沒有檢查碼。pip 用同一份清單，也沒辦法核對，所以不能改走 pip。"""
+
+
 def _wheel_links(tag: str) -> list[tuple[str, str, str]]:
     """從 PyTorch 官方套件清單找出三個 wheel 的網址與檢查碼。"""
     import urllib.parse
@@ -344,8 +348,8 @@ def _wheel_links(tag: str) -> list[tuple[str, str, str]]:
         m = re.search(r'href="([^"]*' + re.escape(fname) + r')(?:#sha256=([0-9a-f]{64}))?"', html)
         if not m:
             raise RuntimeError(f"清單裡找不到 {fname}")
-        if not m.group(2):   # 沒有檢查碼就不直接下載（下載完沒辦法核對），由呼叫端改走 pip（O13）
-            raise RuntimeError(f"清單裡的 {fname} 沒有檢查碼")
+        if not m.group(2):   # 沒有檢查碼：直接下載和 pip 都沒辦法核對，停止安裝（O13）
+            raise NoChecksum(f"清單裡的 {fname} 沒有檢查碼")
         out.append((urllib.parse.urljoin(index, m.group(1)), urllib.parse.unquote(fname), m.group(2)))
     return out
 
@@ -375,6 +379,15 @@ def check_gpu_kernels(tag: str) -> str:
     return tag
 
 
+def _download_wheels(tag: str) -> list[Path]:
+    files = []
+    for i, (url, fname, sha) in enumerate(_wheel_links(tag)):
+        # torch 本體佔了絕大部分，給它進度條的 85%
+        part = (0, 0.85) if i == 0 else (0.85 + 0.05 * (i - 1), 0.85 + 0.05 * i)
+        files.append(download(url, DL / fname, sha, fname.split("-")[0], part))
+    return files
+
+
 def install_torch(tag: str) -> bool:
     want = {k: f"{v}+{tag}" for k, v in TORCH.items()}
     have = installed_versions()
@@ -385,13 +398,11 @@ def install_torch(tag: str) -> bool:
             return True
         say("  PyTorch 檔案不完整（可能是上次安裝中斷），重新安裝…")
     say(f"  下載 PyTorch {TORCH['torch']}（{tag}）{'，約 2.8 GB' if tag != 'cpu' else '，約 200 MB'}…")
-    files = []
     try:
-        links = _wheel_links(tag)
-        for i, (url, fname, sha) in enumerate(links):
-            # torch 本體佔了絕大部分，給它進度條的 85%
-            part = (0, 0.85) if i == 0 else (0.85 + 0.05 * (i - 1), 0.85 + 0.05 * i)
-            files.append(download(url, DL / fname, sha, fname.split("-")[0], part))
+        files = _download_wheels(tag)
+    except NoChecksum as e:
+        say(f"  ! {e}，下載的檔案沒辦法核對，停止安裝 PyTorch")
+        return False
     except Exception as e:
         say(f"  直接下載失敗（{e}），改由 pip 下載…")
         files = []
