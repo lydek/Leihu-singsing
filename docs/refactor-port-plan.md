@@ -44,22 +44,24 @@
 ### B. 開發環境、CI、測試骨架
 | # | commit | 內容 | 初判 | 備註 |
 |---|---|---|---|---|
-| 3 | `447489e` | uv、CI、測試骨架 | 搬 | `requirements` 已經跟著上游變了，`uv.lock` 要重新產生 |
-| 27 | `407b2a7` | ruff 設定 | 搬 | |
-| 31 | `cbb0fbf` | 開發用啟動器（用已安裝的內嵌 Python） | 搬 | |
-| 33 | `ebae3ee` | makensis `-INPUTCHARSET UTF8` | 搬 | 上游 `build.sh` 有改過，要確認 |
-| 41 | `cf7a96e` | CI 加 ruff、`.git-blame-ignore-revs` | 重做 | 格式化 commit 的 hash 會不一樣 |
-| 40 | `c666a91` | ruff format（只改格式） | 重做 | 不要 cherry-pick，在新程式上重跑 `ruff format` |
+| 3 | `447489e` | uv、CI、測試骨架 | 重做 | 改用：`conftest` 不設 `LIANTAI_*`、只檢查使用者資料；路由數 93；CI 加上舊分支後來補的防護；`uv.lock` 重新產生。原因：2.3.2 不讀 `LIANTAI_DATA`（S28 在 C 組），見 3.11 |
+| 27 | `407b2a7` | ruff 設定 | 搬 | 照舊，只搬 `pyproject.toml` 的設定；CI 不跑（3.1） |
+| 31 | `cbb0fbf` | 開發用啟動器（用已安裝的內嵌 Python） | 搬 | 照舊，只搬 `tests/tools/run_dev.py` 和 `.gitignore` 的 `.duet_cleaned` |
+| 33 | `ebae3ee` | makensis `-INPUTCHARSET UTF8` | 搬 | 照舊；2.3.2 的 `installer/build.sh:12` 仍然沒有指定 |
+| 41 | `cf7a96e` | CI 加 ruff、`.git-blame-ignore-revs` | 重做 | 延到 E 組清完違規之後；格式化 commit 的 hash 會不一樣 |
+| 40 | `c666a91` | ruff format（只改格式） | 重做 | 同 41；不要 cherry-pick，在新程式上重跑 `ruff format` |
 
 ### C. 步驟 0：對上游程式的修正（先在扁平結構上做）
+這個版本做 S28 和安全、防止資料遺失的修正；其餘都是改變行為的修正，依 3.1 的原則延後。
+
 | # | commit | 內容 | 初判 | 備註 |
 |---|---|---|---|---|
-| 4 | `a142c98` | 環境變數覆寫 S28、import 副作用 S31 | 重做 | 2.3.2 新增了 `library_dir`、`models_dir`，覆寫順序要重新設計 |
+| 4 | `a142c98` | 環境變數覆寫 S28、import 副作用 S31 | 重做 | 2.3.2 新增了 `library_dir`、`models_dir`，覆寫順序要重新設計。S31 延後：會改變行為（import 時的 `SetErrorMode`、`ffmpeg_path()` 搬走） |
 | 5 | `e2168c4` | M1–M7 修正與回歸測試 | 待查 | M1/M2 上游已修（只差 port 比對），M5 還在；其他逐項查 |
 | 6 | `7ee7791` | R1–R3 資源浪費 | 待查 | 上游 2.2.0 之後有 GPU worker，R1/R2 可能已經改變 |
-| 7 | `da59e07` | 錯誤格式統一 S15 | 重做 | 2.3.2 新增了路由，要一起統一 |
+| 7 | `da59e07` | 錯誤格式統一 S15 | 重做 | 延後：會改變行為（錯誤回應的內容）；以後做時，2.3.2 新增的路由要一起統一 |
 | 9 | `dee8f6b` | 步驟 0 審查修正 | 待查 | 跟 4–7 一起看 |
-| 10 | `dfcb0b9` | yt-dlp 取消／逾時、檢查碼、pip 逾時、`safe_name` 合併 | 重做 | S19 確定還在；其他逐項查 |
+| 10 | `dfcb0b9` | yt-dlp 取消／逾時、檢查碼、pip 逾時、`safe_name` 合併 | 重做 | S19 確定還在。下載檔的檢查碼是安全修正，這個版本做；逾時、檔名規則逐項看，不屬於安全或防止資料遺失的延後 |
 
 ### D. 契約快照與比對工具
 | # | commit | 內容 | 初判 | 備註 |
@@ -82,18 +84,18 @@
 | 45 | `07c4be0` | 拆 `read_sheet`、`sheet.render` | 併入 | 跟步驟 4 一起 |
 
 ### F. 寫在 `leihu/` 上的審查修正
-都要等 E 組完成後才有地方放；如果修的是上游本來就有的問題，可以提早在扁平結構上先修。
+改變行為的修正依 3.1 的原則延後，上游本來就有的問題也一樣，安全和防止資料遺失的修正除外；只有不改行為的拆函式、改名跟著 E 組做。
 
 | # | commit | 內容 | 初判 | 備註 |
 |---|---|---|---|---|
 | 28 | `70d30ce` | 審查修正 A–F：並行、輸入驗證、ext_url、rms 等 | 併入 | |
-| 29 | `1e9f23c` | 審查修正 G：桌面啟動、打包、CI | 待查 | `desktop.py`、`leihu.nsi` 部分可以提早 |
+| 29 | `1e9f23c` | 審查修正 G：桌面啟動、打包、CI | 待查 | `desktop.py`、`leihu.nsi` 部分不改行為才做，否則延後 |
 | 36 | `891b78e` | 第二次審查：錄音負的開始時間、混合精度 OOM、`.server_port` 擁有者 | 待查 | 多數是重構或移植造成的問題（混合精度 OOM 是「上游 2.2.0 漏移植」，上游 `pipeline.py:2069` 已有）；`.server_port` 擁有者等要逐項查上游有沒有 |
-| 38 | `73590fd` | `.partK`、PowerShell 路徑、pip 檢查碼、濾波分段 | 待查 | PowerShell 路徑和 pip 檢查碼可以提早 |
-| 39 | `e38525f` | ruff 違規清到 0、拆 `process_song`、修取消下載的 TypeError | 併入 | TypeError 可以提早 |
-| 46 | `1b5074b` | ml-worker 設定優先順序（錯誤 6） | 重做 | 上游 `gpu_worker._set_priority` 有同一個 bug，提早在 C 組修（3.6） |
-| 68 | `dcd5ce4` | Codex：三個移植問題 | 待查 | WorkerPool、`cuda_ok` 兩項是 ml-worker 才有，不做（3.6）；leadfix 和移調互斥要查上游有沒有 |
-| 69 | `340914c` | Codex：五個上游既有問題（搬移、主唱補回、補做標記） | 重做 | **優先**：上游 2.3.2 也有這些問題，可以直接修在扁平結構上 |
+| 38 | `73590fd` | `.partK`、PowerShell 路徑、pip 檢查碼、濾波分段 | 待查 | PowerShell 路徑和 pip 檢查碼是修正，延後 |
+| 39 | `e38525f` | ruff 違規清到 0、拆 `process_song`、修取消下載的 TypeError | 併入 | TypeError 是修正，延後；拆 `process_song` 是結構調整，跟 E 組 |
+| 46 | `1b5074b` | ml-worker 設定優先順序（錯誤 6） | 重做 | 上游 `gpu_worker._set_priority` 有同一個 bug。延後：會改變行為（直播中的低優先順序才會生效）（3.6） |
+| 68 | `dcd5ce4` | Codex：三個移植問題 | 待查 | WorkerPool、`cuda_ok` 兩項是 ml-worker 才有，不做（3.6）；leadfix 和移調互斥要查上游有沒有，上游沒有的話延後（3.1） |
+| 69 | `340914c` | Codex：五個上游既有問題（搬移、主唱補回、補做標記） | 重做 | 上游 2.3.2 也有這些問題。逐項看：防止資料遺失的這個版本做，其餘延後：會改變行為（搬移、主唱補回、補做標記）；以後修時會改分軌，沒有數值參考輸出之前不合併 |
 | 70 | `0fcc37f` | Codex 第二次：搬移隔離、KEY 版本失效、旋律過期、兩軌一致 | 重做 | 同 69 |
 
 ### G. 測試、量測、紀錄文件
@@ -121,14 +123,16 @@
 ### 3.1 順序
 每一組各開工作分支、各發 PR、用 rebase 合併進 `refactor`。
 
-1. **B 組**：開發環境、pytest CI、ruff 設定。只新增檔案，衝突最少；`tests/test_smoke.py` 的路由數要從 78 改成 93。完整的 ruff 檢查（`cf7a96e` 的 `ruff check .`、`ruff format --check .`）不在這一步啟用：2.3.2 有既有違規（例如 `pipeline.py:118`、`pipeline.py:308` 的 `has = lambda` 會觸發 E731），清違規的 `e38525f` 排在 E 組。先記錄固定 ruff 版本下的違規數，清完再啟用；不要為了讓 B 組通過混入大批程式清理。
+**原則（2026-11-21 決定）：這個版本只做搬遷和行為等價的結構調整。** 延到後面版本的有兩類：會改變程式行為的修改（修上游既有的 bug，C、F 組大部分），以及效能調整（3.8 第二階段）。效能調整目前只能用 CPU 基準驗證（3.10）。**例外：安全和防止資料遺失的修正這個版本做**，照 3.3 的步驟：先確認 2.3.2 還有，加回歸測試，快照的差異先在 `RULES` 登記。遇到要延後的項目，在第 2 節備註寫「延後：會改變行為（……）」或「延後：效能調整（……）」，列進第 4 節。
+
+1. **B 組**：開發環境、pytest CI、ruff 設定。幾乎只新增檔案（另改 `.gitignore`、`installer/build.sh`），衝突最少；`tests/test_smoke.py` 的路由數要從 78 改成 93。完整的 ruff 檢查（`cf7a96e` 的 `ruff check .`、`ruff format --check .`）不在這一步啟用：2.3.2 有既有違規（例如 `pipeline.py:118`、`pipeline.py:308` 的 `has = lambda` 會觸發 E731），清違規的 `e38525f` 排在 E 組。先記錄固定 ruff 版本下的違規數，清完再啟用；不要為了讓 B 組通過混入大批程式清理。
 2. **A 組**：文件，同時把基準改成 2.3.2。
 3. **D 組（安全網，先於任何程式修改）**：搬比對工具，在**原版 `v2.3.2`** 上錄功能基準、效能基準和相似度基準（做法見 3.7、3.8）。H 組的測試不在這一步搬（見 H 組）。
    - 數值工具要先改成配合 `gpu_worker`，不能只重新產生輸出。舊的 `tests/numeric/run.py` 只改父行程的 `P.MODELS` 和 `torchcrepe.convert.dither`，只有 `hasattr(P, "INFER")` 時才換 worker；上游 `gpu_worker` 會開新的 Python、重新 import pipeline，父行程的修改不會帶過去。
    - 兩邊都要在獨立的暫存程式碼和資料夾執行（2.3.2 不讀 `LIANTAI_DATA`，目前只有上游那一側會複製程式碼），模型路徑在父、子程式都要生效，dither 要在真正跑推論的子程式裡關掉。
    - 先證明原版 `v2.3.2` 自己跑兩次結果相同，再錄參考輸出。
-4. **C 組加上 F 組可以提早的部分**：在扁平結構上修上游既有的問題。每個問題都要先確認 2.3.2 還有，才修並加回歸測試；快照出現的差異逐一登記。69、70 優先，但它們會改分軌，沒有數值參考輸出之前不合併。S28 環境變數覆寫要在這一步完成（3.7）。
-5. **E 組加上 F 組其餘的部分**：重構。每做完一步都要跑契約快照和比對測試，只能出現已登記的差異。
+4. **C 組只做不改行為的部分和安全修正**：S28 環境變數覆寫（不設定時和上游相同）要在這一步完成（3.7）；安全和防止資料遺失的修正（例如 M1/M2 的 port 比對、M5 吞例外）也在這一步做。S31（`a142c98` 把 `SetErrorMode`、`ffmpeg_path()` 從 `import pipeline` 搬到 `init_runtime()`）會改變 `gpu_worker` 子程式等每個 `import pipeline` 的行為，延後。修上游既有問題的項目（C 組其餘、F 組可以提早的部分、69、70）依上面的原則延後：先確認 2.3.2 還有，再在第 2 節備註寫「延後：會改變行為（……）」。
+5. **E 組**：重構，只搬動程式、不改行為。F 組只有不改行為的部分（例如 39 拆 `process_song`、45 拆 `read_sheet`）跟著 E 組做，其餘延後。每做完一步都要跑契約快照和比對測試，只能出現已登記的差異。動到 `pipeline.py` 或 `gpu_worker` 呼叫的步驟（3、4），另外跑 `tests/numeric/baseline.py`（CPU 逐位元組，3.8）和 `tests/perf/baseline.py`（不能明顯變慢）。
 6. **G 組**：量測、更新紀錄文件。#43 裡測既有函式的測試（例如 `read_sheet`、旋律譜匯出）改好 import 後，提前到 E 組對應的拆分之前加入。
 
 ### 3.2 E 組做法：照步驟 1–4 重做（2026-11-21 決定）
@@ -136,13 +140,13 @@
 - 每一步都是可以獨立發布的 PR，合併前契約快照和比對測試都要過。
 - 不採用的做法：直接搬舊分支最後的 `leihu/` 樹。原因是中間的 commit 可能跑不起來，也看不出跟 2.3.2 的差別。
 
-F 組的修正跟著程式落點放進對應的步驟。下表是依 commit 標題和檔案清單做的初步對應，review 時再修正：
+F 組的修正跟著程式落點放進對應的步驟；改變行為的修正依 3.1 的原則延後，下表只用來知道以後要放哪裡。下表是依 commit 標題和檔案清單做的初步對應，review 時再修正：
 
 | 步驟 | 舊 commit | 一起處理的 F 組修正 | 要對照的上游 2.3.2 差異 |
 |---|---|---|---|
 | 1 web Blueprint | `90d0357` | 28 的輸入驗證、42 | 2.3.2 新增的路由（歌單、搬移、搜尋範圍、直播歌單）、`_local_only` 已有的 Host／Origin 檢查 |
 | 2 值物件、背景工作佇列 | `3d0fd5f` | 28 的並行、68 的 leadfix 互斥 | 上游 2.2.0 之後的重疊處理、全部暫停、優先處理 |
-| 3 推論子程式 | `c84046a` 的非 ml-worker 部分 | 46 的優先順序修正（改修在 `gpu_worker._set_priority`） | **沿用上游 `gpu_worker.py`，不做 ml-worker**（評估見 3.6） |
+| 3 推論子程式 | `c84046a` 的非 ml-worker 部分 | 46 的優先順序修正（延後，3.6） | **沿用上游 `gpu_worker.py`，不做 ml-worker**（評估見 3.6） |
 | 4 拆 config、dsp、media、lyrics、llm、render | `7247929` | 22、45、39 的拆 `process_song`、28 的 rms／ext_url、38 的濾波分段 | 2.3.2 的 `library_dir`、`models_dir`、搬移流程（`docs/upstream-sync-2.3.2.md` 的 D3） |
 
 步驟 4 拆 `pipeline.py` 時，要保留 `gpu_worker.py` 用到的名稱：`P._sep_progress`、`P._outputs`、`P._track_pitch_local`、`P._whisper_model`、`P.pick_language`、`P._collect_words`、`P.cuda_ok`、`P.MODELS`、`P.SR`、`P.PITCH_SR` 等（`git show v2.3.2:gpu_worker.py | grep -oE 'P\.[A-Za-z_]+'`）。優先在 `pipeline` 保留這些名稱；如果改了 worker 的 import 或呼叫，要另外測 TASKS 的分離、音高、歌詞路徑。契約測試會把 worker 換成假的，不能證明這些依賴還能用。
@@ -152,14 +156,14 @@ F 組的修正跟著程式落點放進對應的步驟。下表是依 commit 標�
 2. 在 `refactor` 上確認問題還在：用 `git grep`，或寫一個會失敗的測試。
 3. 評估有沒有比舊 commit 更好的做法，判斷依據見 3.4。
 4. 判定是搬、重做、併入、不搬或待查，把結果填回本文件第 2 節。如果改用別的做法，在備註寫「改用：……，原因：……」。
-5. 判定要搬或重做的：開分支，實作加測試，`ruff`、`pytest` 都過了才發 PR。
-6. commit message 用繁體中文，結尾註明 `來源：sync/upstream-2.3.2 <hash>`，方便日後追查。
+5. 判定要搬或重做的：開分支，實作加測試，`pytest` 過了才發 PR；`ruff` 在 E 組清完違規後才要求（3.1）。
+6. commit message 用繁體中文。
 
 ### 3.4 評估更好的做法
 舊 commit 是在 2.0.0 上、還不知道後來會發生什麼的情況下寫的。現在多了兩樣東西可以參考：上游 2.1–2.3.2 的做法，以及後來的審查修正。review 每個 commit 時，依序問下面四個問題：
 
 1. **上游有沒有已經解決了？** 有的話優先沿用上游的寫法，只補不足的地方。這樣跟上游的差異小，以後同步比較容易。
-2. **後來有沒有修正這個 commit？** 舊分支有不少審查修正是在修重構時產生的問題，例如 28 的並行和輸入驗證、36、46。重做時要一開始就寫對，不要先重現問題再修。
+2. **後來有沒有修正這個 commit？** 舊分支有不少審查修正是在修重構時產生的問題，例如 28 的並行和輸入驗證、36。重做時要一開始就寫對，不要先重現問題再修。
 3. **以後同步上游要花多少成本？** 搬動或改名越多，每次上游更新時要對應的地方就越多。如果效益不夠大，就不要搬動。
 4. **有沒有更小的改法？** 優先用現成的程式、標準函式庫、已安裝的套件，不加沒人要求的抽象。
 
@@ -174,7 +178,7 @@ F 組的修正跟著程式落點放進對應的步驟。下表是依 commit 標�
 | 範圍 | 舊做法 | 候選做法 | 要比較的地方 |
 |---|---|---|---|
 | 步驟 3 ml-worker | 自己寫 `ml_worker/` 和 `leihu/inference.py`，上游的 `gpu_worker.py`（670 行）整個不保留 | 沿用上游的 `gpu_worker.py` | **已評估，改用候選做法**，見 3.6 |
-| 步驟 0 M1、M2 | 自己加 `before_request` | 沿用上游 `_local_only`（`app.py:131`），只補不足的地方（例如比對 port） | 回歸測試照樣加 |
+| 步驟 0 M1、M2 | 自己加 `before_request` | 沿用上游 `_local_only`（`app.py:131`），只補不足的地方（例如比對 port；安全修正，這個版本做，3.1） | 回歸測試照樣加 |
 | 步驟 1 Blueprint | `app.py`（2.3.2 是 2164 行）整個拆成 `leihu/web/*` | 先只拆出新功能需要的部分，或依路由群組分批拆 | 以後同步上游時，`app.py` 的改動要對應到哪個檔案 |
 | 步驟 4 拆模組 | `pipeline.py`（2.3.2 是 4801 行）拆成 config、dsp、media、lyrics、llm、render | 依上游最常改的區塊決定先拆哪裡，或保留 `pipeline.py` 當相容層 | 同上 |
 | 步驟 0 S28 環境變數 | 自訂覆寫順序 | 配合 2.3.2 的 `library_dir`、`models_dir` 重新設計 | 不能跟上游的搬移功能衝突 |
@@ -206,18 +210,18 @@ F 組的修正跟著程式落點放進對應的步驟。下表是依 commit 標�
 | 不裝 torch 也能測（Protocol 加假 worker） | 測試用 monkeypatch 換掉 `gpu_worker.call`、`gpu_worker.POOL`、`gpu_worker.CPU_POOL`（`pipeline.py:177` 的 `POOL.call("probe")`、`pipeline.py:3289` 的 `POOL.count()`；`app.py:1430`、`app.py:1450` 的 `POOL.shutdown()`、`CPU_POOL.shutdown()`），不需要另外的介面 |
 | 子程式不 import pipeline，啟動比較輕 | 子程式的時間和記憶體主要花在 torch 和模型上，差距沒有量過；需要時用 `tests/numeric/measure_r4.py` 量了再決定 |
 | 伺服器永遠不載入 torch | 上游只有在子程式開不起來時才在主程式裡做。**要決定**：保留上游的備援（不用改，子程式壞了還能處理歌曲），還是拿掉（遵守舊分支 `docs/upstream-sync-2.2.0.md` 第 2 節「伺服器不載入 torch」，但子程式壞了就完全不能處理） |
-| 長音訊的旋律分析逾時依音訊長度放寬（`leihu/inference.py` 的 `max(STALL["crepe"], 3 * 音訊秒數)`） | 上游 GPU、CPU worker 都固定 600 秒（`gpu_worker.py:524` 的 `STALL.get(name, 600.0)`），長歌在 CPU 上可能逾時失敗。另外評估在 `gpu_worker` 保留這項保護，加逾時邊界測試，不用搬回 ml-worker |
+| 長音訊的旋律分析逾時依音訊長度放寬（`leihu/inference.py` 的 `max(STALL["crepe"], 3 * 音訊秒數)`） | 上游 GPU、CPU worker 都固定 600 秒（`gpu_worker.py:524` 的 `STALL.get(name, 600.0)`），長歌在 CPU 上可能逾時失敗。在 `gpu_worker` 加這項保護會改變行為，延後（3.1）；不用搬回 ml-worker |
 | 歌詞辨識拆成三個呼叫、同一個 worker 做完 | 上游是一個工作做完三步，結果一樣，不搬 |
 | JSON 協定（不用 pickle） | 兩邊都只在本機溝通，上游有隨機 authkey，不搬 |
 
-**在上游 `gpu_worker.py` 上要補的修正：**
-- **`_set_priority` 的優先順序從來沒生效**（舊分支 `1b5074b`）。上游 `gpu_worker.py:42` 一樣沒有設 `GetCurrentProcess` 的 `restype` 和 `SetPriorityClass` 的 `argtypes`，64 位元 Windows 上 `SetPriorityClass` 會失敗（回傳 0，不丟例外），上游沒有檢查回傳值，所以完全沒有訊息。直播中的低優先順序在上游也沒有生效。修法照 `1b5074b` 搬，放在 C 組（扁平結構上的修正）。回歸測試也照搬，但上游沒有失敗訊息，只保留「子行程讀回 `GetPriorityClass` 是 `0x4000`、`0x20`」的斷言，載入的檔案改成 `gpu_worker.py`、呼叫 `_set_priority`。
+**在上游 `gpu_worker.py` 上要補的修正（延後，3.1 的原則）：**
+- **`_set_priority` 的優先順序從來沒生效**（舊分支 `1b5074b`）。上游 `gpu_worker.py:42` 一樣沒有設 `GetCurrentProcess` 的 `restype` 和 `SetPriorityClass` 的 `argtypes`，64 位元 Windows 上 `SetPriorityClass` 會失敗（回傳 0，不丟例外），上游沒有檢查回傳值，所以完全沒有訊息。直播中的低優先順序在上游也沒有生效。修了會讓直播中的低優先順序真的生效，屬於改變行為，這個版本不修。以後要修時，修法照 `1b5074b` 搬，放在 `gpu_worker.py`。回歸測試也照搬，但上游沒有失敗訊息，只保留「子行程讀回 `GetPriorityClass` 是 `0x4000`、`0x20`」的斷言，載入的檔案改成 `gpu_worker.py`、呼叫 `_set_priority`。
 - `dcd5ce4` 的 GpuStalled 放鎖順序，commit 說明寫「和上游 `gpu_worker.call` 一致」，所以上游不用修。`cuda_ok` 交握卡住是 ml-worker 才有的問題，上游 `track_pitch` 判斷用 CPU 時不會呼叫 `cuda_ok`，不用處理。
 - 36 的混合精度 OOM：commit 說明寫「上游 2.2.0 漏移植」，上游 `pipeline.py:2069` 遇到 out of memory 不標壞、交給外層退回標準模型，預計不搬，review 時確認。
 
 **連帶影響：**
-- F 組：46 改修在 `gpu_worker._set_priority`；68 的 WorkerPool 和 `cuda_ok` 兩項不做；68 的 leadfix 互斥照原計畫查。
-- 舊步驟 3 的其他部分照原計畫逐項評估：數值比對與量測工具（`tests/numeric/`、`tests/test_numeric.py`，D 組要用；`measure_r4.py`、`worker_nodither.py` 可能依賴 ml-worker，要改）、`LIANTAI_URL_BASE`、背景工作契約快照、伺服器不載入 librosa／scipy／numba（`leihu/dsp.py`、soxr）。其中 dsp 改寫會跟上游 pipeline 的改動衝突，要用 3.4 第 3 點判斷。
+- F 組：46 延後，以後改修在 `gpu_worker._set_priority`；68 的 WorkerPool 和 `cuda_ok` 兩項不做；68 的 leadfix 互斥照原計畫查，上游沒有的話延後（3.1）。
+- 舊步驟 3 的其他部分照原計畫逐項評估：數值比對與量測工具（`tests/numeric/`、`tests/test_numeric.py`，D 組要用；`measure_r4.py`、`worker_nodither.py` 可能依賴 ml-worker，要改）、`LIANTAI_URL_BASE`、背景工作契約快照、伺服器不載入 librosa／scipy／numba（`leihu/dsp.py`、soxr）。其中 dsp 改寫會跟上游 pipeline 的改動衝突，要用 3.4 第 3 點判斷；改寫若讓輸出數值改變，就是效能調整，延後。
 - 刻意不移植清單裡的上游 `_local_only` 和「2.2.0 `gpu_worker` 機制的 7 個名稱」都不再成立，比對工具（`tests/contract/compare_upstream.py`）的登記要拿掉。
 - 3.6 推翻了舊分支 2026-11-17 的決定（`docs/upstream-sync-2.2.0.md` 第 2 節：保留 ml-worker）。
 
@@ -240,8 +244,8 @@ F 組的修正跟著程式落點放進對應的步驟。下表是依 commit 標�
    - 所以 D 組要在 `compare_upstream.py` 補 `--record`：匯出指定的 git 參照，用 `serve_upstream.py` 跑 `CASES`，在 `LIANTAI_SNAPSHOT_UPDATE=1` 下呼叫 `compare_snapshot(result, SNAPSHOT)` 寫出 `contract.json`。
    - D 組完成時跑 `compare_upstream.py v2.3.2 --record` 錄一次，這時兩邊相同。舊的 `contract.json` 是重構版的輸出，不能沿用。
    - `RULES` 要先清成空 list：舊的 S15、D1、R2、D2/D4 是 2.0.0 重構版的差異，其中 D1 用案例名稱的字首整個放行，留著會讓未登記的差異被當成預期。
-   - 之後 C 組、E 組每次改變行為：先在 `RULES` 登記，再更新快照。除了第一次建立基準，更新都要先寫出候選結果，確認案例集合一致，並和現場跑的 `v2.3.2` 比對；所有差異都符合 `RULES` 才覆寫 `contract.json`，否則 exit 1、保留原快照。
-3. 步驟 1 之前，`refactor` 這邊用 `compare_upstream.py <已 commit 的參照> --record`，以 `serve_upstream.py` 執行匯出的程式，兩邊只要一個啟動器。步驟 1 之後改用 `serve.py` 加 pytest 更新目前工作樹的快照（`LIANTAI_SNAPSHOT_UPDATE=1 uv run pytest tests/contract`，要 S28），不再用 `--record`；`serve.py` 的 `ROOT` 固定是 repo 本身，如果要錄重構後的任意參照，要先讓它接受程式碼資料夾參數。上一點「先比對、全部登記才覆寫」的規則兩種錄法都要做到。`test_contract.py` 同時是工具庫和唯一的 pytest 測試，所以 D 組要讓 CI 不收集 `test_contract_snapshot`（例如在 `pyproject.toml` 的 `addopts` 加 `--deselect tests/contract/test_contract.py::test_contract_snapshot`），等 C 組完成 S28 後再拿掉。
+   - 之後 C 組、E 組除了安全修正都不改行為（3.1）；出現差異時（例如安全修正、沙盒要替換的名稱變了），先在 `RULES` 登記並寫原因，再更新快照。除了第一次建立基準，更新都要先寫出候選結果，確認案例集合一致，並和現場跑的 `v2.3.2` 比對；所有差異都符合 `RULES` 才覆寫 `contract.json`，否則 exit 1、保留原快照。
+3. 步驟 1 之前，`refactor` 這邊用 `compare_upstream.py <已 commit 的參照> --record`，以 `serve_upstream.py` 執行匯出的程式，兩邊只要一個啟動器。步驟 1 之後改用 `serve.py` 加 pytest 更新目前工作樹的快照（`LIANTAI_SNAPSHOT_UPDATE=1 uv run pytest tests/contract`，要 S28），不再用 `--record`；`serve.py` 的 `ROOT` 固定是 repo 本身，如果要錄重構後的任意參照，要先讓它接受程式碼資料夾參數。上一點「先比對、全部登記才覆寫」的規則兩種錄法都要做到。`test_contract.py` 同時是工具庫和唯一的 pytest 測試，所以 B 組要讓 CI 不收集 `test_contract_snapshot`（3.11 的 `addopts`），等 C 組完成 S28 後再拿掉。
 4. 步驟 1 會把 `prefetcher`、`lead_fix_sweep` 等背景函式從 `app` 搬走，`serve_upstream.py` 的 `hasattr(app, name)` 找不到就靜默略過，背景執行緒會真的啟動。所以 S28 要在步驟 1 之前完成，之後 `refactor` 這邊改用 `serve.py`。
 
 從行為比對計畫補過來的做法：
@@ -265,8 +269,8 @@ shim 要補的地方：
 ### 3.8 三種基準與兩個階段（2026-11-21 決定）
 **原則：先證明功能和上游沒有差異，再調整效能。** 調整效能（換模型精度、平行處理、改演算法）一定會讓輸出不同，最多只能做到相似。兩者混在一起的話，看到差異時分不出是 bug 還是效能調整造成的。
 
-- **第一階段（行為等價）**：B、A、D、C、E 組。只允許 `RULES` 登記過的差異，不做任何會改變輸出數值的效能調整。
-- **第二階段（效能調整）**：第一階段完成後才開始。每項調整都要對照效能基準和相似度基準，寫明快了多少、輸出差多少。
+- **第一階段（行為等價）**：B、A、D 組，C 組不改行為的部分和安全修正（3.1），E 組。只允許 `RULES` 登記過的差異，不做任何會改變輸出數值的效能調整。
+- **第二階段（效能調整）**：延到後面的版本（3.1），第一階段完成後才開始。每項調整都要對照效能基準和相似度基準，寫明快了多少、輸出差多少。
 
 工作分支：`test/upstream-baseline`（從 `refactor` 開），先放 D 組的測試和基準，暫不發 PR。
 
@@ -350,10 +354,37 @@ shim 要補的地方：
 - 第一階段只靠開發機的 CPU 基準證明行為沒變。顯示卡路徑（`gpu_worker` 的顯示卡分支、CUDA 失敗時的退回、高品質模型 BS-Roformer、顯示卡記憶體不足時的行為與效能）沒有基準，重構時改到這些地方要特別小心，並在 PR 寫明沒有驗證。
 - 工具已經支援顯示卡的部分：`--device=cpu|auto`、`similarity.py --fixed`（顯示卡數值基準要用的固定條件下限）、`child_hook.py` 回報每一步的實際裝置、數值基準在顯示卡上改用下限判斷穩定性。都只在 CPU 上跑過，顯示卡分支沒有實際執行過。
 
+### 3.11 B 組執行計畫
+分支的起點見第 4 節。一個舊 commit 對一個新 commit，依下面的順序；舊 commit 裡的文件（`docs/step0-plan.md`、`docs/improvements.md`、`docs/ruff-handoff.md`、`docs/HANDOFF.md`）不搬，跟 A、G 組一起處理。
+
+1. **`447489e` 重做**：
+   - `pyproject.toml`、`.python-version`、`uv.lock`：`requires-python`、`[tool.uv]`（`package = false`、`default-groups`、只解 `win32`）和 `test` 群組（扣掉推論和視窗套件，版本照 `requirements-win.txt`）照 `447489e`。不要複製 `sync/upstream-2.3.2` 的版本：它多了 2.3.2 用不到的 `soxr`。`uv lock` 重新產生。
+   - `[tool.pytest.ini_options]`：`pythonpath = ["."]`、`testpaths`、`markers` 照舊；`addopts = "-m 'not models' --ignore=tests/private --deselect tests/contract/test_contract.py::test_contract_snapshot"`。`tests/private` 會放匯出的程式碼，裡面有它自己的測試。deselect 對不存在的測試沒有作用，D 組有沒有先進來都加；C 組完成 S28 後拿掉。
+   - `tests/conftest.py`：只留 `_root_untouched` 和 `app_module`。`_root_untouched` 照 `sync/upstream-2.3.2` 只檢查使用者資料清單（清單換成 2.3.2 實際會寫的檔案），不掃整個 repo：`import pipeline` 沒有系統 ffmpeg 時會把它複製到 `bin/`（`pipeline.py:3869` 在模組載入時執行的 `ffmpeg_path()`），`run_dev.py` 也把資料寫在 repo 裡。不設 `LIANTAI_*`：2.3.2 只讀 `LIANTAI_PORT`（3.7），設了會讓人以為資料有隔離。S28 完成後再補。
+   - `tests/test_smoke.py`：`app` 可以載入，`url_map` 扣掉 `static` 是 93 條（含 `/api/debug/stacks`，契約快照的 92 條不含）；加上 `sync/upstream-2.3.2` 的 `test_installer_check_still_works`（`VERSION` 檔等於 `app.VERSION`）。
+   - `tests/test_requirements_sync.py` 照搬。`.github/workflows/test.yml` 用 `sync/upstream-2.3.2` 的版本、拿掉 `ruff` job：保留 `permissions: contents: read`、`timeout-minutes: 30`、`push` 只跑 `main`。
+2. **`407b2a7` 搬**：只搬 `pyproject.toml` 的 ruff 設定，CI 不跑 ruff。
+3. **`cbb0fbf` 搬**：`tests/tools/run_dev.py`（docstring 拿掉 `import leihu` 的說明）；`.gitignore` 加 `.duet_cleaned`（`app.py:1928` 會寫）。
+4. **`ebae3ee` 搬**：`installer/build.sh` 的 makensis 加 `-INPUTCHARSET UTF8`。
+
+驗收：
+- CI 和本機的 `uv run pytest` 都通過。
+- 除了 `tests/` 和設定檔，只改 `installer/build.sh` 的 makensis 參數；被測程式沒變，基準不用重錄。
+- 有 makensis 就跑 `sh installer/build.sh` 確認能建立安裝檔；沒有就在 PR 寫明沒驗證。
+- PR 寫明 `uvx ruff@0.17.5 check .` 在 2.3.2 的違規數（只記錄；版本和舊分支的 CI 相同）。
+
+不在 B 組做：
+- CI 跑 ruff（`cf7a96e`、`c666a91`）：延到 E 組清完違規之後（3.1）。
+- CI 跑契約快照（`compare_upstream.py v2.3.2`）：要先確認快照在 CI 的機器上兩次相同（例如音檔的 `pcm_sha256` 可能因 CPU 不同而不同），另外評估。
+
+順帶發現，延到後面的版本（修了會改變行為，見 3.1 的原則）：`pipeline.py` 沒有在模組頂端 `import subprocess`，`pipeline.py:3263`（`_running_apps` 在 Windows API 失敗時改用 `tasklist`）和 `pipeline.py:3294`（`_sample_gpu_load` 跑 `nvidia-smi`）會丟 `NameError`，被 `except Exception` 吞掉，所以這兩個功能一直沒有作用、也沒有訊息。契約、數值、效能的沙盒都換掉了這兩個函式，基準測不到。
+
 ## 4. 要先決定的事
 - 舊分支要留著（唯讀）還是封存成 tag，`claude/original-refactor-behavior-comparison-d469de` 也一樣。在搬完之前不要刪。
 - 測試歌曲的清單和授權（3.8）。
-- 上游 `gpu_worker` 的主程式備援（`_local`）要保留還是拿掉：保留則子程式壞了仍能處理歌曲，但伺服器會載入 torch；拿掉則遵守「伺服器不載入 torch」，子程式壞了就不能處理（3.6）。
+- B 組從哪裡開分支：D 組（`test/upstream-baseline`）先發 PR 合進 `refactor`，B 組再從 `refactor` 開；或 B 組先接在 `test/upstream-baseline` 上，之後一起合併。兩種做法的 B 組內容相同（3.11）。
+- 延後到後面版本的項目（會改變行為，3.1）：`pipeline.py` 缺 `import subprocess`（3.11）、S31、`_set_priority`（3.6）、長音訊旋律分析逾時放寬（3.6）、69 和 70 不屬於防止資料遺失的部分；C、F 組其餘逐項確認後補列。
+- 上游 `gpu_worker` 的主程式備援（`_local`）要保留還是拿掉：保留則子程式壞了仍能處理歌曲，但伺服器會載入 torch；拿掉則遵守「伺服器不載入 torch」，子程式壞了就不能處理（3.6）。拿掉會改變行為，依 3.1 屬於後面的版本，這個版本先保留。
 
 ## 5. 沒有驗證的部分
 - 初判只看了 commit 標題、檔案清單，以及 M1、M2、M5、S19 四處抽查，其他 commit 都還沒看 diff。
