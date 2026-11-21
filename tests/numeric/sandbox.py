@@ -30,17 +30,22 @@ _REPARSE = 0x400  # FILE_ATTRIBUTE_REPARSE_POINT：junction、符號連結
 
 
 def remove_tree(d: Path) -> str:
-    """刪掉暫存資料夾：先把裡面所有 junction／符號連結只拆連結（不跟進去），全部拆掉才 rmtree，
-    不可能刪到模型資料夾。回傳空字串＝刪乾淨；否則是沒刪掉的原因。"""
-    if not d.exists():
+    """刪掉這個工具建立的暫存資料夾：先把裡面所有 junction／符號連結只拆連結（不跟進去），全部拆掉才 rmtree，
+    不可能刪到模型資料夾。只接受系統暫存資料夾底下、名稱是 PREFIX 開頭、本身不是連結的資料夾。
+    回傳空字串＝刪乾淨；否則是沒刪掉的原因（資料夾保留）。"""
+    if not os.path.lexists(d):
         return ""
-    stack = [d]
+    if Path(d).parent.resolve() != Path(tempfile.gettempdir()).resolve() or not Path(d).name.startswith(PREFIX):
+        return f"{d} 不是這個工具建立的暫存資料夾，不刪"
+    if getattr(os.lstat(d), "st_file_attributes", 0) & _REPARSE:
+        return f"{d} 本身是 junction／連結，不跟進去，不刪"
+    stack = [Path(d)]
     while stack:
         cur = stack.pop()
         try:
             entries = list(os.scandir(cur))
-        except OSError:
-            continue
+        except OSError as err:
+            return f"讀不到 {cur}（{err}），整個資料夾保留不刪"
         for e in entries:
             st = e.stat(follow_symlinks=False)
             if getattr(st, "st_file_attributes", 0) & _REPARSE:
@@ -61,33 +66,56 @@ def remove_tree(d: Path) -> str:
     return "刪不掉（可能還有行程在用）"
 
 
-def _alive(pid: int) -> bool:
+def process_start(pid: int) -> int | None | str:
+    """行程的建立時間（FILETIME 整數，用來分辨 PID 被重用）；行程不存在回傳 None；沒有權限查回傳 "unknown"。"""
     import ctypes
+    from ctypes import wintypes
 
     k = ctypes.windll.kernel32
-    h = k.OpenProcess(0x00100000, False, pid)  # SYNCHRONIZE
+    k.OpenProcess.restype = wintypes.HANDLE
+    h = k.OpenProcess(0x1000, False, pid)  # PROCESS_QUERY_LIMITED_INFORMATION
     if not h:
-        return False
+        return None if k.GetLastError() == 87 else "unknown"  # 87＝參數錯誤（沒有這個 PID）；5＝拒絕存取
     try:
-        return k.WaitForSingleObject(h, 0) != 0  # 0＝已結束
+        code = wintypes.DWORD()
+        if k.GetExitCodeProcess(wintypes.HANDLE(h), ctypes.byref(code)) and code.value != 259:  # 259＝STILL_ACTIVE
+            return None
+        t = [wintypes.FILETIME() for _ in range(4)]
+        if not k.GetProcessTimes(wintypes.HANDLE(h), *(ctypes.byref(x) for x in t)):
+            return "unknown"
+        return (t[0].dwHighDateTime << 32) | t[0].dwLowDateTime
     finally:
-        k.CloseHandle(h)
+        k.CloseHandle(wintypes.HANDLE(h))
 
 
 def clean_stale() -> list[str]:
-    """上一次被強制結束（工作管理員、逾時）留下的暫存資料夾：建立它的行程已經不在就刪掉。回傳做了什麼（寫進報告）。"""
+    """上一次被強制結束（工作管理員、逾時）留下的暫存資料夾：確定建立它的行程已經不在（PID 不存在，
+    或 PID 被別的行程重用、建立時間不同）才刪。沒有 owner、讀不到、查不到行程狀態的都保留，只寫進報告。"""
     out = []
     for d in sorted(Path(tempfile.gettempdir()).glob(PREFIX + "*")):
-        owner = d / "owner.pid"
         try:
-            pid = int(owner.read_text("utf-8"))
+            pid, start = (int(x) for x in (d / "owner.pid").read_text("utf-8").split())
         except (OSError, ValueError):
-            pid = None
-        if pid is not None and _alive(pid):
-            continue  # 還在跑（例如另一個基準），不要動
+            out.append(f"保留暫存資料夾 {d.name}：沒有可讀的 owner.pid，無法確定是不是別的工作正在用（確認沒有在跑再手動刪）")
+            continue
+        now = process_start(pid)
+        if now == "unknown":
+            out.append(f"保留暫存資料夾 {d.name}：查不到 PID {pid} 的狀態（權限不足），無法確定是不是還在用")
+            continue
+        if now is not None and now == start:
+            continue  # 建立它的行程還在跑（例如另一個基準），不要動
         why = remove_tree(d)
         out.append(f"清掉上一次留下的暫存資料夾 {d.name}" + (f"：沒刪成功，{why}" if why else ""))
     return out
+
+
+def make_tmp() -> Path:
+    """先在別的名稱底下建好資料夾、寫好 owner.pid，再改名成 PREFIX 開頭：clean_stale 不會看到沒有 owner 的空窗。"""
+    stage = Path(tempfile.mkdtemp(prefix="leihu-nstage-"))
+    (stage / "owner.pid").write_text(f"{os.getpid()} {process_start(os.getpid())}", "utf-8")
+    final = stage.with_name(PREFIX + stage.name[len("leihu-nstage-"):])
+    stage.rename(final)
+    return final
 
 
 class Sandbox:
@@ -95,8 +123,7 @@ class Sandbox:
         self.models, self.tag = models, tag
         self.conditions: list[str] = []
         self.stale = clean_stale()  # 先清上一次被強制結束留下的（problems() 會列出來）
-        self.tmp = Path(tempfile.mkdtemp(prefix=PREFIX))
-        (self.tmp / "owner.pid").write_text(str(os.getpid()), "utf-8")
+        self.tmp = make_tmp()
         self.root = self.tmp / "app"
         self.junctions: list[Path] = []
         self.spawns = 0

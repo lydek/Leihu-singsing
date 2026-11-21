@@ -65,8 +65,19 @@ def machine() -> dict:
 TIMEOUT = 7200  # 秒：每一次執行的上限（--timeout 可改）；推論卡住時不會一直等下去
 
 
-def kill_tree(pid: int) -> None:
-    subprocess.run(["taskkill", "/T", "/F", "/PID", str(pid)], capture_output=True)
+def kill_tree(p: subprocess.Popen) -> str:
+    """結束整個行程樹，taskkill 和之後的等待都有期限；回傳空字串＝確認停止，否則是說明（寫進報告）。"""
+    try:
+        r = subprocess.run(["taskkill", "/T", "/F", "/PID", str(p.pid)], capture_output=True, text=True,
+                           encoding="utf-8", errors="replace", timeout=60)
+        note = "" if r.returncode == 0 else f"taskkill 結束代碼 {r.returncode}：{(r.stdout + r.stderr).strip()[:200]}"
+    except subprocess.TimeoutExpired:
+        note = "taskkill 60 秒沒有結束"
+    try:
+        p.wait(timeout=60)
+    except subprocess.TimeoutExpired:
+        return f"無法確認行程樹已經停止（{note or 'taskkill 回報成功'}），暫存資料夾可能還在用"
+    return note
 
 
 def run_logged(cmd: list[str], log: Path, timeout: float) -> tuple[int | None, list[str]]:
@@ -80,9 +91,9 @@ def run_logged(cmd: list[str], log: Path, timeout: float) -> tuple[int | None, l
         try:
             return p.wait(timeout=timeout), []
         except subprocess.TimeoutExpired:
-            kill_tree(p.pid)
-            p.wait()
-    return None, [f"超過 {timeout:g} 秒沒有結束，已結束整個行程樹，這次結果不完整（log：{log}）", *clean_stale()]
+            note = kill_tree(p)
+    return None, [f"超過 {timeout:g} 秒沒有結束，已結束整個行程樹，這次結果不完整（log：{log}）",
+                  *([note] if note else []), *clean_stale()]
 
 
 def log_alerts(log: str, label: str) -> list[str]:
