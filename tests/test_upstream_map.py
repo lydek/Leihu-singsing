@@ -81,3 +81,10 @@ def test_current_index_knows_split_locations():
     assert idx["clean_pitch"] == ["leihu/pitch.py"]
     assert idx["parse_lrc"] == ["leihu/lyrics_text.py"]
     assert idx["process_song"] == ["pipeline.py"]
+
+
+def test_trim_blank_context_for_moved_hunks():
+    # 搬到別的檔案後函式可能在檔案結尾：上游 hunk 尾端的空白上下文行要拿掉（split.patch 用 --recount 套）
+    assert U.trim_blank_context([" ", " a", "-b", "+c", " ", " "]) == [" a", "-b", "+c"]
+    assert U.trim_blank_context([" a", "+b"]) == [" a", "+b"]
+    assert U.trim_blank_context([" ", "+x", " "]) == ["+x"]  # 加的空行（"+"）不動
