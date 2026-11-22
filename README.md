@@ -42,7 +42,8 @@ sh installer/build.sh
 
 | 檔案 | 用途 |
 | --- | --- |
-| `app.py` | 本機伺服器（Flask） |
+| `app.py` | 本機伺服器的入口（建立 app、啟動背景工作） |
+| `leihu/web/` | 本機伺服器的路由（Flask Blueprint，依功能分檔）與共用狀態 |
 | `desktop.py` | 桌面視窗（pywebview），伺服器在另一個行程執行 |
 | `pipeline.py` | 分軌、音高、歌詞辨識、線上歌詞搜尋、歌曲庫 |
 | `claude_api.py` | 呼叫 Claude 並記錄 token 用量與費用 |

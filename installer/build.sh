@@ -4,6 +4,7 @@ set -e
 cd "$(dirname "$0")"
 rm -rf payload && mkdir -p payload/static payload/setup out
 cp ../app.py ../desktop.py ../installer.py ../pipeline.py ../claude_api.py ../share.py ../score_sheet.py ../hotkeys.py ../gpu_worker.py ../exporter.py ../VERSION ../requirements-win.txt payload/
+mkdir -p payload/leihu/web && cp ../leihu/__init__.py payload/leihu/ && cp ../leihu/web/*.py payload/leihu/web/
 cp ../static/index.html ../static/app.js ../static/style.css ../static/help.html ../static/overlay.html ../static/timing.html ../static/icon.ico ../static/kenzi.png ../static/linepay.png ../static/song-list-template.csv payload/static/
 mkdir -p payload/static/fonts && cp ../static/fonts/* payload/static/fonts/
 cp ../static/help.html payload/使用說明.html
