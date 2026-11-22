@@ -71,6 +71,91 @@ def test_clean_pitch_drops_runs_shorter_than_6():
     assert same(got, arr((NAN, 7), (62, 6)))
 
 
+# ---------------------------------------------------------------- octave_low_score、fix_octaves
+
+
+def tone(midi: float, frames: int, harmonics=(1, 2, 3, 4)) -> np.ndarray:
+    """frames 格長、基頻是 midi 的聲音，只含指定的泛音（第 k 泛音 = k 倍基頻）。"""
+    f = 440.0 * 2 ** ((midi - 69) / 12)
+    t = np.arange(frames * PT.HOP) / PT.PITCH_SR
+    return sum(np.sin(2 * np.pi * k * f * t) for k in harmonics).astype(np.float32)
+
+
+def test_octave_low_score_tells_real_low_note_from_octave_up():
+    low = tone(60, 40)  # 真的是 C4：第 1～4 泛音都有
+    up = tone(72, 40, (1, 2))  # 其實是 C5：C4 的第 1、3 泛音位置沒有能量
+    assert PT.octave_low_score(low, 0, 40, 60) >= 0.35
+    assert PT.octave_low_score(up, 0, 40, 60) <= 0.12
+
+
+def test_octave_low_score_none_when_too_short_or_silent():
+    assert PT.octave_low_score(tone(60, 40), 0, 2, 60) is None  # 320 個取樣，不到 400
+    assert PT.octave_low_score(np.zeros(40 * PT.HOP, np.float32), 0, 40, 60) is None
+
+
+# 四段音：前後都是 C4（60），第三段（90～125 格、35 格長）是候選音。候選音不算句尾短尾音（超過 30 格），
+# 要有「比周圍小聲」或泛音證據才會移
+A, B = 90, 125
+
+
+def melody(target: float) -> np.ndarray:
+    return arr((60, 40), (NAN, 5), (60, 40), (NAN, 5), (target, B - A), (NAN, 5), (60, 40))
+
+
+def level(weak: bool) -> np.ndarray:
+    rms = np.ones(len(melody(60)), np.float32)
+    rms[A:B] = 0.1 if weak else 1.0
+    return rms
+
+
+def audio(seg: np.ndarray) -> np.ndarray:
+    y = np.zeros(len(melody(60)) * PT.HOP, np.float32)
+    y[A * PT.HOP : B * PT.HOP] = seg
+    return y
+
+
+def test_fix_octaves_needs_evidence_to_move():
+    m = melody(72)
+    assert same(PT.fix_octaves(m), m)  # 沒有音量、沒有聲音：看不出來，不移
+    assert same(PT.fix_octaves(m, level(False)), m)  # 音量和周圍一樣：不移
+    got = PT.fix_octaves(m, level(True))
+    assert same(got, melody(60))  # 比周圍小聲：移回低八度
+    assert same(m[A:B], np.full(B - A, 72))  # 不改輸入
+
+
+def test_fix_octaves_uses_harmonics():
+    m = melody(72)
+    # 泛音顯示低八度的音確實存在：音量正常也移
+    assert same(PT.fix_octaves(m, level(False), audio(tone(60, B - A))), melody(60))
+    # 泛音顯示真的是高音：比周圍小聲也保留
+    assert same(PT.fix_octaves(m, level(True), audio(tone(72, B - A, (1, 2)))), m)
+
+
+def test_fix_octaves_moves_low_note_up():
+    m = melody(48)
+    assert same(PT.fix_octaves(m, level(True)), melody(60))  # 往下差八度又比較小聲：往上移
+    # 泛音顯示低音確實存在：保留
+    assert same(PT.fix_octaves(m, level(True), audio(tone(48, B - A))), m)
+
+
+def test_fix_octaves_short_tail_after_long_note():
+    """句尾短尾音（不超過 30 格，緊接在比它兩倍還長的音後面）：沒有音量、聲音也移。"""
+    m = arr((60, 40), (NAN, 5), (60, 41), (NAN, 5), (72, 20), (NAN, 5), (60, 40))
+    want = arr((60, 40), (NAN, 5), (60, 41), (NAN, 5), (60, 20), (NAN, 5), (60, 40))
+    assert same(PT.fix_octaves(m), want)
+
+
+def test_fix_octaves_keeps_long_notes_and_few_runs():
+    """候選音都比周圍小聲，換成別的長度就會被移。"""
+    long = arr((60, 40), (NAN, 5), (72, 61), (NAN, 5), (60, 40))  # 超過 60 格的音不看
+    two = arr((60, 41), (NAN, 5), (72, 20))  # 不到 3 段不看（不然算句尾短尾音）
+    for x, a in ((long, 45), (two, 46)):
+        rms = np.ones(len(x), np.float32)
+        rms[a:] = 0.1
+        rms[a + 61 + 5 :] = 1.0  # long 的最後一段回到正常音量
+        assert same(PT.fix_octaves(x, rms), x)
+
+
 # ---------------------------------------------------------------- trim_glides
 
 
