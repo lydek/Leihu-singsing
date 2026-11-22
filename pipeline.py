@@ -28,6 +28,33 @@ from pathlib import Path
 import numpy as np
 import soundfile as sf
 
+# 不常改的純運算搬到 leihu/（E 組步驟 4）；這裡轉出同樣的名稱，P.<名稱> 和 gpu_worker 的用法不變
+from leihu.lyrics_text import (  # noqa: F401
+    _CREDIT,
+    _NOISE,
+    _norm,
+    align_to_recognized,
+    clean_lrc,
+    fmt_lrc_time,
+    lyric_queries,
+    parse_lrc,
+    similarity,
+    srt_to_lrc,
+    to_lrc,
+    to_simplified,
+)
+from leihu.pitch import (  # noqa: F401
+    HOP,
+    HOP_S,
+    PITCH_SR,
+    bridge_gaps,
+    clean_pitch,
+    fix_octaves,
+    octave_low_score,
+    segment_notes,
+    trim_glides,
+)
+
 APP_NAME = "雷虎練唱台"
 ROOT = Path(__file__).resolve().parent
 # S28：使用者資料（歌曲庫、設定、用量、歌單、logs）的根目錄。測試用 LIANTAI_DATA 指到暫存資料夾；沒設時就是程式資料夾。
@@ -74,9 +101,6 @@ def spawned(kind: str, target: str) -> bool:
     return True
 
 SR = 44100
-PITCH_SR = 16000
-HOP = 160            # 10 ms
-HOP_S = HOP / PITCH_SR
 STEMS = ("lead", "back", "inst")
 
 DEFAULT_CONFIG = {
@@ -2340,223 +2364,6 @@ def _track_pitch_local(y16: np.ndarray, cfg: dict | None = None, strict: bool = 
     return fix_octaves(bridge_gaps(clean_pitch(midi)), rms, y16)
 
 
-def bridge_gaps(midi: np.ndarray, max_gap: int = 12, tol: float = 1.0) -> np.ndarray:
-    """前後音高接近（1 個半音內）而且只斷了很短（0.12 秒內）的地方直接連起來。"""
-    out = midi.copy()
-    n, i = len(out), 0
-    while i < n:
-        if not np.isnan(out[i]):
-            i += 1
-            continue
-        j = i
-        while j < n and np.isnan(out[j]):
-            j += 1
-        if 0 < i and j < n and j - i <= max_gap and abs(out[i - 1] - out[j]) <= tol:
-            out[i:j] = np.linspace(out[i - 1], out[j], j - i + 2)[1:-1]
-        i = j
-    return out
-
-
-def octave_low_score(y16: np.ndarray, a: int, b: int, low_midi: float) -> float | None:
-    """看這段聲音的泛音：低八度那個音是不是真的存在。
-
-    回傳（第 1＋3 泛音）÷（第 2＋4 泛音）。真的是低音時第 1、3 泛音明顯（約 0.4 以上）；
-    其實是高八度時，低音位置幾乎沒能量（約 0.1 以下）。"""
-    s0, s1 = a * HOP_S * PITCH_SR, b * HOP_S * PITCH_SR
-    seg = y16[int(s0):int(s1)]
-    if len(seg) < 400:
-        return None
-    S = np.abs(np.fft.rfft(seg * np.hanning(len(seg)), n=1 << 15))
-    fr = np.fft.rfftfreq(1 << 15, 1 / PITCH_SR)
-    f = 440.0 * 2 ** ((low_midi - 69) / 12)
-    h = [float(S[(fr > k * f * 0.97) & (fr < k * f * 1.03)].max(initial=0.0)) for k in (1, 2, 3, 4)]
-    if h[1] + h[3] <= 0:
-        return None
-    return (h[0] + h[2]) / (h[1] + h[3])
-
-
-def fix_octaves(midi: np.ndarray, rms: np.ndarray | None = None, y16: np.ndarray | None = None,
-                ctx_s: float = 2.0) -> np.ndarray:
-    """修正整段被判成高／低一個八度的音（常見在句尾漸弱的尾音）。
-
-    找出和周圍（前後 2 秒，或緊接在前面的長音）差了將近一個八度的短音或弱音，
-    再用泛音確認：低八度的音確實存在才往下移，確定是高音就保留；
-    泛音看不出來時，只有「比周圍明顯小聲」或「句尾跟在長音後面的短尾音」才移。"""
-    out = midi.copy()
-    n = len(out)
-    level = rms[:n] if rms is not None and len(rms) >= n else None
-    runs, i = [], 0
-    while i < n:
-        if np.isnan(out[i]):
-            i += 1
-            continue
-        j = i
-        while j < n and not np.isnan(out[j]):
-            j += 1
-        runs.append([i, j])
-        i = j
-    if len(runs) < 3:
-        return out
-    win = int(ctx_s / HOP_S)
-    done = set()          # 每段最多移一次，避免第二輪又被移回去
-    for _ in range(2):    # 修一次後周圍的參考也會變準，再看一次
-        meds = [float(np.median(out[a:b])) for a, b in runs]
-        for k, (a, b) in enumerate(runs):
-            if k in done or (b - a) > 60:
-                continue
-            near = [q for q, (c, d) in enumerate(runs) if q != k and d > a - win and c < b + win]
-            wts = [runs[q][1] - runs[q][0] for q in near]
-            if sum(wts) < 30:
-                continue
-            vals = [meds[q] for q in near]
-            order = np.argsort(vals)
-            cum = np.cumsum(np.array(wts)[order])
-            ctx = float(np.array(vals)[order][np.searchsorted(cum, cum[-1] / 2)])   # 依長度加權的中位數
-            diff = meds[k] - ctx
-            tail = False
-            if k > 0:
-                # 句尾的短尾音：跟緊接在前面（0.5 秒內）、比較長的那個音比
-                pa, pb = runs[k - 1]
-                pd = meds[k] - meds[k - 1]
-                if a - pb <= 50 and (pb - pa) > 2 * (b - a) and (b - a) <= 30 and 10 <= abs(pd) <= 14:
-                    diff, tail = pd, True
-            if not 10 <= abs(diff) <= 14:
-                continue
-            weak = False
-            if level is not None and near:
-                ctx_lvl = float(np.median(np.concatenate([level[runs[q][0]:runs[q][1]] for q in near])))
-                weak = float(np.median(level[a:b])) < 0.5 * ctx_lvl
-            low = meds[k] - 12 if diff > 0 else meds[k]   # 兩個候選音裡比較低的那個
-            score = octave_low_score(y16, a, b, low) if y16 is not None else None
-            if score is not None and diff > 0 and score <= 0.12:
-                continue      # 低音位置沒有能量：真的是高音
-            if score is not None and diff < 0 and score >= 0.35:
-                continue      # 低音確實存在：真的是低音
-            sure = score is not None and ((diff > 0 and score >= 0.35) or (diff < 0 and score <= 0.12))
-            if sure or weak or tail:
-                shift = 12 * np.sign(diff)
-                out[a:b] -= shift
-                meds[k] -= shift
-                done.add(k)
-    return out
-
-
-def trim_glides(midi: np.ndarray, slope: float = 0.9, k: int = 3) -> np.ndarray:
-    """去掉每段聲音開頭與結尾「快速滑動」的部分（30 ms 內變化超過 slope 個半音）。
-
-    只從兩端往內修，句子中間正常的換音、滑音不受影響。"""
-    out = midi.copy()
-    n = len(out)
-    i = 0
-    while i < n:
-        if np.isnan(out[i]):
-            i += 1
-            continue
-        j = i
-        while j < n and not np.isnan(out[j]):
-            j += 1
-        s, e = i, j
-        while s + k < e and abs(out[s] - out[s + k]) > slope:
-            s += 1
-        while e - k - 1 >= s and abs(out[e - 1] - out[e - 1 - k]) > slope:
-            e -= 1
-        # 第二步：從兩端找最近一段穩定的音（8 格內起伏小於 0.6 半音），
-        # 比它偏離超過 1.5 半音的頭尾視為滑入／滑落（慢慢掉下去的尾音也能去掉）
-        w = 8
-        for q in range(e - w, s - 1, -1):
-            seg = out[q:q + w]
-            if seg.max() - seg.min() < 0.6:
-                med = float(np.median(seg))
-                t = q + w
-                while t < e and abs(out[t] - med) <= 1.5:
-                    t += 1
-                e = t
-                break
-        for q in range(s, e - w + 1):
-            seg = out[q:q + w]
-            if seg.max() - seg.min() < 0.6:
-                med = float(np.median(seg))
-                t = q
-                while t > s and abs(out[t - 1] - med) <= 1.5:
-                    t -= 1
-                s = t
-                break
-        out[i:s] = np.nan
-        out[e:j] = np.nan
-        if e - s < 6:
-            out[s:e] = np.nan
-        i = j
-    return out
-
-
-def clean_pitch(f0: np.ndarray) -> np.ndarray:
-    n = len(f0)
-    out = np.full(n, np.nan, dtype=np.float32)
-    for i in range(n):
-        v = f0[i]
-        if np.isnan(v):
-            continue
-        w = f0[max(0, i - 3): i + 4]
-        w = w[~np.isnan(w)]
-        med = float(np.median(w))
-        if abs(v - med - 12) < 1.5:
-            v -= 12
-        elif abs(v - med + 12) < 1.5:
-            v += 12
-        out[i] = med if abs(v - med) > 2.5 else v
-    i = 0
-    while i < n:
-        if np.isnan(out[i]):
-            i += 1
-            continue
-        j = i
-        while j < n and not np.isnan(out[j]):
-            j += 1
-        if j - i < 6:
-            out[i:j] = np.nan
-        i = j
-    return out
-
-
-def segment_notes(f0: np.ndarray) -> list[list[float]]:
-    notes = []
-
-    def close(cur, end):
-        if cur and end - cur["s"] >= 0.08 and float(np.median(cur["v"])) >= 38:
-            notes.append([round(cur["s"], 3), round(end, 3), int(round(float(np.median(cur["v"]))))])
-
-    cur = None
-    dev = 0
-    for i, v in enumerate(f0):
-        t = i * HOP_S
-        if np.isnan(v):
-            if cur:
-                close(cur, t)
-                cur = None
-            continue
-        if cur is None:
-            cur = {"s": t, "v": [float(v)]}
-            dev = 0
-            continue
-        mean = sum(cur["v"]) / len(cur["v"])
-        if abs(v - mean) > 0.7:
-            dev += 1
-            if dev >= 5:
-                split = t - 4 * HOP_S
-                tail = cur["v"][-4:]
-                cur["v"] = cur["v"][:-4]
-                close(cur, split)
-                cur = {"s": split, "v": tail + [float(v)]}
-                dev = 0
-                continue
-        else:
-            dev = 0
-        cur["v"].append(float(v))
-    if cur:
-        close(cur, len(f0) * HOP_S)
-    return notes
-
-
 PITCH_ALGO = 2   # 1.4.2：旋律分析改良（補斷點、修八度）；舊的歌可以重新分析旋律
 
 
@@ -2668,35 +2475,6 @@ def _whisper_model(cfg):
         return WhisperModel(name, device="cpu", compute_type="int8", download_root=root)
     except Exception as e:
         raise UserError(f"載入語音辨識模型 {name} 失敗（第一次使用需要連網下載）：{e}") from e
-
-
-def fmt_lrc_time(t: float) -> str:
-    t = max(0.0, t)
-    m = int(t // 60)
-    return f"{m:02d}:{t - m * 60:05.2f}"
-
-
-def parse_lrc(text: str) -> list[dict]:
-    lines = []
-    for raw in text.splitlines():
-        tags = re.findall(r"\[(\d+):(\d+(?:\.\d+)?)\]", raw)
-        body = re.sub(r"\[[^\]]*\]", "", raw)
-        body = re.sub(r"<\d+:\d+(?:\.\d+)?>", "", body).strip()   # 逐字時間標記（Enhanced LRC）
-        if not tags:
-            if body:
-                lines.append({"t": None, "text": body})
-            continue
-        for mm, ss in tags:
-            lines.append({"t": int(mm) * 60 + float(ss), "text": body})
-    timed = sorted([l for l in lines if l["t"] is not None], key=lambda l: l["t"])
-    return timed + [l for l in lines if l["t"] is None]
-
-
-def to_lrc(lines: list[dict]) -> str:
-    out = []
-    for l in lines:
-        out.append((f"[{fmt_lrc_time(l['t'])}]" if l.get("t") is not None else "") + l["text"])
-    return "\n".join(out) + "\n"
 
 
 def _collect_words(segs, dur: float, report, stats: list | None = None) -> list:
@@ -3956,83 +3734,8 @@ except Exception:
 # ---------------------------------------------------------------- 線上歌詞搜尋（LRCLIB）
 
 LRCLIB = "https://lrclib.net/api/search"
-_NOISE = re.compile(r"(official|music\s*video|lyric[s]?|audio|mv|m/v|4k|hd|hq|live|cover|翻唱|清唱|純人聲|人聲|"
-                    r"a\s*cappella|acapella|vocal[s]?\s*only|伴奏|動態歌詞|歌詞版?|完整版|高音質|官方|字幕)", re.I)
 
 
-def lyric_queries(meta: dict) -> list[str]:
-    """從歌名與 YouTube 資訊猜幾個搜尋字串。"""
-    out = []
-    track, artist = meta.get("yt_track") or "", meta.get("yt_artist") or ""
-    if track:
-        out.append(f"{track} {artist}".strip())
-    title = meta.get("title") or ""
-    inner = re.findall(r"[【「《『\[]([^】」》』\]]+)[】」》』\]]", title)
-    for x in inner:
-        if not _NOISE.search(x):
-            out.append(x.strip())
-    t = re.sub(r"[【「《『\[(（][^】」》』\])）]*[】」》』\])）]", " ", title)
-    t = _NOISE.sub(" ", t)
-    t = re.sub(r"[|｜/\\_~\-–—:：#]+", " ", t)
-    t = re.sub(r"\s+", " ", t).strip()
-    good_inner = [x.strip() for x in inner if not _NOISE.search(x)]
-    if good_inner and t:
-        out.insert(len(out) - len(good_inner), f"{good_inner[0]} {t}")   # 歌名＋歌手 優先
-    if t:
-        out.append(t)
-    seen, uniq = set(), []
-    for q in out:
-        k = q.lower()
-        if q and k not in seen:
-            seen.add(k)
-            uniq.append(q)
-    return uniq[:3]
-
-
-def to_simplified(text: str) -> str:
-    try:
-        from opencc import OpenCC
-    except ImportError:
-        return text
-    for conf in ("t2s", "t2s.json"):
-        try:
-            return OpenCC(conf).convert(text)
-        except Exception:
-            continue
-    return text
-
-
-_CREDIT = re.compile(r"^\s*(作词|作曲|编曲|作詞|編曲|制作人|製作人|制作|製作|监制|監製|演唱|原唱|词|詞|曲|混音|录音|錄音|和声|和聲|"
-                     r"吉他|贝斯|貝斯|鼓|弦乐|弦樂|出品|发行|發行|OP|SP|Lyrics|Composer|Arranger|Producer)\s*[:：]", re.I)
-
-
-def clean_lrc(text: str, track: str = "", artist: str = "") -> str:
-    """去掉作詞作曲等資訊行、「歌手 - 歌名」標題行與空白行。"""
-    out = []
-    title_lines = {f"{artist} - {track}", f"{track} - {artist}"} if track and artist else set()
-    for line in (text or "").splitlines():
-        body = re.sub(r"\[[^\]]*\]", "", line).strip()
-        if not body or _CREDIT.match(body) or body in title_lines or \
-                re.match(r"^\[(ti|ar|al|by|offset|length|re|id|hash|sign|qq|total):", line, re.I):
-            continue
-        out.append(line.strip())
-    return "\n".join(out)
-
-
-def _norm(text: str) -> str:
-    """比對用：轉簡體、只留文字。"""
-    text = re.sub(r"\[[^\]]*\]|<[^>]*>", "", text or "")
-    return "".join(ch for ch in to_simplified(text).lower() if ch.isalnum())
-
-
-def similarity(recognized: str, candidate: str) -> float | None:
-    """辨識結果中，有多少比例的字依序出現在候選歌詞裡（0–1）。"""
-    import difflib
-    a, b = _norm(recognized), _norm(candidate)
-    if len(a) < 6 or not b:
-        return None
-    m = difflib.SequenceMatcher(None, a, b, autojunk=False)
-    return round(sum(x.size for x in m.get_matching_blocks()) / len(a), 3)
 
 
 USER_AGENT = "LeihuLiantai/2.3.2.1 (+https://github.com/lydek/Leihu-singsing)"   # HTTP 標頭只能用英文字
@@ -4533,70 +4236,6 @@ def align_by_voice(lines: list[str], d: Path, bonus: float = 0.6) -> list[dict]:
         idx.append(k)
     idx.reverse()
     return [{"t": round(max(0.0, float(C[k]) - 0.1), 2), "text": t} for k, t in zip(idx, lines)]
-
-
-def align_to_recognized(lines: list[str], d: Path) -> list[dict]:
-    """把只有文字的歌詞，依辨識結果的時間對上：逐字比對後，每句取第一個對到的字的時間。"""
-    import difflib
-    auto = d / "lyrics_auto.lrc"
-    rec = [l for l in parse_lrc(auto.read_text("utf-8")) if l["t"] is not None] if auto.exists() else []
-    stream, times = [], []
-    for i, l in enumerate(rec):
-        end = rec[i + 1]["t"] if i + 1 < len(rec) else l["t"] + 4
-        chars = _norm(l["text"])
-        for k, ch in enumerate(chars):
-            stream.append(ch)
-            times.append(l["t"] + (end - l["t"]) * 0.85 * k / max(1, len(chars)))
-    cand, owner = [], []
-    for i, l in enumerate(lines):
-        for ch in _norm(l):
-            cand.append(ch)
-            owner.append(i)
-    starts = [None] * len(lines)
-    if stream and cand:
-        m = difflib.SequenceMatcher(None, "".join(cand), "".join(stream), autojunk=False)
-        for blk in m.get_matching_blocks():
-            for k in range(blk.size):
-                li = owner[blk.a + k]
-                if starts[li] is None:
-                    starts[li] = times[blk.b + k]   # 該句第一個對到的字
-    # 沒對到的句子：前後內插
-    known = [(i, t) for i, t in enumerate(starts) if t is not None]
-    for i in range(len(lines)):
-        if starts[i] is not None:
-            continue
-        prev = max((k for k in known if k[0] < i), default=None, key=lambda k: k[0])
-        nxt = min((k for k in known if k[0] > i), default=None, key=lambda k: k[0])
-        if prev and nxt:
-            starts[i] = prev[1] + (nxt[1] - prev[1]) * (i - prev[0]) / (nxt[0] - prev[0])
-        elif prev:
-            starts[i] = prev[1] + 3.5 * (i - prev[0])
-        elif nxt:
-            starts[i] = max(0.0, nxt[1] - 3.5 * (nxt[0] - i))
-        else:
-            starts[i] = 3.5 * i
-    out, last = [], -1.0
-    for t, text in zip(starts, lines):   # 保持遞增
-        t = max(t, last + 0.3)
-        out.append({"t": round(t, 2), "text": text})
-        last = t
-    return out
-
-
-def srt_to_lrc(text: str) -> str:
-    """SRT 字幕 → LRC（每段字幕取開始時間，多行合成一句）。"""
-    out = []
-    for block in re.split(r"\r?\n\s*\r?\n", text.strip()):
-        m = re.search(r"(\d+):(\d+):(\d+)[,.](\d+)\s*-->", block)
-        if not m:
-            continue
-        t = int(m.group(1)) * 3600 + int(m.group(2)) * 60 + int(m.group(3)) + int(m.group(4)[:3].ljust(3, "0")) / 1000
-        body = " ".join(l.strip() for l in block.splitlines()[block.splitlines().index(
-            next(l for l in block.splitlines() if "-->" in l)) + 1:] if l.strip())
-        body = re.sub(r"<[^>]+>|\{[^}]*\}", "", body).strip()
-        if body:
-            out.append({"t": t, "text": body})
-    return to_lrc(out)
 
 
 def import_lyrics(d: Path, text: str, cfg: dict, filename: str = "") -> tuple[str, str]:
