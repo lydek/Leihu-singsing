@@ -511,7 +511,7 @@ Codex 第 7 次審查後補的（同類問題和繞過路徑）：
   - 沒搬的：假名（`tw_to_ja` 用 `log_error`，`furigana` 用安裝狀態 `_kana_lock`、`_KANA_TK`）、`align_by_voice`（用上游常改的 `voice_phrases`）、線上歌詞搜尋（呼叫 `P._http_json`，`tests/test_fork_update.py` 會替換它）、`gpu_worker` 用到的名稱（`PITCH_SR` 除外：搬到 `leihu/pitch.py`，`pipeline` 轉出同一個值，`P.PITCH_SR` 不變）。測試或沙盒會替換的 `P.<名稱>` 都留在 `pipeline`：搬走的話，搬過去的模組直接呼叫它，替換就會靜默失效。
   - 安裝檔：`build.sh` 複製 `leihu/*.py` 和 `leihu/web/*.py`（不遞迴，新增子資料夾要在 `build.sh` 加一行）；`leihu.nsi` 修復與解除安裝時清掉 `$INSTDIR\leihu`；`installer.yml` 的路徑篩選加 `leihu/**`。
   - 驗證：`uv run pytest` 通過，ruff 違規數和步驟 1 後相同；契約比對 141 個案例和快照相同、異常「無」。數值基準（CPU）各跑 1 次、和 `f3bf3df` 逐檔核對：只有合成素材時 14／14，加一首真實歌曲時 20／20 個檔案完全相同，異常都是「無」。真實歌曲只和 `f3bf3df` 比；`v2.3.2` 的真實歌曲基準已在開發機用測試計畫錄好（3.9）。
-  - **偏離 3.1 第 5 點**：步驟 4 動到 `pipeline.py`，本來要加跑 `tests/perf/baseline.py`，這一步沒跑。理由：搬的是同一份程式碼（AST 相同），只多一層 import，預期不會變慢；多 import 兩個模組對啟動時間的影響沒有量。
+  - **偏離 3.1 第 5 點**：步驟 4 動到 `pipeline.py`，本來要加跑 `tests/perf/baseline.py`，這一步沒跑。理由：搬的是同一份程式碼（AST 相同），只多一層 import，預期不會變慢；之後補量了啟動時間（2026-11-22，只量 import）：`refactor`（98aa307）和 v2.3.4 各交錯跑 15 次，`import pipeline, share` 中位數 0.253 秒對 0.249 秒，`import app` 0.277 秒對 0.276 秒，合計 0.536 秒對 0.526 秒，範圍重疊；`-X importtime` 看 `leihu.pitch`、`leihu.lyrics_text` 本身各約 3 毫秒，步驟 1 的 `leihu/web/` 各模組本身合計約 30 毫秒（程式原本就在 `app.py` 裡）。
 
 ### 3.20 待查項目的判定（2026-11-22）
 照 3.3 逐項對照 `refactor` 現在的程式，不看 v2.3.2 的行號。**結論：這幾項都不是這個版本要做的安全或防止資料遺失修正。** 每項的判定（已做、不適用、延後）寫在第 2 節備註。
@@ -570,4 +570,4 @@ Codex 第 7 次審查後補的（同類問題和繞過路徑）：
 - 「上游 2.3.2 也有這些問題」只根據 commit 說明，還沒有在 `v2.3.2` 上重現。
 - 顯示卡路徑只有筆電的一份基準（3.10）：只錄真實歌曲 2 首的效能（合成歌在顯示卡上失敗）和 `refactor` 計畫的數值各 1 次；CUDA 失敗時的退回、顯示卡記憶體不足沒有被觸發過；顯示卡的相似度基準（`similarity.py --fixed`）沒錄。
 - 背景工作（線上歌詞搜尋、更新檢查、下載）沒有契約快照（3.19 決定不做）；#43 的歌詞文字測試在步驟 4 之後才加入（3.1 第 6 點要求在拆分之前）；步驟 4 搬的函式當時靠「AST 相同」和數值基準驗證。`fix_octaves`、`octave_low_score` 的單元測試用合成的音高、RMS 和泛音訊號，涵蓋各個判斷分支、門檻的邊界、加權中位數和第二輪，確認的是判斷邏輯；真實歌曲的修正效果仍要實際錄音驗證。
-- 步驟 4 沒跑 `tests/perf/baseline.py`，多 import 兩個模組對啟動時間的影響沒有量（3.19）。
+- 步驟 1、4 對啟動時間的影響只量了 import（3.19），沒有量伺服器開好要多久，也沒有用 `tests/perf/baseline.py` 跑整首歌的效能。
