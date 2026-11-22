@@ -403,7 +403,7 @@ shim 要補的地方：
 - CI 跑 ruff（`cf7a96e`、`c666a91`）：延到 E 組清完違規之後（3.1）。
 - CI 跑契約快照（`compare_upstream.py v2.3.2`）：要先確認快照在 CI 的機器上兩次相同（例如音檔的 `pcm_sha256` 可能因 CPU 不同而不同），另外評估。
 
-順帶發現，延到後面的版本（修了會改變行為，見 3.1 的原則）：`pipeline.py` 沒有在模組頂端 `import subprocess`，`pipeline.py:3263`（`_running_apps` 在 Windows API 失敗時改用 `tasklist`）和 `pipeline.py:3294`（`_sample_gpu_load` 跑 `nvidia-smi`）會丟 `NameError`，被 `except Exception` 吞掉：`tasklist` 備援和 `nvidia-smi` 取樣一直沒有作用、也沒有訊息（Windows API 那條直播偵測正常）。契約、數值、效能的沙盒都換掉了這兩個函式，基準測不到。
+順帶發現，延到後面的版本（修了會改變行為，見 3.1 的原則）：`pipeline.py` 沒有在模組頂端 `import subprocess`，`pipeline.py:3263`（`_running_apps` 在 Windows API 失敗時改用 `tasklist`）和 `pipeline.py:3294`（`_sample_gpu_load` 跑 `nvidia-smi`）會丟 `NameError`，被 `except Exception` 吞掉：`tasklist` 備援和 `nvidia-smi` 取樣一直沒有作用、也沒有訊息（Windows API 那條直播偵測正常）。契約、數值、效能的沙盒都換掉了這兩個函式，基準測不到。（下一版第 1 批已修，`next-version-plan.md`）
 
 **進度（2026-11-21）**：接在 `test/upstream-baseline` 上做完，四個 commit 依序對應上面四步（`f8538e4`、`e234dd4`、`5d3db0d`、`5d430b7`）。
 - 本機 `uv run pytest`：4 個通過、1 個不收集（`test_contract_snapshot`）。`import app` 沒有寫到使用者資料。
@@ -562,7 +562,7 @@ Codex 第 7 次審查後補的（同類問題和繞過路徑）：
 ## 4. 要先決定的事
 - 舊分支要留著（唯讀）還是封存成 tag，`claude/original-refactor-behavior-comparison-d469de` 也一樣。在搬完之前不要刪。
 - 測試歌曲的清單和授權（3.8）。
-- 延後到後面版本的項目（會改變行為，3.1）：`pipeline.py` 缺 `import subprocess`（3.11）、步驟 2 的 API 變更（`step2-plan.md` 的 D1–D6）與 `step_import` 補鎖（3.19）、步驟 3 的伺服器不載入 librosa／scipy／numba（效能調整，3.19）、S31、長音訊旋律分析逾時放寬（3.6）、M3、M7、S8、O21、S19（3.13）、69、70（3.20）、6 的 R2／R3、9 的試聽檔、22 的第一段退回與 6 GB 門檻、36 的建議與可選、38 的 `.partK`／PowerShell 路徑／濾波分段、68 的主唱補回與移調互斥（3.20）；C、F 組其餘逐項確認後補列。
+- 延後到後面版本的項目（會改變行為，3.1）：`pipeline.py` 缺 `import subprocess`（3.11，下一版第 1 批已修）、步驟 2 的 API 變更（`step2-plan.md` 的 D1–D6）與 `step_import` 補鎖（3.19）、步驟 3 的伺服器不載入 librosa／scipy／numba（效能調整，3.19）、S31、長音訊旋律分析逾時放寬（3.6）、M3、M7、S8、O21、S19（3.13）、69、70（3.20）、6 的 R2／R3、9 的試聽檔、22 的第一段退回與 6 GB 門檻、36 的建議與可選、38 的 `.partK`／PowerShell 路徑／濾波分段、68 的主唱補回與移調互斥（3.20）；C、F 組其餘逐項確認後補列。
 - 上游 `gpu_worker` 的主程式備援（`_local`）要保留還是拿掉：保留則子程式壞了仍能處理歌曲，但伺服器會載入 torch；拿掉則遵守「伺服器不載入 torch」，子程式壞了就不能處理（3.6）。拿掉會改變行為，依 3.1 屬於後面的版本，這個版本先保留。
 
 ## 5. 沒有驗證的部分
