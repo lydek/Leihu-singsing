@@ -496,7 +496,7 @@ Codex 第 7 次審查後補的（同類問題和繞過路徑）：
   - 搬出去的（`v1.6` 以來沒改過、只依賴標準函式庫和 numpy；`to_simplified` 會選用 `opencc`，沒裝就原樣回傳）：`leihu/pitch.py`（`bridge_gaps`、`octave_low_score`、`fix_octaves`、`trim_glides`、`clean_pitch`、`segment_notes`，連同 `PITCH_SR`、`HOP`、`HOP_S`）；`leihu/lyrics_text.py`（`fmt_lrc_time`、`parse_lrc`、`to_lrc`、`lyric_queries`、`to_simplified`、`clean_lrc`、`_norm`、`similarity`、`srt_to_lrc`、`align_to_recognized`，連同 `_NOISE`、`_CREDIT`）。21 個定義的 AST 和搬移前相同，`pipeline` 只多了轉出這些名稱的 import，`P.<名稱>` 拿到的是同一個物件。
   - 沒搬的：假名（`tw_to_ja` 用 `log_error`，`furigana` 用安裝狀態 `_kana_lock`、`_KANA_TK`）、`align_by_voice`（用上游常改的 `voice_phrases`）、線上歌詞搜尋（呼叫 `P._http_json`，`tests/test_fork_update.py` 會替換它）、`gpu_worker` 用到的名稱（`PITCH_SR` 除外：搬到 `leihu/pitch.py`，`pipeline` 轉出同一個值，`P.PITCH_SR` 不變）。測試或沙盒會替換的 `P.<名稱>` 都留在 `pipeline`：搬走的話，搬過去的模組直接呼叫它，替換就會靜默失效。
   - 安裝檔：`build.sh` 複製 `leihu/*.py` 和 `leihu/web/*.py`（不遞迴，新增子資料夾要在 `build.sh` 加一行）；`leihu.nsi` 修復與解除安裝時清掉 `$INSTDIR\leihu`；`installer.yml` 的路徑篩選加 `leihu/**`。
-  - 驗證：`uv run pytest` 通過，ruff 違規數和步驟 1 後相同；契約比對 141 個案例和快照相同、異常「無」。數值基準（CPU）各跑 1 次、和 `f3bf3df` 逐檔核對：只有合成素材時 14／14，加一首真實歌曲時 20／20 個檔案完全相同，異常都是「無」。真實歌曲只和 `f3bf3df` 比；`v2.3.2` 的真實歌曲基準已在開發機用測試計畫錄好，紀錄在 `claude/e-group-baselines-b1ff67`，還沒合進 `refactor`（3.9 尚未更新）。
+  - 驗證：`uv run pytest` 通過，ruff 違規數和步驟 1 後相同；契約比對 141 個案例和快照相同、異常「無」。數值基準（CPU）各跑 1 次、和 `f3bf3df` 逐檔核對：只有合成素材時 14／14，加一首真實歌曲時 20／20 個檔案完全相同，異常都是「無」。真實歌曲只和 `f3bf3df` 比；`v2.3.2` 的真實歌曲基準已在開發機用測試計畫錄好（3.9）。
   - **偏離 3.1 第 5 點**：步驟 4 動到 `pipeline.py`，本來要加跑 `tests/perf/baseline.py`，這一步沒跑。理由：搬的是同一份程式碼（AST 相同），只多一層 import，預期不會變慢；多 import 兩個模組對啟動時間的影響沒有量。
 
 ### 3.20 待查項目的判定（2026-11-22）
