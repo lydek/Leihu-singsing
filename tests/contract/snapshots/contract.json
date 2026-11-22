@@ -3033,36 +3033,12 @@
     {
      "created": "<time>",
      "error": null,
-     "id": "<id10>",
+     "id": "<id14>",
      "kind": "process",
      "label": "youtube",
      "order": 6,
      "progress": 0.0,
-     "song": "<id9>",
-     "status": "queued",
-     "step": "排隊中"
-    },
-    {
-     "created": "<time>",
-     "error": null,
-     "id": "<id14>",
-     "kind": "process",
-     "label": "youtube",
-     "order": 7,
-     "progress": 0.0,
      "song": "<id11>",
-     "status": "queued",
-     "step": "排隊中"
-    },
-    {
-     "created": "<time>",
-     "error": null,
-     "id": "<id13>",
-     "kind": "process",
-     "label": "all",
-     "order": 8,
-     "progress": 0.0,
-     "song": "<id12>",
      "status": "queued",
      "step": "排隊中"
     },
@@ -3097,7 +3073,7 @@
     "whisper": true
    },
    "parallel_ok": false,
-   "queued_total": 5,
+   "queued_total": 3,
    "remote": {
     "id": "songnew001",
     "key": 1,
@@ -3203,36 +3179,12 @@
     {
      "created": "<time>",
      "error": null,
-     "id": "<id10>",
+     "id": "<id14>",
      "kind": "process",
      "label": "youtube",
      "order": 6,
      "progress": 0.0,
-     "song": "<id9>",
-     "status": "queued",
-     "step": "排隊中"
-    },
-    {
-     "created": "<time>",
-     "error": null,
-     "id": "<id14>",
-     "kind": "process",
-     "label": "youtube",
-     "order": 7,
-     "progress": 0.0,
      "song": "<id11>",
-     "status": "queued",
-     "step": "排隊中"
-    },
-    {
-     "created": "<time>",
-     "error": null,
-     "id": "<id13>",
-     "kind": "process",
-     "label": "all",
-     "order": 8,
-     "progress": 0.0,
-     "song": "<id12>",
      "status": "queued",
      "step": "排隊中"
     },
@@ -3267,7 +3219,7 @@
     "whisper": true
    },
    "parallel_ok": false,
-   "queued_total": 5,
+   "queued_total": 3,
    "remote": {
     "id": "songnew001",
     "key": 1,
@@ -3373,36 +3325,12 @@
     {
      "created": "<time>",
      "error": null,
-     "id": "<id10>",
+     "id": "<id14>",
      "kind": "process",
      "label": "youtube",
      "order": 6,
      "progress": 0.0,
-     "song": "<id9>",
-     "status": "queued",
-     "step": "排隊中"
-    },
-    {
-     "created": "<time>",
-     "error": null,
-     "id": "<id14>",
-     "kind": "process",
-     "label": "youtube",
-     "order": 7,
-     "progress": 0.0,
      "song": "<id11>",
-     "status": "queued",
-     "step": "排隊中"
-    },
-    {
-     "created": "<time>",
-     "error": null,
-     "id": "<id13>",
-     "kind": "process",
-     "label": "all",
-     "order": 8,
-     "progress": 0.0,
-     "song": "<id12>",
      "status": "queued",
      "step": "排隊中"
     },
@@ -3438,7 +3366,7 @@
     "whisper": true
    },
    "parallel_ok": false,
-   "queued_total": 5,
+   "queued_total": 3,
    "remote": {
     "id": "songnew001",
     "key": 1,
@@ -3544,36 +3472,12 @@
     {
      "created": "<time>",
      "error": null,
-     "id": "<id10>",
+     "id": "<id14>",
      "kind": "process",
      "label": "youtube",
      "order": 6,
      "progress": 0.0,
-     "song": "<id9>",
-     "status": "queued",
-     "step": "排隊中"
-    },
-    {
-     "created": "<time>",
-     "error": null,
-     "id": "<id14>",
-     "kind": "process",
-     "label": "youtube",
-     "order": 7,
-     "progress": 0.0,
      "song": "<id11>",
-     "status": "queued",
-     "step": "排隊中"
-    },
-    {
-     "created": "<time>",
-     "error": null,
-     "id": "<id13>",
-     "kind": "process",
-     "label": "all",
-     "order": 8,
-     "progress": 0.0,
-     "song": "<id12>",
      "status": "queued",
      "step": "排隊中"
     },
@@ -3609,7 +3513,7 @@
     "whisper": true
    },
    "parallel_ok": false,
-   "queued_total": 5,
+   "queued_total": 3,
    "remote": {
     "id": "songnew001",
     "key": 1,
