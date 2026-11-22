@@ -11,9 +11,9 @@ FORK = "https://github.com/lydek/Leihu-singsing"
 
 
 def test_version_is_fork_version(app_module):
-    assert app_module.VERSION == "2.3.3.1"
+    assert app_module.VERSION == "2.3.4.1"
     assert (ROOT / "VERSION").read_text("utf-8").strip() == app_module.VERSION
-    assert '!define VERSION "2.3.3.1"' in (ROOT / "installer" / "leihu.nsi").read_text("utf-8")
+    assert '!define VERSION "2.3.4.1"' in (ROOT / "installer" / "leihu.nsi").read_text("utf-8")
 
 
 def test_ver_compares_four_parts(app_module):
@@ -46,20 +46,20 @@ def update(app_module, monkeypatch):
 
 def test_update_checks_fork_releases(update):
     app, release, calls = update
-    release("v2.3.3.2", f"{FORK}/releases/download/v2.3.3.2/LeihuLiantai-2.3.3.2-Setup.exe")
+    release("v2.3.4.2", f"{FORK}/releases/download/v2.3.4.2/LeihuLiantai-2.3.4.2-Setup.exe")
     app.check_update()
     assert calls == ["https://api.github.com/repos/lydek/Leihu-singsing/releases/latest"]
-    assert app.UPDATE["latest"] == "2.3.3.2"
+    assert app.UPDATE["latest"] == "2.3.4.2"
     assert app._UPDATE_ASSET["url"].startswith(FORK + "/releases/download/")
     assert app.UPDATE["url"] == f"{FORK}/releases/latest"
 
 
 def test_update_ignores_same_version_and_upstream_assets(update):
     app, release, _ = update
-    release("v2.3.3.1", f"{FORK}/releases/download/v2.3.3.1/LeihuLiantai-2.3.3.1-Setup.exe")
+    release("v2.3.4.1", f"{FORK}/releases/download/v2.3.4.1/LeihuLiantai-2.3.4.1-Setup.exe")
     app.check_update()
     assert app.UPDATE["latest"] is None  # 和目前一樣：不提示
-    release("v2.3.3.9", "https://github.com/LeihuTW/Leihu-singsing/releases/download/v2.3.3.9/x-Setup.exe")
+    release("v2.3.4.9", "https://github.com/LeihuTW/Leihu-singsing/releases/download/v2.3.4.9/x-Setup.exe")
     app.check_update()
     assert "url" not in app._UPDATE_ASSET  # 不是 fork 的安裝檔：不能一鍵更新
 

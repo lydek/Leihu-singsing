@@ -9,7 +9,7 @@ from flask import request
 
 import pipeline as P
 
-VERSION = "2.3.3.1"   # fork：上游版本＋第 4 段 fork 序號
+VERSION = "2.3.4.1"   # fork：上游版本＋第 4 段 fork 序號
 
 
 HOST, PORT = "127.0.0.1", int(os.environ.get("LIANTAI_PORT", "8765"))

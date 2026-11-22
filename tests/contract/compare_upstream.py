@@ -60,11 +60,11 @@ NOT_PORTED: dict[str, str] = {}
 # 目前這一邊對前端、安裝檔的改動：(檔案, 改動行要符合的 regex)；和上游比，其他改動行都算漏移
 FRONT = ["static", "hotkeys.py", "VERSION", "installer/leihu.nsi"]
 OWN_CHANGES: list[tuple[str, str]] = [
-    # fork 版號 2.3.3.1（3.15）
-    ("VERSION", r"-2\.3\.3"),
-    ("VERSION", r"\+2\.3\.3\.1"),
-    ("static/help.html", r"[-+].*2\.3\.3.*"),  # 標題、版號、安裝檔名
-    ("static/index.html", r"[-+].*id=\"ver\">2\.3\.3(\.1)?<.*"),
+    # fork 版號 2.3.4.1（3.15）
+    ("VERSION", r"-2\.3\.4"),
+    ("VERSION", r"\+2\.3\.4\.1"),
+    ("static/help.html", r"[-+].*2\.3\.4.*"),  # 標題、版號、安裝檔名
+    ("static/index.html", r"[-+].*id=\"ver\">2\.3\.4(\.1)?<.*"),
     # 更新提示改連 fork 的 release（3.15）
     ("static/index.html", r"[-+].*href=\"https://github\.com/(LeihuTW|lydek)/Leihu-singsing/releases/latest\".*"),
     # 安裝檔：版號與測試版開關（3.14、3.15）
