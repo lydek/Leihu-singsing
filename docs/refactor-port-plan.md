@@ -530,16 +530,28 @@ Codex 第 7 次審查後補的（同類問題和繞過路徑）：
    ```
    python tests/tools/upstream_map.py <上次同步的版本> <新版本> --patch=tests/private/sync/<新版本>
    ```
-   報告列出每個 hunk 的目標檔案；標成「手動」的（模組層級的 import、常數，或橫跨兩個現在分在不同檔案的定義，或上游新增的定義）不在 patch 裡，照報告的名稱手動改。上游新增的路由，依網址放進對應的 Blueprint。
+   報告列出每個 hunk 的目標檔案。名稱相同時，只找來源檔拆出去的範圍（app.py → `app.py`、`leihu/web/`；pipeline.py → `pipeline.py`、`leihu/pitch.py`、`leihu/lyrics_text.py`）。pipeline.py 上游新增的定義自動放在 `pipeline.py`；標成「手動」的（模組層級的 import、常數，橫跨兩個現在分在不同檔案的定義，app.py 上游新增的定義）不在 patch 裡，照報告的名稱手動改。app.py 新增的路由，依網址決定放哪個 Blueprint；啟動時的背景工作放 `leihu/web/background.py`。
 3. 依序套用每個 commit 的兩個 patch：
-   - `<序號>-<sha>.other.patch`（其他檔案）：`git apply --index --3way`。fork 自己改過的地方（版號、`help.html`、`leihu.nsi`）會變成衝突，手動解。
-   - `<序號>-<sha>.split.patch`（app.py、pipeline.py 改好路徑的 hunk，沒有對應的 blob，不能 3-way）：`git apply --index --reject`，套不上的 hunk 留在 `.rej` 手動處理（通常是 C 組改過的地方，例如 `main()`、`take_export`）。
-   手動的部分改完後執行 `git commit -C <sha> --trailer "Upstream-commit: <sha>"`，作者和說明沿用上游。
-4. 套完後跑 `uv run pytest`、`compare_upstream.py <新版本> --leak`（上游新增的名稱要找得到；它會搜尋包含 `leihu/` 的所有程式）、契約比對；動到分離、音高、歌詞、評分時再挑一首歌跑數值的 `--against`（3.8）。上游行為改變造成的契約差異，照 3.7 先在 `RULES` 登記再更新快照。
+   - `<序號>-<sha>.other.patch`（其他檔案，有 blob index）：`git apply --index --3way`。fork 自己改過的地方（版號、`help.html`、`leihu.nsi`）會變成衝突，手動解。
+   - `<序號>-<sha>.split.patch`（app.py、pipeline.py 改好路徑的 hunk，沒有對應的 blob，不能 3-way）：`git apply --index --reject --recount`。工具會去掉頭尾的空白上下文行（函式搬到檔案開頭或結尾時，上游 hunk 邊上的空行不存在），所以要 `--recount`。套不上的 hunk 留在 `.rej` 手動處理，通常是 C 組改過的地方（例如 `main()`、`take_export`、`downloads_dir`）。
+   - 版號照 3.15 改成「上游版本＋.1」（`VERSION`、`leihu.nsi`、`help.html`、`index.html`、`leihu/web/common.py`、`pipeline.USER_AGENT`），版號測試（`test_fork_update.py`、`test_installer_identity.py`）和漏移檢查的 `OWN_CHANGES` 一起改。
+   - commit 沿用上游的作者和日期（`--author`、`--date` 取自上游 commit），說明保留上游原文，後面補兩段：放進現在的結構、fork 的調整，最後加 `Upstream-commit: <sha>` trailer（trailer 的 key 要用英文）。連續幾個上游 commit 改同一個功能、中間狀態馬上被換掉時，可以合成一個，每個來源各寫一行 trailer。
+   - 注意：`git apply --index` 會把改動放進暫存區。要先 commit 別的東西時，先確認暫存區裡只有那些檔案。
+4. 套完後檢查：
+   - `uv run pytest`。
+   - `compare_upstream.py <新版本> --leak`：前端和安裝檔和上游比只能剩 `OWN_CHANGES`，上游新增的名稱都要找得到（它會搜尋包含 `leihu/` 的所有程式）。
+   - 契約：上游行為改變時，用 `compare_upstream.py <同步後的 commit> --record --base=<新版本>` 重錄快照（fork 和上游的差異都要符合 `RULES` 才寫入），再跑 `check_snapshot.py`。
+   - 數值：動到分離、音高、歌詞、評分時，挑合成素材或一首歌跑 `baseline.py <新版本>` 和 `baseline.py <同步後的 commit> --against=<新版本>`（3.8）。
+   - 上游每個最上層定義都和現在的程式比對一次，比對時套用步驟 1 的改寫規則。確認沒有漏掉，fork 原本的修改也沒有被蓋掉。
 
 演練（`v2.2.0..v2.3.2`，逐個 hunk 反向套到現在的程式，只算拆檔前的 `refactor` 也套得上的 hunk）：工具能定位的 app.py 8 個、pipeline.py 30 個全部套得上；app.py 另有 3 個要手動（1 個 import 區、2 個橫跨兩個現在分在不同檔案的定義）。這段期間上游沒有改過步驟 4 搬出去的函式。其餘 hunk 在拆檔前就被上游或 C 組改過，沒有拆檔一樣要手動合併。
 
-v2.3.3 試套（暫時的 worktree，沒有 commit）：5 個 commit；pipeline.py 上游新增的 `onset_offset`、`unique_path` 自動放在 `pipeline.py`；app.py 新增的 `requeue_fine`、`restore_queue`、`queue_saver` 等要手動決定放哪個 Blueprint。split.patch 第 1 個直接套上，另外 3 個套不上的 hunk 都在 C 組改過的 `main()`（S28）、`take_export`（M4）；other.patch 的衝突都在 fork 改過版號的 `VERSION`、`help.html`、`index.html`、`leihu.nsi`。上游 2.3.3 的「匯出同名自動加編號」（`unique_path`）和 C 組 M4（`share.out_path`）解決同一個問題，同步時要決定留哪一種。
+**v2.3.3 同步（2026-11-22）**：上游 5 個 commit 變成 3 個同步 commit（佇列保存的 3 個合成 1 個），版號 2.3.3.1。
+- 錄音位置改用開口瞬間對齊（`score_take`、`onset_offset`，`TAKE_ALGO` 4 → 5：舊錄音會自動重新評分，錄音的 `offset` 和匯出的音訊會和 2.3.2 不同）。
+- 處理佇列跨重開保存：佇列保存的程式放在 `leihu/web/background.py`，和上游逐字相同。fork 的調整：`queue.json` 放 `P.DATA`（S28；沒設 `LIANTAI_DATA` 時和上游一樣是程式資料夾）；`restore_queue`、`queue_saver` 放在 `main()` 的 `if not P.NO_BACKGROUND` 裡；契約沙盒替換這兩個名稱；`conftest` 的使用者資料清單、`.gitignore` 加 `queue.json`。
+- 匯出同名自動加編號：`unique_path` 照上游。上游 `take_export` 加的是「同一次錄音匯出過就加編號」，和 C 組 M4 是兩個問題（M4 是歌名有「.」時 `with_suffix` 截斷檔名、不同的歌撞名），兩個都要：編號邏輯改用 `SH.out_path` 檢查和產生檔名，`test_security.py` 加回歸測試（換回上游用 `with_suffix` 檢查的寫法會失敗）。`unique_path` 遇到歌名有「.」時編號位置不理想，但不會蓋掉檔案，照上游。
+- 驗證：v2.3.3 `app.py`、`pipeline.py` 的 467 個最上層定義都找得到；同步只改到上游 2.3.3 也改過的 13 個定義，fork 原本的修改沒有被蓋掉。漏移檢查 0 項（補登記步驟 1 的 `leihu.nsi` 清除 `leihu`）。契約快照以 v2.3.3 重錄：141 個案例 140 個相同、1 個是已登記的 F1，`check_snapshot.py` 兩次都和快照相同、92 條路由都有案例。數值（合成素材 1 次）和 v2.3.3 逐檔 14／14 相同、異常「無」。`uv run pytest` 97 passed。
+- 沒有驗證：真實歌曲的數值、效能基準、顯示卡路徑。之後重構的比對對象改成 v2.3.3，還沒用測試計畫錄 v2.3.3 的正式基準。
 
 ## 4. 要先決定的事
 - 舊分支要留著（唯讀）還是封存成 tag，`claude/original-refactor-behavior-comparison-d469de` 也一樣。在搬完之前不要刪。
