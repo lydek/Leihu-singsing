@@ -33,10 +33,10 @@ fork 對上游後端檔案的修改（同步時 3.21 步驟 4 要確認沒被蓋
 | 項目 | 檔案、定義 | 改了什麼 | 測試 |
 |---|---|---|---|
 | M6 | `score_sheet.py` 的 `_chunks` | 字的時間等於段落起點時不當切點（逐字時間早於句首、兩個字同一個時間時，原本會無限迴圈）；原本會正常結束的輸入，結果不變 | `tests/test_sheet_io.py` 的 `test_chunks_*`（舊程式會卡到 30 秒逾時） |
+| 46 | `gpu_worker.py` 的 `_set_priority` | 用自己的 `WinDLL("kernel32")` 實例設 `GetCurrentProcess.restype`、`SetPriorityClass.argtypes`，64 位元 Windows 上才真的改得了優先順序；CPU 處理程式（`CPU_POOL`）從此一律是「低於標準」，顯示卡處理程式在暫停判斷成立時降低 | `tests/test_gpu_worker.py`（子行程裡讀回優先順序；舊程式兩次都是 NORMAL） |
 
 ## 4. 還沒確認的
 
 - 28（審查修正 A–F）沒有逐項拆開；36 的「建議與可選」各小項（佇列、下載、歌單、匯出影片、`LIANTAI_PORT` 等，目前只把重疊處理 OOM 放在第 5 批）、70 的 `cancel_song`、`on_cancel` 只依 commit 說明判斷（3.20）。開始第 2、4、5、6 批之前要逐行看 diff；看完 36 的各小項，再分到對應批次。
-- `_set_priority` 的問題只看了程式碼，沒有在 Windows 上重現（3.6）。
 - 修好 `import subprocess` 後，顯示卡忙碌判斷會開始作用：上游從來沒有真的跑過這段，門檻是否合理沒有驗證。
 - 舊分支的測試（`test_jobs.py`、`test_values.py`）能不能直接搬，沒有確認。

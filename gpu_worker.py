@@ -43,7 +43,12 @@ def _set_priority(low: bool) -> None:
     if sys.platform == "win32":
         try:
             import ctypes
-            k = ctypes.windll.kernel32
+            from ctypes import wintypes
+            # fork：GetCurrentProcess 回傳虛擬控制代碼 -1，沒設型別時 ctypes 當 32 位元整數傳，64 位元上變成
+            # 0xFFFFFFFF，SetPriorityClass 失敗（錯誤 6）。用自己的實例設型別，不改到共用的 windll.kernel32
+            k = ctypes.WinDLL("kernel32")
+            k.GetCurrentProcess.restype = wintypes.HANDLE
+            k.SetPriorityClass.argtypes = (wintypes.HANDLE, wintypes.DWORD)
             k.SetPriorityClass(k.GetCurrentProcess(), BELOW_NORMAL if low else NORMAL)
         except Exception:
             pass
