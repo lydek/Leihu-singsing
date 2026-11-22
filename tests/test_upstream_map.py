@@ -43,6 +43,19 @@ def test_target_of_by_enclosing_name():
     assert U.target_of({"s": 7, "n": 1}, sp, {})[0] is None  # 名稱現在找不到：手動
 
 
+def test_target_of_only_looks_where_the_source_file_was_split_to():
+    sp = U.spans(SRC)
+    # app.py 的路由和 pipeline 的同名函式不衝突
+    idx = {"a": ["leihu/web/lyrics.py", "pipeline.py"], "b": ["pipeline.py"]}
+    assert U.target_of({"s": 7, "n": 1}, sp, idx, "app.py") == ("leihu/web/lyrics.py", "a")
+    assert U.target_of({"s": 7, "n": 1}, sp, idx, "pipeline.py") == ("pipeline.py", "a")
+    # pipeline.py 上游新增的定義預設留在 pipeline.py；app.py 新增的要手動決定放哪個 Blueprint
+    assert U.target_of({"s": 11, "n": 2}, sp, {}, "pipeline.py")[0] == "pipeline.py"
+    assert U.target_of({"s": 11, "n": 2}, sp, {}, "app.py")[0] is None
+    # 新增的定義接在搬走的定義旁邊：手動
+    assert U.target_of({"s": 8, "n": 4}, sp, {"a": ["leihu/pitch.py"]}, "pipeline.py")[0] is None
+
+
 def test_retarget_rewrites_app_decorators_only_for_app_py():
     lines = [
         ' @app.get("/x")',

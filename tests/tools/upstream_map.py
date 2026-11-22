@@ -6,9 +6,10 @@ E 組步驟 1 把 app.py 拆到 leihu/web/，步驟 4 把 pipeline.py 的一部�
 
 用法（repo 根目錄，要先 git fetch upstream --tags）：
   python tests/tools/upstream_map.py v2.3.2 v2.3.3                # 列出每個 commit 的每個 hunk 要改哪個檔案
-  python tests/tools/upstream_map.py v2.3.2 v2.3.3 --patch=<資料夾>  # 另外寫出改好路徑的 patch（每個 commit 一個）
+  python tests/tools/upstream_map.py v2.3.2 v2.3.3 --patch=<資料夾>  # 另外寫出 patch（每個 commit 最多兩個）
 
-patch 裡 app.py 的 hunk 改寫成目標檔案的路徑，並把 @app.X 換成 @bp.X（errorhandler、before_request 用 app_ 版本）、
+<序號>-<sha>.other.patch 是其他檔案的改動，用 git apply --index --3way 套；<序號>-<sha>.split.patch 是
+app.py、pipeline.py 的 hunk，用 git apply --index 套。split.patch 裡 app.py 的 hunk 改寫成目標檔案的路徑，並把 @app.X 換成 @bp.X（errorhandler、before_request 用 app_ 版本）、
 app.static_folder／app.response_class 換成 current_app.*；其他檔案原樣。行號是上游的，git apply 會依內容找位置。
 落在模組層級（import、常數）或名稱已經不在的 hunk 不放進 patch，列在報告裡手動處理。
 """
@@ -23,6 +24,11 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 SPLIT = ("app.py", "pipeline.py")  # 拆過的檔案；其他檔案的改動原樣套用
+# 拆過的檔案的程式現在可能在哪裡（同名的定義只在這個範圍裡找：app.py 的 furigana 路由和 pipeline.furigana 不同）
+MOVED_TO = {
+    "app.py": ("app.py", "leihu/web/"),
+    "pipeline.py": ("pipeline.py", "leihu/pitch.py", "leihu/lyrics_text.py"),
+}
 HUNK = re.compile(r"^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@.*$")
 APP_RULES = [  # 步驟 1 搬移時唯一改過的寫法（3.19）
     (re.compile(r"@app\.errorhandler\b"), "@bp.app_errorhandler"),
@@ -84,15 +90,21 @@ def split_hunks(diff: str) -> list[dict]:
     return out
 
 
-def target_of(h: dict, up_spans: list[tuple[int, int, str]], idx: dict[str, list[str]]) -> tuple[str | None, str]:
-    """回傳 (目標檔案或 None, 說明)。"""
+def target_of(
+    h: dict, up_spans: list[tuple[int, int, str]], idx: dict[str, list[str]], src: str = "app.py"
+) -> tuple[str | None, str]:
+    """回傳 (目標檔案或 None, 說明)。src 是上游的檔案（app.py 或 pipeline.py）。"""
     s = h["s"]
     e = s + max(h["n"], 1) - 1
     names = sorted({nm for a, b, nm in up_spans if a <= e and s <= b})
     if not names:
         return None, "模組層級（import、常數、註解）：手動"
-    files = sorted({f for nm in names for f in idx.get(nm, [])})
-    gone = [nm for nm in names if nm not in idx]
+    where = {nm: [f for f in idx.get(nm, []) if f.startswith(MOVED_TO[src])] for nm in names}
+    files = sorted({f for fs in where.values() for f in fs})
+    gone = [nm for nm, fs in where.items() if not fs]
+    if gone and src == "pipeline.py" and files in ([], ["pipeline.py"]):
+        # pipeline.py 只搬出不常改的區塊：上游新增的定義預設留在 pipeline.py
+        return "pipeline.py", f"{', '.join(names)}（{', '.join(gone)} 是上游新增的，放在 pipeline.py）"
     if gone:
         return None, f"{', '.join(gone)} 現在找不到（上游新增的定義，或已改名）：手動決定放哪個檔案"
     if len(files) != 1:
@@ -112,19 +124,19 @@ def retarget(lines: list[str], src: str) -> list[str]:
     return out
 
 
-def commit_patch(c: str, idx: dict[str, list[str]]) -> tuple[str, list[str]]:
-    """一個上游 commit → (改好路徑的 patch, 報告行)。"""
+def commit_patch(c: str, idx: dict[str, list[str]]) -> tuple[str, str, list[str]]:
+    """一個上游 commit → (其他檔案的 patch, 改好路徑的 patch, 報告行)。
+    其他檔案的 patch 有 blob index，用 git apply --3way 套（fork 自己改過的地方會變成衝突）；
+    改好路徑的 hunk 沒有對應的 blob，不能 3-way，直接 git apply。"""
     report, parts = [], []
     other = git("diff", "--binary", f"{c}^", c, "--", ".", *(f":!{f}" for f in SPLIT))
-    if other.strip():
-        parts.append(other.rstrip("\n"))
     for f in SPLIT:
         diff = git("diff", "-U3", f"{c}^", c, "--", f)
         if not diff.strip():
             continue
         up = spans(git("show", f"{c}:{f}"))
         for h in split_hunks(diff):
-            tgt, why = target_of(h, up, idx)
+            tgt, why = target_of(h, up, idx, f)
             report.append(f"  {f} {h['header'].split(' @@')[0]} @@ → {tgt or '（不放進 patch）'}：{why}")
             if tgt:
                 parts.append(
@@ -138,7 +150,7 @@ def commit_patch(c: str, idx: dict[str, list[str]]) -> tuple[str, list[str]]:
                         ]
                     )
                 )
-    return "\n".join(parts) + "\n", report
+    return other, ("\n".join(parts) + "\n") if parts else "", report
 
 
 def main() -> int:
@@ -156,10 +168,12 @@ def main() -> int:
     commits = git("rev-list", "--reverse", "--no-merges", f"{base}..{ref}").split()
     for i, c in enumerate(commits, 1):
         print(f"{i:02d} {git('show', '-s', '--format=%h %s', c).strip()}")
-        patch, report = commit_patch(c, idx)
+        other, split, report = commit_patch(c, idx)
         print("\n".join(report) or "  （沒有改 app.py、pipeline.py）")
         if out:
-            (out / f"{i:02d}-{c[:7]}.patch").write_text(patch, "utf-8", newline="\n")
+            for suffix, text in (("other", other), ("split", split)):
+                if text.strip():
+                    (out / f"{i:02d}-{c[:7]}.{suffix}.patch").write_text(text, "utf-8", newline="\n")
     return 0
 
 
