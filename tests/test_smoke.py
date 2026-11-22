@@ -3,10 +3,10 @@
 from pathlib import Path
 
 
-def test_app_imports_with_93_routes(app_module):
-    # 含 /api/debug/stacks；契約快照的路由涵蓋（92 條）不含它
+def test_app_imports_with_95_routes(app_module):
+    # 含 /api/debug/stacks；契約快照的路由涵蓋（94 條）不含它
     rules = [r for r in app_module.app.url_map.iter_rules() if r.endpoint != "static"]
-    assert len(rules) == 93
+    assert len(rules) == 95
 
 
 def test_installer_check_still_works(app_module):

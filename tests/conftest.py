@@ -38,6 +38,7 @@ _USER_DATA = (
     "setlist.json",
     "setlists",
     "queue.json",
+    "ui_prefs.json",
     "hotkeys_status.json",
     ".hotkeys_pause",
     ".appwin",
