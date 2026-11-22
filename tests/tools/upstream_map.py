@@ -9,7 +9,7 @@ E 組步驟 1 把 app.py 拆到 leihu/web/，步驟 4 把 pipeline.py 的一部�
   python tests/tools/upstream_map.py v2.3.2 v2.3.3 --patch=<資料夾>  # 另外寫出 patch（每個 commit 最多兩個）
 
 <序號>-<sha>.other.patch 是其他檔案的改動，用 git apply --index --3way 套；<序號>-<sha>.split.patch 是
-app.py、pipeline.py 的 hunk，用 git apply --index 套。split.patch 裡 app.py 的 hunk 改寫成目標檔案的路徑，並把 @app.X 換成 @bp.X（errorhandler、before_request 用 app_ 版本）、
+app.py、pipeline.py 的 hunk，用 git apply --index --reject --recount 套。split.patch 裡 app.py 的 hunk 改寫成目標檔案的路徑，並把 @app.X 換成 @bp.X（errorhandler、before_request 用 app_ 版本）、
 app.static_folder／app.response_class 換成 current_app.*；其他檔案原樣。行號是上游的，git apply 會依內容找位置。
 落在模組層級（import、常數）或名稱已經不在的 hunk 不放進 patch，列在報告裡手動處理。
 """
@@ -124,10 +124,21 @@ def retarget(lines: list[str], src: str) -> list[str]:
     return out
 
 
+def trim_blank_context(lines: list[str]) -> list[str]:
+    """去掉頭尾的空白上下文行：搬到別的檔案後，函式可能在檔案開頭或結尾，上游 hunk 邊上的空行不存在。
+    行數和 header 對不上，所以 split.patch 要用 git apply --recount。"""
+    s, e = 0, len(lines)
+    while s < e and lines[s] == " ":
+        s += 1
+    while e > s and lines[e - 1] == " ":
+        e -= 1
+    return lines[s:e]
+
+
 def commit_patch(c: str, idx: dict[str, list[str]]) -> tuple[str, str, list[str]]:
     """一個上游 commit → (其他檔案的 patch, 改好路徑的 patch, 報告行)。
     其他檔案的 patch 有 blob index，用 git apply --3way 套（fork 自己改過的地方會變成衝突）；
-    改好路徑的 hunk 沒有對應的 blob，不能 3-way，直接 git apply。"""
+    改好路徑的 hunk 沒有對應的 blob，不能 3-way，用 git apply --reject --recount。"""
     report, parts = [], []
     other = git("diff", "--binary", f"{c}^", c, "--", ".", *(f":!{f}" for f in SPLIT))
     for f in SPLIT:
@@ -146,7 +157,7 @@ def commit_patch(c: str, idx: dict[str, list[str]]) -> tuple[str, str, list[str]
                             f"--- a/{tgt}",
                             f"+++ b/{tgt}",
                             h["header"],
-                            *retarget(h["lines"], f),
+                            *(trim_blank_context(retarget(h["lines"], f)) if tgt != f else h["lines"]),
                         ]
                     )
                 )
