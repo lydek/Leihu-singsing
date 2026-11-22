@@ -507,10 +507,15 @@ Codex 第 7 次審查後補的（同類問題和繞過路徑）：
    python tests/tools/upstream_map.py <上次同步的版本> <新版本> --patch=tests/private/sync/<新版本>
    ```
    報告列出每個 hunk 的目標檔案；標成「手動」的（模組層級的 import、常數，或橫跨兩個現在分在不同檔案的定義，或上游新增的定義）不在 patch 裡，照報告的名稱手動改。上游新增的路由，依網址放進對應的 Blueprint。
-3. 依序套用每個 commit：`git apply --index tests/private/sync/<新版本>/<序號>-<sha>.patch`，套不上就加 `--reject` 再處理 `.rej`；手動的部分改完後執行 `git commit -C <sha> --trailer "Upstream-commit: <sha>"`，作者和說明沿用上游。
+3. 依序套用每個 commit 的兩個 patch：
+   - `<序號>-<sha>.other.patch`（其他檔案）：`git apply --index --3way`。fork 自己改過的地方（版號、`help.html`、`leihu.nsi`）會變成衝突，手動解。
+   - `<序號>-<sha>.split.patch`（app.py、pipeline.py 改好路徑的 hunk，沒有對應的 blob，不能 3-way）：`git apply --index --reject`，套不上的 hunk 留在 `.rej` 手動處理（通常是 C 組改過的地方，例如 `main()`、`take_export`）。
+   手動的部分改完後執行 `git commit -C <sha> --trailer "Upstream-commit: <sha>"`，作者和說明沿用上游。
 4. 套完後跑 `uv run pytest`、`compare_upstream.py <新版本> --leak`（上游新增的名稱要找得到；它會搜尋包含 `leihu/` 的所有程式）、契約比對；動到分離、音高、歌詞、評分時再挑一首歌跑數值的 `--against`（3.8）。上游行為改變造成的契約差異，照 3.7 先在 `RULES` 登記再更新快照。
 
 演練（`v2.2.0..v2.3.2`，逐個 hunk 反向套到現在的程式，只算拆檔前的 `refactor` 也套得上的 hunk）：工具能定位的 app.py 8 個、pipeline.py 30 個全部套得上；app.py 另有 3 個要手動（1 個 import 區、2 個橫跨兩個現在分在不同檔案的定義）。這段期間上游沒有改過步驟 4 搬出去的函式。其餘 hunk 在拆檔前就被上游或 C 組改過，沒有拆檔一樣要手動合併。
+
+v2.3.3 試套（暫時的 worktree，沒有 commit）：5 個 commit；pipeline.py 上游新增的 `onset_offset`、`unique_path` 自動放在 `pipeline.py`；app.py 新增的 `requeue_fine`、`restore_queue`、`queue_saver` 等要手動決定放哪個 Blueprint。split.patch 第 1 個直接套上，另外 3 個套不上的 hunk 都在 C 組改過的 `main()`（S28）、`take_export`（M4）；other.patch 的衝突都在 fork 改過版號的 `VERSION`、`help.html`、`index.html`、`leihu.nsi`。上游 2.3.3 的「匯出同名自動加編號」（`unique_path`）和 C 組 M4（`share.out_path`）解決同一個問題，同步時要決定留哪一種。
 
 ## 4. 要先決定的事
 - 舊分支要留著（唯讀）還是封存成 tag，`claude/original-refactor-behavior-comparison-d469de` 也一樣。在搬完之前不要刪。
