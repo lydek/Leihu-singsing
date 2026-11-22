@@ -7,6 +7,7 @@ models/
 bin/
 downloads/
 installed.json
+queue.json
 # Python
 __pycache__/
 *.pyc

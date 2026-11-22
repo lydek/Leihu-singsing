@@ -76,7 +76,17 @@ def queue_fine(sid: str) -> str:
     if jid:
         return jid
     P.update_meta(P.song_dir(sid), fine_queued=True)
-    return jobs.submit("process", sid, P.fine_job(sid, after=prerender_key), label="fine")
+    job = P.fine_job(sid, after=prerender_key)
+
+    def run(report):
+        try:
+            job(report)
+        except P.JobDeferred:
+            raise   # 直播中先延後：還在佇列裡，標記保留
+        except BaseException:
+            P.update_meta(P.song_dir(sid), fine_queued=False)   # 失敗或取消：不要一直顯示「排隊中」
+            raise
+    return jobs.submit("process", sid, run, label="fine")
 
 
 def yt_submit(sid: str, url: str) -> str:
