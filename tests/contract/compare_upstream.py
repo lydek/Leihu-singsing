@@ -137,14 +137,54 @@ def user_leaks(text: str) -> list[str]:
 assert user_leaks("x C:\\\\Users\\\\alice\\\\y") and user_leaks("/home/bob/x") and not user_leaks("desktop-9900x3d-cpu <home>\\a")
 
 
-def write_summary(path: Path, summary: dict) -> str:
-    """寫要進 git 的摘要：先 scrub，再確認沒有使用者名稱、沒有 inf／nan。有問題就不寫，回傳原因（呼叫端列為異常）。"""
-    text = json.dumps(scrub(summary), ensure_ascii=False, allow_nan=False, indent=1)
-    leaks = user_leaks(text)
-    if leaks:
-        return f"摘要裡還有使用者名稱，沒有寫入 {path.name}：{leaks[0]!r}"
-    path.parent.mkdir(exist_ok=True)
-    path.write_text(text, "utf-8")
+_DROP = object()
+
+
+def public_view(x, songs: tuple[str, ...]):
+    """要進 git 的那份摘要：拿掉真實歌曲的一切資料（以歌曲編號當 key 的項目、編號開頭的比對列與 floor 項目、
+    清單裡的編號），只留合成素材的結果。完整的那份寫在 tests/private/baselines/（不進 git）。"""
+    heads = tuple(f"{s}{sep}" for s in songs for sep in ("/", " "))
+
+    def hit(v) -> bool:
+        return isinstance(v, str) and (v in songs or v.startswith(heads))
+
+    def walk(v):
+        if isinstance(v, dict):
+            if hit(v.get("item")):
+                return _DROP
+            return {k: w for k, val in v.items() if not hit(k) and (w := walk(val)) is not _DROP}
+        if isinstance(v, list):
+            return [w for val in v if not hit(val) and (w := walk(val)) is not _DROP]
+        return v
+
+    return walk(x) if songs else x
+
+
+assert public_view({"songs": {"synth": 1, "real01": 2}, "rows": [{"item": "real01/lead.flac"}, {"item": "sing x"}],
+                    "floor": {"real01 音符數差": 1, "songsing01 音符": 2}, "ids": ["real01", "x"]}, ("real01",)) == \
+    {"songs": {"synth": 1}, "rows": [{"item": "sing x"}], "floor": {"songsing01 音符": 2}, "ids": ["x"]}
+
+
+def private_copy(path: Path) -> Path:
+    """摘要在本機的完整版：tests/private/baselines/<numeric|perf>/<同一個檔名>。"""
+    return ROOT / "tests" / "private" / "baselines" / path.parent.parent.name / path.name
+
+
+def write_summary(path: Path, summary: dict, songs: tuple[str, ...] = ()) -> str:
+    """寫要進 git 的摘要：先 scrub，再確認沒有使用者名稱、沒有 inf／nan。有問題就不寫，回傳原因（呼叫端列為異常）。
+    有真實歌曲（songs＝計畫裡的編號）時，完整版寫到 private_copy(path)，git 那份用 public_view 拿掉歌曲資料。"""
+    targets = [(path, public_view(summary, songs) | ({"real_songs": {"count": len(songs), "full": "tests/private/baselines/"}}
+                                                       if songs else {}))]
+    if songs:
+        targets.append((private_copy(path), summary))
+    for p, data in targets:
+        text = json.dumps(scrub(data), ensure_ascii=False, allow_nan=False, indent=1)
+        leaks = user_leaks(text)
+        if leaks:
+            return f"摘要裡還有使用者名稱，沒有寫入 {p.name}：{leaks[0]!r}"
+    for p, data in targets:
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text(json.dumps(scrub(data), ensure_ascii=False, allow_nan=False, indent=1), "utf-8")
     return ""
 
 
@@ -194,20 +234,17 @@ def export(ref: str) -> tuple[str, Path]:
     """每次都從 git 重新匯出到這個行程自己的資料夾 OUT/<名稱>/exports/<pid>-<時間>（不沿用、不共用：
     解壓中斷、被改過、tag 改指別的 commit、同時跑的另一個工具刪掉，都不會測到錯的程式），行程結束時刪掉。
     完整 commit 寫在 <code>/.leihu-commit，報告用 commit_of() 讀。"""
-    full = subprocess.run(["git", "rev-parse", f"{ref}^{{commit}}"], cwd=ROOT, capture_output=True, text=True,
-                          check=True).stdout.strip()
-    tag = subprocess.run(
-        ["git", "describe", "--tags", "--exact-match", full], cwd=ROOT, capture_output=True, text=True
-    ).stdout.strip()
-    name = tag or full[:7]
+    full, name = ref_name(ref)
     import atexit
     import time
 
-    from sandbox import clean_stale, owner_text, remove_tree
+    from sandbox import clean_stale, owner_text, remove_tree, split_cleanup
 
     exports = OUT / name / "exports"
     exports.mkdir(parents=True, exist_ok=True)
-    EXPORT_NOTES.extend(f"匯出資料夾：{m}" for m in clean_stale(exports, "*", allowed=(exports,)))
+    cleaned, rest = split_cleanup(clean_stale(exports, "*", allowed=(exports,)))
+    EXPORT_CLEANED.extend(f"開始前匯出資料夾：{m}（建立它的行程確定已結束）" for m in cleaned)
+    EXPORT_NOTES.extend(f"匯出資料夾：{m}" for m in rest)
     fresh = exports / f"{os.getpid()}-{time.time_ns()}"
     fresh.mkdir()
     (fresh / "owner.pid").write_text(owner_text(), "utf-8")  # 被強制結束時，下一次 export() 會清掉
@@ -228,7 +265,19 @@ def export(ref: str) -> tuple[str, Path]:
     return name, fresh
 
 
-EXPORT_NOTES: list[str] = []  # export() 清理舊匯出時發生的事，報告要列出來
+EXPORT_NOTES: list[str] = []  # export() 清理舊匯出時發生的問題，報告列為異常
+EXPORT_CLEANED: list[str] = []  # export() 清掉的舊匯出（建立它的行程確定已結束），報告寫進執行條件
+LOCK_NOTES: list[str] = []  # acquire_recording()：接手上一次沒有正常結束的錄製鎖，報告寫進執行條件
+
+
+def ref_name(ref: str) -> tuple[str, str]:
+    """git 參照的完整 commit 和輸出資料夾名稱（剛好是 tag 就用 tag，否則用 7 碼 commit）。"""
+    full = subprocess.run(["git", "rev-parse", f"{ref}^{{commit}}"], cwd=ROOT, capture_output=True, text=True,
+                          check=True).stdout.strip()
+    tag = subprocess.run(
+        ["git", "describe", "--tags", "--exact-match", full], cwd=ROOT, capture_output=True, text=True
+    ).stdout.strip()
+    return full, tag or full[:7]
 
 
 def commit_of(code: Path) -> str:
@@ -422,6 +471,9 @@ def main() -> int:  # noqa: C901
         # 之後一律用驗證過的完整 commit 匯出（分支、tag 在中途移動也不會匯出別的 commit）
         args = [ref_full, *args[1:]]
         opt["--base"] = base_full
+    from sandbox import acquire_recording
+
+    LOCK_NOTES.extend(acquire_recording("compare_upstream.py " + " ".join(sys.argv[1:])))
     if "--code" in opt:
         code = Path(opt["--code"]).resolve()
         name = code.name
@@ -495,6 +547,8 @@ def main() -> int:  # noqa: C901
                 "",
             ]
     lines += ["## 沙盒替換", "", *[f"- {s}" for s in stubs], ""]
+    if LOCK_NOTES or EXPORT_CLEANED:
+        lines += ["## 開始前的清理（不算異常）", "", *[f"- {s}" for s in LOCK_NOTES + EXPORT_CLEANED], ""]
 
     # 重錄基準本身而且明確加了 --rebase（上面已確認參照和 --base 是同一個 commit）：和舊快照的差異只供參考
     rebase = recording and "--rebase" in opt and SNAPSHOT.exists() and commit_of(code) == opt.get("--base")

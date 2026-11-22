@@ -15,6 +15,7 @@ deterministic=True（數值基準）另外：OMP_NUM_THREADS、MKL_NUM_THREADS�
 from __future__ import annotations
 
 import atexit
+import contextlib
 import os
 import shutil
 import subprocess
@@ -31,6 +32,54 @@ _REPARSE = 0x400  # FILE_ATTRIBUTE_REPARSE_POINT：junction、符號連結
 
 STAGE = "leihu-nstage-"  # make_tmp 還沒改名前的名稱（只有 owner.pid）
 LIVE_KEEP = "保留（行程可能還在跑）"  # clean_stale 的訊息字首：有這種訊息時 Sandbox 不開始量測
+BUSY = "別的工作正在用 "  # clean_stale 的訊息字首：建立它的行程還在跑（同時有別的錄製），Sandbox 不開始量測
+CLEANED = "清掉上一次留下的 "  # clean_stale 的訊息字首：建立它的行程確定已結束，已刪乾淨
+LOCK = HERE.parent / "private" / "upstream" / "recording.lock"  # 同一時間只錄一個基準
+
+
+def split_cleanup(msgs: list[str]) -> tuple[list[str], list[str]]:
+    """clean_stale 的訊息分兩類：確定沒人用、已刪乾淨的（寫進執行條件，不影響結果）；其他（異常）。"""
+    done = [m for m in msgs if m.startswith(CLEANED) and "：沒刪成功" not in m]
+    return done, [m for m in msgs if m not in done]
+
+
+def acquire_recording(what: str) -> list[str]:
+    """同一時間只錄一個基準：兩個基準同時跑會互搶 CPU、記憶體，效能數字、逾時都不能信，還會清掉對方的暫存資料夾。
+    別的基準還在跑（鎖的建立者還在）就直接結束；建立者確定已結束就接手，回傳要寫進執行條件的訊息。行程結束時放開。"""
+    LOCK.parent.mkdir(parents=True, exist_ok=True)
+    notes: list[str] = []
+    for _ in range(3):
+        try:
+            fd = os.open(LOCK, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+        except FileExistsError:
+            try:
+                head, *rest = LOCK.read_text("utf-8").splitlines()
+                pid, start = (int(x) for x in head.split())
+            except (OSError, ValueError):
+                raise SystemExit(f"錄製鎖 {LOCK} 讀不了，無法確定是不是有別的基準在跑（確認沒有在跑再手動刪）") from None
+            now = process_start(pid)
+            if now == "unknown":
+                raise SystemExit(f"查不到錄製鎖建立者 PID {pid} 的狀態，這次不開始（確認沒有在跑再手動刪 {LOCK}）") from None
+            if now is not None and now == start:
+                raise SystemExit(f"另一個基準正在錄（PID {pid}：{' '.join(rest)[:200]}），這次不開始") from None
+            notes.append(f"上一次錄製（PID {pid}：{' '.join(rest)[:120]}）沒有正常結束，接手錄製鎖")
+            with contextlib.suppress(FileNotFoundError):
+                LOCK.unlink()
+            continue
+        mine = f"{owner_text()}\n{what}"
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write(mine)
+
+        def _release(mine=mine):
+            try:
+                if LOCK.read_text("utf-8") == mine:
+                    LOCK.unlink()
+            except OSError:
+                pass
+
+        atexit.register(_release)
+        return notes
+    raise SystemExit(f"拿不到錄製鎖 {LOCK}（一直被別的行程搶走）")
 
 
 def remove_tree(d: Path, allowed: tuple[Path, ...] = ()) -> str:
@@ -135,8 +184,9 @@ def clean_stale(parent: Path | None = None, pattern: str | None = None, allowed:
         for d in sorted(base.glob(pat)):
             try:
                 state = owner_state(d)
-                if state == "alive":
-                    continue  # 建立它的行程還在跑（例如另一個基準），不要動
+                if state == "alive":  # 建立它的行程還在跑（例如另一個基準）：不要動，但要讓呼叫端知道
+                    out.append(f"{BUSY}{d.name}（建立它的行程還在跑）")
+                    continue
                 keep = d / "keep.json"
                 if state == "dead" and keep.exists():  # 上次逾時沒確認停止：裡面記的行程都停了才刪
                     import json
@@ -151,7 +201,7 @@ def clean_stale(parent: Path | None = None, pattern: str | None = None, allowed:
                     out.append(f"保留 {d.name}：{state}")
                     continue
                 why = remove_tree(d, allowed)
-                out.append(f"清掉上一次留下的 {d.name}" + (f"：沒刪成功，{why}" if why else ""))
+                out.append(f"{CLEANED}{d.name}" + (f"：沒刪成功，{why}" if why else ""))
             except Exception as e:  # noqa: BLE001  清理出錯不能讓整個基準中止
                 out.append(f"清理 {d.name} 時出錯，保留不刪：{type(e).__name__}: {e}")
     return out
@@ -248,11 +298,14 @@ class Sandbox:
     def __init__(self, code: Path, models: Path, tag: str, deterministic: bool, device: str = "auto"):
         self.models, self.tag = Path(models).resolve(), tag  # 之後會 chdir 到沙盒：相對路徑要先轉成絕對路徑
         self.conditions: list[str] = []
-        self.stale = clean_stale()  # 先清上一次被強制結束留下的（problems() 會列出來）
-        live = [m for m in self.stale if m.startswith(LIVE_KEEP)]
-        if live:  # 殘留的行程會吃 CPU／顯示卡、可能還在寫它的沙盒：這時量出來的數字不能信
-            raise SystemExit("上一次逾時留下的行程可能還在跑，這次不開始量測（先結束它們，或確認後手動刪掉暫存資料夾）：\n"
+        # 先清上一次被強制結束留下的：確定沒人用、刪乾淨的寫進執行條件；其他的 problems() 列為異常
+        cleaned, self.stale = split_cleanup(clean_stale())
+        live = [m for m in self.stale if m.startswith((LIVE_KEEP, BUSY))]
+        if live:  # 殘留或同時在跑的行程會吃 CPU／顯示卡、可能還在寫它的沙盒：這時量出來的數字不能信
+            raise SystemExit("有別的行程可能還在跑，這次不開始量測（先結束它們，或確認後手動刪掉暫存資料夾）：\n"
                              + "\n".join(live))
+        for m in cleaned:
+            self.cond(f"開始前{m}（建立它的行程確定已結束）")
         self.tmp = make_tmp()
         self.root = self.tmp / "app"
         self.junctions: list[Path] = []

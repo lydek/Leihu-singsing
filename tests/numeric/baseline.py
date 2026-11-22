@@ -1,23 +1,27 @@
 r"""錄一個版本在這台電腦上的數值基準（docs/refactor-port-plan.md 3.8）。
 
-從 git 匯出指定的版本，用 run.py 處理合成素材 N 次（預設 2），然後寫報告：
+從 git 匯出指定的版本，用 run.py 處理合成素材和測試計畫指定的真實歌曲 N 次（次數寫在計畫裡；沒給計畫只跑合成素材 2 次），
+然後寫報告：
 - 執行條件：run.py 為了讓結果可重現而改掉的設定，逐項列出；
 - 實際使用的裝置與模型：子程式每一步回報的裝置（child_hook.py 的 [device]）、各首歌實際用的分離模型、
   子程式載入的程式路徑；顯示卡探測結果只列出來，不拿來推定每一步用的裝置；
 - 異常：結束代碼不是 0、run.py 回報的問題（素材 sha256 不符、模型檔被改、想對外連線、沒開過子程式）、
   被測程式 logs/ 裡的錯誤紀錄）、log 裡的 Traceback／改用 CPU／改用標準模型／改在主程式裡執行／退回／卡住／逾時／
   記憶體不足、子程式載入了別份程式、同一版各次輸出不完全相同（compare.exact，第 2 次起都和第 1 次比）。沒有就寫「無」；
-- 第 1、2 次的差距表（compare.pair，參考用）與每次和標準答案的差距（compare.quality）。
-報告和輸出在 tests/private/upstream/<版本>/numeric/<標籤>/（不進 git）；
-摘要（不含音檔）寫到 tests/numeric/baselines/<版本>-<標籤>.json（進 git，給另一台電腦、之後的重構版對照）。
+- 第 1、2 次的差距表（compare.pair，參考用）與每次和標準答案的差距（compare.quality）；
+- --against=<版本>：這次的第 1 次和那個版本用同一個計畫、同一個標籤錄的第 1 次逐檔核對（重構前後是否等價）。
+報告和輸出在 tests/private/upstream/<版本>/numeric/<標籤>[-<計畫名稱>]/（不進 git）；
+摘要（不含音檔）寫到 tests/numeric/baselines/<版本>-<標籤>[-<計畫名稱>].json（進 git，給另一台電腦、之後的重構版對照）。
+同一時間只能錄一個基準（sandbox.acquire_recording）：別的基準還在跑就不開始。
 
 用法（repo 根目錄，用已安裝版本的內嵌 Python）：
-  <python> tests/numeric/baseline.py [git 參照，預設 v2.3.2] [--label=<這台電腦的名稱，例如 desktop-cpu>] [--runs=2] [--songs]
-  [--timeout=<每次執行的秒數上限，預設 7200>] [--device=auto|cpu] [--floor-version=<上游版本，預設 v2.3.2>]
+  <python> tests/numeric/baseline.py [git 參照，預設 v2.3.2] [--label=<這台電腦的名稱，例如 desktop-cpu>]
+  [--plan=<測試計畫 JSON，見 plan.py>] [--against=<版本>] [--timeout=<每次執行的秒數上限，預設 7200>] [--device=auto|cpu] [--floor-version=<上游版本，預設 v2.3.2>]
 --device=cpu：強制只用 CPU（CUDA_VISIBLE_DEVICES=-1），例如在有 NVIDIA 顯示卡的筆電上錄 CPU 基準；不能只靠 --label 區分。
 穩定性：所有步驟實際都在 CPU 上（看 [device]）時，各次輸出要逐檔完全相同；有任何一步在顯示卡上時，
   浮點運算順序本來就可能不同，改用差距表的門檻判斷，逐檔核對只列出來參考。
---songs：tests/private/songs/ 的真實歌曲也一起跑（run.py --songs；單執行緒，一首 3～4 分鐘的歌每次要幾分鐘）。
+--plan：計畫的 numeric 段落指定次數和真實歌曲（單執行緒，一首 3～4 分鐘的歌每次要 3～6 分鐘）。只跑 1 次時同一版的穩定性
+  不判定（寫進執行條件），要靠 --against 和已知穩定的版本逐檔相同來確認。
 有異常時結束代碼是 1。
 """
 
@@ -37,12 +41,12 @@ ROOT = HERE.parents[1]
 sys.path[:0] = [str(HERE), str(ROOT / "tests" / "contract")]
 
 import compare as C  # noqa: E402
-from compare_upstream import BASE, EXPORT_NOTES, write_summary, tools_dirty, LOG_ALERTS, OUT, _git, commit_of, export  # noqa: E402
+import plan as PLAN  # noqa: E402
+from compare_upstream import BASE, EXPORT_CLEANED, EXPORT_NOTES, private_copy, ref_name, write_summary, tools_dirty, LOG_ALERTS, OUT, _git, commit_of, export  # noqa: E402
 
 INPUTS = ROOT / "tests" / "private" / "numeric" / "inputs"
 MODELS = ROOT / "tests" / "private" / "models"
 SUMMARY = HERE / "baselines"
-SONGS = ROOT / "tests" / "private" / "songs"
 
 
 def machine() -> dict:
@@ -197,8 +201,8 @@ def floor_source(floor_path: Path, expect: dict, mode: str = "fixed",
         why.append("模型檔的 sha256 和這一次不同")
     if (f.get("inputs") or {}).get("sha256") != (expect.get("inputs") or {}).get("sha256"):
         why.append("素材的 sha256 和這一次不同")
-    if (f.get("songs") or {}) != (expect.get("songs") or {}):  # song01 這類編號要對應到同一首歌
-        why.append("真實歌曲（tests/private/songs/）和錄下限時不同：編號對應的 sha256 不一樣")
+    if (f.get("songs") or {}) != (expect.get("songs") or {}):  # 計畫裡的歌曲編號要對應到同一首歌
+        why.append("真實歌曲和錄下限時不同：編號對應的 sha256 不一樣")
     return f, [f"相似度下限 {floor_path.name} 不能用：{w}" for w in why]
 
 
@@ -283,21 +287,56 @@ def used(run_dir: Path, logs: dict[str, str]) -> list[str]:
     return lines
 
 
+def against_check(ref: str, sub: str, mine: Path, rj: dict, have_run1: bool) -> dict:
+    """這次的第 1 次和另一個版本（同一個標籤、同一個計畫）錄的第 1 次逐檔核對：重構前後是否等價。
+    素材、模型、真實歌曲、套件要相同才比；不同或缺檔都列為異常（不能當作等價）。"""
+    _, other_name = ref_name(ref)
+    other = OUT / other_name / "numeric" / sub / "run1"
+    out = {"version": other_name, "rows": [], "problems": []}
+    oj = C._json(other / "run.json")
+    if not have_run1:
+        out["problems"].append(f"這次的第 1 次沒有成功，沒有和 {other_name} 比")
+    elif oj is None or oj.get("incomplete"):
+        out["problems"].append(f"{other} 沒有完整的輸出：先用同一個 --label、--plan 錄 {ref}")
+    else:
+        for key, what in (("inputs", "素材"), ("models", "模型檔"), ("songs", "真實歌曲"), ("environment", "套件")):
+            a, b = oj.get(key), rj.get(key)
+            if key == "environment":  # 內嵌 Python 的路徑不比
+                a, b = ({k: v for k, v in (x or {}).items() if k != "executable"} for x in (a, b))
+            if a != b:
+                out["problems"].append(f"和 {other_name} 的{what}不同，逐檔核對不能代表等價")
+        out["problems"] += [f"{other_name} 的輸出不完整：{m}" for m in C.required(other)]
+        out["rows"] = C.exact(other, mine)
+        out["problems"] += [f"和 {other_name} 不完全相同：{r['item']} {r['value']}" for r in out["rows"] if not r["ok"]]
+    return out
+
+
 def main() -> int:  # noqa: C901
     sys.stdout.reconfigure(encoding="utf-8")
     args = [a for a in sys.argv[1:] if not a.startswith("--")]
     opt = dict(a[2:].split("=", 1) if "=" in a else (a[2:], "1") for a in sys.argv[1:] if a.startswith("--"))
     ref = args[0] if args else "v2.3.2"
     label = opt.get("label") or platform.node().lower()
-    runs = int(opt.get("runs", 2))
-    if runs < 2:
-        print("--runs 至少要 2：數值基準要同一版跑兩次以上，逐檔核對確認結果穩定")
+    if "songs" in opt or "runs" in opt:
+        print("--songs、--runs 已改成測試計畫：--plan=<JSON>（次數和歌曲都寫在計畫裡，見 tests/numeric/plan.py）")
         return 2
+    plan = PLAN.load(opt["plan"], "numeric") if opt.get("plan") else None
+    runs = plan["runs"] if plan else 2
     if not (INPUTS / "manifest.json").exists() or not MODELS.exists():
         print(f"找不到 {INPUTS / 'manifest.json'} 或 {MODELS}：先跑 tests/numeric/make_inputs.py、複製模型（見計畫 3.8）")
         return 2
+    from sandbox import acquire_recording
+
+    notes = acquire_recording("numeric/baseline.py " + " ".join(sys.argv[1:]))
+    sub = f"{label}-{plan['name']}" if plan else label  # 不同計畫的輸出、摘要不互相覆蓋
     name, code = export(ref)
-    base = OUT / name / "numeric" / label
+    notes += EXPORT_CLEANED
+    if plan:
+        notes.append(f"測試計畫 {plan['name']}（{plan['path'].name}）：{runs} 次；真實歌曲 "
+                     + f"{len(plan['songs'])} 首")
+    if runs < 2:
+        notes.append(f"只跑 {runs} 次（測試計畫指定）：同一版的穩定性沒有判定")
+    base = OUT / name / "numeric" / sub
     base.mkdir(parents=True, exist_ok=True)
     problems: list[str] = list(EXPORT_NOTES)
     logs: dict[int, str] = {}
@@ -312,7 +351,7 @@ def main() -> int:  # noqa: C901
         t0 = time.time()
         rc, late, stopped = run_logged(
             [sys.executable, "-I", str(HERE / "run.py"), str(code), str(INPUTS), str(MODELS), str(out)]
-            + ([f"--songs={SONGS}"] if "songs" in opt else []) + [f"--device={opt.get('device', 'auto')}"],
+            + ([f"--plan={plan['path']}", "--kind=numeric"] if plan else []) + [f"--device={opt.get('device', 'auto')}"],
             base / f"run{i}.log", float(opt.get("timeout", TIMEOUT)),
         )
         wall[i] = round(time.time() - t0, 1)
@@ -343,6 +382,8 @@ def main() -> int:  # noqa: C901
             problems.append(f"第 1 次和第 {i} 次比對時出錯：{type(e).__name__}: {e}"[:300])
     # 下限一律用上游（--floor-version，預設 v2.3.2）在這台電腦錄的，不用被測版本自己的
     floor_path = SUMMARY / f"{opt.get('floor-version', BASE)}-{label}-similarity-fixed.json"
+    if private_copy(floor_path).exists():  # 有真實歌曲時，逐首的下限只在本機的完整版
+        floor_path = private_copy(floor_path)
     expect = {"machine": machine(), "environment": rj0.get("environment"), "models": rj0.get("models"),
               "inputs": rj0.get("inputs"), "songs": rj0.get("songs")}
     for i in exact:
@@ -351,8 +392,12 @@ def main() -> int:  # noqa: C901
         else:
             problems += [f"第 1 次和第 {i} 次：{m}" for m in floor_check(pairs[i], floor_path, expect)]
     pair = pairs.get(2, [])
-    if not exact:
+    if not exact and runs >= 2:
         problems.append("少於兩次有效的執行，沒有做穩定性比對")
+    against: dict = {}
+    if opt.get("against"):
+        against = against_check(opt["against"], sub, base / "run1", rj0, 1 in ok_runs)
+        problems += against["problems"]
     quality = {}
     for i in ok_runs:
         try:
@@ -382,6 +427,7 @@ def main() -> int:  # noqa: C901
         "",
         "## 執行條件（和平常使用不同的地方）",
         "",
+        *[f"- {c}" for c in notes],
         *([f"- {c}" for c in rj.get("conditions", [])] or ["（沒有 run.json，讀不到）"]),
         "",
         "## 實際使用的裝置與模型",
@@ -397,6 +443,9 @@ def main() -> int:  # noqa: C901
         *[x for i, rows in exact.items()
           for x in (f"第 {i} 次：{sum(r['ok'] for r in rows)}／{len(rows)} 個檔案完全相同", "", *C.table(rows), "")],
         *([] if exact else ["（沒有做）", ""]),
+        *([f"## 和 {against['version']} 逐檔核對（兩邊的第 1 次）", "",
+           f"{sum(r['ok'] for r in against['rows'])}／{len(against['rows'])} 個檔案完全相同", "",
+           *C.table(against["rows"]), ""] if against else []),
         "## 第 1、2 次的差距表（參考：逐檔核對通過時這裡一定全部通過）",
         "",
         *(C.table(pair) if pair else ["（沒有做）"]),
@@ -413,20 +462,22 @@ def main() -> int:  # noqa: C901
         "machine": mach,
         # 不放 Python 的完整路徑（含使用者名稱）；報告裡有
         "environment": {k: v for k, v in (rj.get("environment") or {}).items() if k != "executable"},
-        "conditions": rj.get("conditions"),
+        "conditions": notes + (rj.get("conditions") or []),
+        "plan": {"name": plan["name"], "runs": runs, "songs": [s["id"] for s in plan["songs"]]} if plan else None,
         "commit": commit_of(code),
         "inputs": rj.get("inputs"),
-        "songs": rj.get("songs"),  # run.py --songs 的真實歌曲：匿名編號 → sha256（不記檔名）
+        "songs": rj.get("songs"),  # 測試計畫的真實歌曲：編號 → sha256（不記檔名）
         "models": rj.get("models"),  # 模型檔 → sha256
         "problems": problems,
         "on_gpu": on_gpu,
         "exact": {str(i): rows for i, rows in exact.items()},
         "stability": pair,
+        "against": {"version": against["version"], "rows": against["rows"]} if against else None,
         "quality": {str(i): q for i, q in quality.items()},
         "wall_seconds": wall,
     }
-    out_json = SUMMARY / f"{name}-{label}.json"
-    why = write_summary(out_json, summary)
+    out_json = SUMMARY / f"{name}-{sub}.json"
+    why = write_summary(out_json, summary, tuple(s["id"] for s in plan["songs"]) if plan else ())
     if why:
         problems.append(why)
         (base / "numeric-report.md").write_text("\n".join(rep) + f"\n\n## 摘要沒有寫入\n\n- {why}\n", "utf-8")

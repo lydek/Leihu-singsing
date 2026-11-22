@@ -13,9 +13,11 @@
 相似度基準（similarity.py）另外用：
 - --normal：執行緒數、torchcrepe 隨機抖動都照平常（deterministic=False），量「上游自己跑多次」的自然差異；
 - --quality=auto：分離品質照平常的 auto（顯示卡上會用高品質模型）；預設 standard；
-- --songs=<資料夾>：另外處理裡面的音檔（真實歌曲，走匯入→分離→音高→歌詞），輸出在 song01、song02…（依檔名排序）。
+- --plan=<測試計畫 JSON> --kind=numeric|similarity：另外處理計畫裡那一段指定的真實歌曲（走匯入→分離→音高→歌詞），
+  輸出資料夾和歌曲編號用計畫裡的編號（plan.py；路徑和 sha256 由計畫指定，不掃描資料夾）。
 
-用法：<python> tests/numeric/run.py <程式碼資料夾> <素材資料夾> <模型資料夾> <輸出資料夾> [--normal] [--quality=auto] [--songs=<資料夾>]
+用法：<python> tests/numeric/run.py <程式碼資料夾> <素材資料夾> <模型資料夾> <輸出資料夾> [--normal] [--quality=auto]
+  [--plan=<測試計畫 JSON> --kind=numeric|similarity]
 """
 
 from __future__ import annotations
@@ -30,15 +32,15 @@ from pathlib import Path
 sys.stdout.reconfigure(encoding="utf-8")
 sys.stderr.reconfigure(encoding="utf-8")
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import plan as PLAN  # noqa: E402
 from sandbox import Sandbox  # noqa: E402
 
 args = [a for a in sys.argv[1:] if not a.startswith("--")]
 opt = dict(a[2:].split("=", 1) if "=" in a else (a[2:], "1") for a in sys.argv[1:] if a.startswith("--"))
 code, inputs, models, out = (Path(a).resolve() for a in args[:4])
-AUDIO = (".flac", ".wav", ".mp3", ".m4a", ".ogg")
-SONG_FILES = sorted(x for x in Path(opt["songs"]).glob("*") if x.suffix.lower() in AUDIO) if opt.get("songs") else []
-if opt.get("songs") and not SONG_FILES:  # 明確要求真實歌曲卻一首都沒有：不要默默只跑合成素材
-    sys.exit(f"--songs={opt['songs']} 裡沒有音檔（{'、'.join(AUDIO)}）")
+if "songs" in opt:  # 舊參數：掃描資料夾，已改成測試計畫
+    sys.exit("--songs 已改成 --plan=<測試計畫 JSON> --kind=numeric|similarity（tests/numeric/plan.py）")
+SONGS = PLAN.load(opt["plan"], opt.get("kind", "numeric"))["songs"] if opt.get("plan") else []
 BOX = Sandbox(code, models, "[numeric]", deterministic="normal" not in opt, device=opt.get("device", "auto"))
 P, SH = BOX.P, BOX.SH
 cond = BOX.cond
@@ -144,8 +146,8 @@ def main() -> None:
                 subtype="FLOAT",
             )
         keep(d, sid, timing)
-    for i, src in enumerate(SONG_FILES, 1):
-        sid = f"song{i:02d}"
+    for s in SONGS:
+        sid, src = s["id"], s["path"]
         print(sid, flush=True)
         d = P.LIB / sid
         d.mkdir(parents=True)
@@ -166,7 +168,7 @@ def main() -> None:
                 "conditions": BOX.conditions,
                 "problems": problems,
                 "worker_spawns": BOX.spawns,
-                "songs": {f"song{i:02d}": hashlib.sha256(f.read_bytes()).hexdigest() for i, f in enumerate(SONG_FILES, 1)},
+                "songs": {s["id"]: s["sha256"] for s in SONGS},  # 計畫裡的編號 → sha256（不記檔名）
                 "environment": BOX.environment(),
                 "models": BOX.models_sha,
                 "inputs": json.loads((inputs / "manifest.json").read_text("utf-8"))

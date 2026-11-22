@@ -2,18 +2,18 @@ r"""錄一個版本在這台電腦上的相似度基準（docs/refactor-port-pla
 
 數值基準（baseline.py）固定單執行緒、關掉隨機抖動，讓同一版逐位元組相同，用來確認「行為沒變」。
 第二階段的效能調整一定會讓輸出不同，只能要求「相似」；可以接受的差距不能比上游自己跑多次的差距還嚴，
-所以這裡用平常的條件（run.py --normal：執行緒數照平常、torchcrepe 隨機抖動開著）跑 N 次（預設 3），
+所以這裡用平常的條件（run.py --normal：執行緒數照平常、torchcrepe 隨機抖動開著）跑 N 次（次數寫在測試計畫的 similarity 段落；沒給計畫是 3 次），
 每兩次比一次（compare.pair），記下每個項目的中位數和最差值，當作第二階段門檻的下限。
 也記每次和合成素材標準答案的差距（compare.quality）的範圍。
 
-歌曲：合成素材（tests/private/numeric/inputs）一定會跑；tests/private/songs/ 有音檔時一起跑（run.py --songs），
-摘要只記 sha256，不記檔名。報告和輸出在 tests/private/upstream/<版本>/similarity/<標籤>/（不進 git），
-摘要寫到 tests/numeric/baselines/<版本>-<標籤>-similarity.json（進 git）。
+歌曲：合成素材（tests/private/numeric/inputs）一定會跑；測試計畫（--plan，見 plan.py）similarity 段落指定的真實歌曲一起跑，
+摘要只記編號和 sha256，不記檔名。報告和輸出在 tests/private/upstream/<版本>/similarity/<標籤>[-<計畫名稱>]/（不進 git），
+摘要寫到 tests/numeric/baselines/<版本>-<標籤>[-<計畫名稱>]-similarity.json（進 git）。同一時間只能錄一個基準。
 報告一定有「異常」一節（結束代碼、run.py 回報的問題、log 的 Traceback／改用 CPU／改在主程式裡執行／退回／卡住／逾時／
 記憶體不足、子程式載入了別份程式），沒有就寫「無」。兩次之間超過數值基準門檻不算異常（這裡就是要量它），會列在表裡。
 
 用法（repo 根目錄，用已安裝版本的內嵌 Python）：
-  <python> tests/numeric/similarity.py [git 參照，預設 v2.3.2] [--label=<這台電腦的名稱>] [--runs=3] [--quality=standard|auto]
+  <python> tests/numeric/similarity.py [git 參照，預設 v2.3.2] [--label=<這台電腦的名稱>] [--plan=<測試計畫 JSON>] [--quality=standard|auto]
   [--timeout=<每次執行的秒數上限，預設 7200>] [--device=auto|cpu] [--fixed]
 --fixed：用和數值基準一樣的固定條件（單執行緒、關抖動、固定亂數種子）跑，記下的差距給顯示卡的數值基準當下限；
   摘要是 <版本>-<標籤>-similarity-fixed.json。不加是平常條件（第二階段效能調整的門檻下限）。
@@ -38,9 +38,8 @@ sys.path[:0] = [str(HERE), str(ROOT / "tests" / "contract")]
 import compare as C  # noqa: E402
 import numpy as np  # noqa: E402
 from baseline import INPUTS, MODELS, SUMMARY, TIMEOUT, log_alerts, machine, run_logged, used, valid_runs  # noqa: E402
-from compare_upstream import EXPORT_NOTES, write_summary, tools_dirty, OUT, _git, commit_of, export  # noqa: E402
-
-SONGS = ROOT / "tests" / "private" / "songs"
+import plan as PLAN  # noqa: E402
+from compare_upstream import EXPORT_CLEANED, EXPORT_NOTES, write_summary, tools_dirty, OUT, _git, commit_of, export  # noqa: E402
 
 
 def number(r: dict) -> float | None:
@@ -70,18 +69,26 @@ def main() -> int:  # noqa: C901
     opt = dict(a[2:].split("=", 1) if "=" in a else (a[2:], "1") for a in sys.argv[1:] if a.startswith("--"))
     ref = args[0] if args else "v2.3.2"
     label = opt.get("label") or platform.node().lower()
-    runs = int(opt.get("runs", 3))
-    if runs < 2:
-        print("--runs 至少要 2：相似度要兩兩比較")
+    if "runs" in opt:
+        print("--runs 已改成測試計畫：--plan=<JSON>（次數和歌曲都寫在計畫裡，見 tests/numeric/plan.py）")
         return 2
+    plan = PLAN.load(opt["plan"], "similarity") if opt.get("plan") else None
+    runs = plan["runs"] if plan else 3
     quality = opt.get("quality", "standard")
     fixed = "fixed" in opt  # 固定條件（和數值基準一樣）：顯示卡數值基準的下限要用這種錄的
     if not (INPUTS / "manifest.json").exists() or not MODELS.exists():
         print(f"找不到 {INPUTS / 'manifest.json'} 或 {MODELS}（見計畫 3.8）")
         return 2
-    has_songs = SONGS.exists() and any(x.suffix.lower() in C.AUDIO for x in SONGS.iterdir())  # fetch.py 等不算
+    from sandbox import acquire_recording
+
+    notes = acquire_recording("numeric/similarity.py " + " ".join(sys.argv[1:]))
+    sub = f"{label}-{plan['name']}" if plan else label  # 不同計畫的輸出、摘要不互相覆蓋
     name, code = export(ref)
-    base = OUT / name / ("similarity-fixed" if fixed else "similarity") / label  # 兩種模式不互相覆蓋
+    notes += EXPORT_CLEANED
+    if plan:
+        notes.append(f"測試計畫 {plan['name']}（{plan['path'].name}）：{runs} 次；真實歌曲 "
+                     + f"{len(plan['songs'])} 首")
+    base = OUT / name / ("similarity-fixed" if fixed else "similarity") / sub  # 兩種模式不互相覆蓋
     base.mkdir(parents=True, exist_ok=True)
     problems: list[str] = list(EXPORT_NOTES)
     logs: dict[int, str] = {}
@@ -95,7 +102,7 @@ def main() -> int:  # noqa: C901
         print(f"第 {i} 次：{name} → {out}", flush=True)
         cmd = [sys.executable, "-I", str(HERE / "run.py"), str(code), str(INPUTS), str(MODELS), str(out),
                *([] if fixed else ["--normal"]),
-               f"--quality={quality}", f"--device={opt.get('device', 'auto')}"] + ([f"--songs={SONGS}"] if has_songs else [])
+               f"--quality={quality}", f"--device={opt.get('device', 'auto')}"] + ([f"--plan={plan['path']}", "--kind=similarity"] if plan else [])
         t0 = time.time()
         rc, late, stopped = run_logged(cmd, base / f"run{i}.log", float(opt.get("timeout", TIMEOUT)))
         wall[i] = round(time.time() - t0, 1)
@@ -171,7 +178,7 @@ def main() -> int:  # noqa: C901
         f"- 電腦：{mach['cpu']}（{mach['logical_cpus']} 個邏輯處理器）；{mach['ram_gb']} GB RAM；{mach['os']}",
         f"- 顯示卡：{mach['gpus']}；nvidia-smi：{mach['nvidia_smi']}",
         f"- 素材：{INPUTS}（語音：{(rj.get('inputs') or {}).get('tts_voice')}）；真實歌曲："
-        + (f"{len(rj.get('songs') or {})} 首（{SONGS}）" if has_songs else "沒有（tests/private/songs/ 是空的）"),
+        + (f"{len(rj.get('songs') or {})} 首（測試計畫 {plan['name']}）" if plan else "沒有（沒有給測試計畫）"),
         f"- 執行次數：{runs}（兩兩比較 {len(pairs)} 組）；每次總時間：" + "、".join(f"{v} 秒" for v in wall.values())
         + f"；時間：{time.strftime('%Y-%m-%d %H:%M:%S')}",
         "",
@@ -181,6 +188,7 @@ def main() -> int:  # noqa: C901
         "",
         "## 執行條件（和平常使用不同的地方）",
         "",
+        *[f"- {c}" for c in notes],
         *([f"- {c}" for c in rj.get("conditions", [])] or ["（沒有 run.json，讀不到）"]),
         *([] if fixed else ["- 執行緒數、torchcrepe 隨機抖動、亂數種子照平常（run.py --normal）"]),
         "",
@@ -209,7 +217,8 @@ def main() -> int:  # noqa: C901
         "tool_commit": tool + ("+dirty" if dirty else ""),
         "machine": mach,
         "environment": {k: v for k, v in (rj.get("environment") or {}).items() if k != "executable"},
-        "conditions": rj.get("conditions"),
+        "conditions": notes + (rj.get("conditions") or []),
+        "plan": {"name": plan["name"], "runs": runs, "songs": [s["id"] for s in plan["songs"]]} if plan else None,
         "quality": quality,
         "mode": "fixed" if fixed else "normal",
         "commit": commit_of(code),
@@ -223,8 +232,8 @@ def main() -> int:  # noqa: C901
         "truth": {str(i): q for i, q in quality_runs.items()},
         "wall_seconds": wall,
     }
-    out_json = SUMMARY / f"{name}-{label}-similarity{'-fixed' if fixed else ''}.json"
-    why = write_summary(out_json, summary)
+    out_json = SUMMARY / f"{name}-{sub}-similarity{'-fixed' if fixed else ''}.json"
+    why = write_summary(out_json, summary, tuple(s["id"] for s in plan["songs"]) if plan else ())
     if why:
         problems.append(why)
         (base / "similarity-report.md").write_text("\n".join(rep) + f"\n\n## 摘要沒有寫入\n\n- {why}\n", "utf-8")
