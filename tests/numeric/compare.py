@@ -30,7 +30,6 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import make_inputs as MI  # noqa: E402
 
 SONGS = ("songsing01", "songspeech01")
-AUDIO = (".flac", ".wav", ".mp3", ".m4a", ".ogg")  # run.py --songs、similarity.py 認的音檔
 META_KEYS = ("separation", "vocal_model", "karaoke", "acapella", "language", "lyrics_unreliable", "harmony")
 # JSON 裡每次都會變、和輸出內容無關的欄位：combo_lufs_sig 是用檔案 mtime（奈秒）組成的響度快取簽章
 VOLATILE = {"meta.json": {"combo_lufs_sig": r"\d+(\|\d+)*"}}  # 欄位 → 合法格式；只把值換成 <sig:段數>
@@ -38,7 +37,7 @@ VOLATILE = {"meta.json": {"combo_lufs_sig": r"\d+(\|\d+)*"}}  # 欄位 → 合�
 REQUIRED = {
     "songsing01": ("lead.flac", "back.flac", "inst.flac", "pitch.json", "meta.json", "take_take01.json", "export.wav"),
     "songspeech01": ("lead.flac", "back.flac", "inst.flac", "pitch.json", "meta.json", "lyrics_auto.lrc"),
-    "song": ("lead.flac", "back.flac", "inst.flac", "pitch.json", "meta.json"),  # run.py --songs 的 songNN
+    "song": ("lead.flac", "back.flac", "inst.flac", "pitch.json", "meta.json"),  # 測試計畫指定的真實歌曲
 }
 SKIP = ("timing.json", "run.json", "net_blocked.log")  # exact() 不比的檔案（處理時間、執行環境、診斷）
 
@@ -112,9 +111,7 @@ def _volatile(name: str, j):
 def required(d: Path) -> list[str]:
     """一份輸出缺了哪些必要檔案、哪些 JSON 讀不了、音檔打不開（空清單＝完整）。"""
     bad = []
-    sids = [*SONGS, *sorted(x.name for x in d.iterdir() if x.is_dir() and re.fullmatch(r"song\d+", x.name))] \
-        if d.exists() else list(SONGS)
-    for sid in sids:
+    for sid in [*SONGS, *run_songs(d)]:
         for f in REQUIRED.get(sid, REQUIRED["song"]):
             p = d / sid / f
             if not p.exists():
@@ -222,20 +219,30 @@ def _json(p: Path) -> dict | None:
     return json.loads(p.read_text("utf-8")) if p.exists() else None
 
 
+def run_songs(d: Path) -> list[str]:
+    """run.py 處理的真實歌曲編號：看 run.json 記的清單（測試計畫指定的），不掃描資料夾。"""
+    j = _json(d / "run.json") if d.exists() else None
+    return sorted((j or {}).get("songs") or {})
+
+
 def songs(a: Path, b: Path) -> list[str]:
-    """合成素材的兩首，加上 run.py --songs 處理的真實歌曲（song01、song02…，任一邊有就列，缺的那邊會報檔案不存在）。"""
-    extra = {x.name for d in (a, b) if d.exists() for x in d.iterdir() if x.is_dir() and re.fullmatch(r"song\d+", x.name)}
-    return [*SONGS, *sorted(extra)]
+    """合成素材的兩首，加上兩邊 run.json 記的真實歌曲（任一邊有就列，缺的那邊會報檔案不存在）。"""
+    return [*SONGS, *sorted(set(run_songs(a)) | set(run_songs(b)))]
 
 
 def _lyrics(a: Path, b: Path, sid: str) -> list[dict]:
     la, lb = (_lrc(d / sid / "lyrics_auto.lrc") for d in (a, b))
     ta, tb = ("".join(t for _, t in x) for x in (la, lb))
     v = cer(ta, tb)
-    rows = [row(f"{sid} 歌詞字元錯誤率", f"{v:.3f}（{len(ta)} 字 vs {len(tb)} 字）", "< 0.01", bool(ta) and v < 0.01, v)]
+    # 合成素材一定要辨識出歌詞；真實歌曲可能整首都辨識不出來（例如器樂很長、歌詞不可靠），兩邊都沒有就算相同
+    none_ok = not ta and not tb and sid not in SONGS
+    rows = [row(f"{sid} 歌詞字元錯誤率", f"{v:.3f}（{len(ta)} 字 vs {len(tb)} 字）", "< 0.01",
+                none_ok or (bool(ta) and v < 0.01), v)]
     if la and len(la) == len(lb):
         diff = float(np.median([abs(x[0] - y[0]) for x, y in zip(la, lb, strict=True)]) * 1000)
         rows.append(row(f"{sid} 歌詞起點差中位數", f"{diff:.0f} ms", "< 80 ms", diff < 80, diff))
+    elif not la and not lb and sid not in SONGS:
+        rows.append(row(f"{sid} 歌詞行數", "0 vs 0（兩邊都沒有辨識出歌詞）", "相同", True, 0))
     else:
         rows.append(row(f"{sid} 歌詞行數", f"{len(la)} vs {len(lb)}", "相同", False, abs(len(la) - len(lb))))
     return rows

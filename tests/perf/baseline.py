@@ -1,18 +1,20 @@
 r"""錄一個版本在這台電腦上的效能基準（docs/refactor-port-plan.md 3.8）。
 
-每首歌跑 N 次（預設 3）tests/perf/run_perf.py，同時每 0.25 秒取樣那個行程和它底下所有子孫行程的記憶體
+每首歌跑 N 次（次數寫在測試計畫的 perf 段落；沒給計畫是 3 次）tests/perf/run_perf.py，同時每 0.25 秒取樣那個行程和它底下所有子孫行程的記憶體
 （working set、private bytes；內嵌 Python 沒有 psutil，用 Windows API），有 nvidia-smi 時每秒記顯示卡記憶體與使用率
 （整張卡，含其他程式；所以另外記 idle_before 時的值當底）。各階段取中位數，並列出最小、最大值看變異。
 
 歌曲：
 - 合成歌（一定會跑）：tests/private/numeric/inputs/sing.flac 接 7 次（約 3.6 分鐘），沒有授權問題，兩台電腦都能用；
-- 真實歌曲：tests/private/songs/ 底下的音檔（自己擁有的歌，不進 git）。摘要只記 sha256、長度，不記檔名（檔名常是歌名）。
-報告和 log 在 tests/private/upstream/<版本>/perf/<標籤>/（不進 git）；摘要寫到 tests/perf/baselines/<版本>-<標籤>.json（進 git）。
+- 真實歌曲：測試計畫（--plan，見 tests/numeric/plan.py）perf 段落指定的音檔，用路徑和 sha256 指定，不掃描資料夾。
+  摘要只記編號、sha256、長度，不記檔名（檔名常是歌名）。
+報告和 log 在 tests/private/upstream/<版本>/perf/<標籤>[-<計畫名稱>]/（不進 git）；
+摘要寫到 tests/perf/baselines/<版本>-<標籤>[-<計畫名稱>].json（進 git）。同一時間只能錄一個基準（sandbox.acquire_recording）。
 報告一定有「異常」（結束代碼、run.py 回報的問題、log 的 Traceback／改用 CPU／改在主程式裡執行／退回／卡住／逾時／
 記憶體不足、子程式載入了別份程式），沒有就寫「無」；也列出執行條件和實際用的模型。
 
 用法（repo 根目錄，用已安裝版本的內嵌 Python）：
-  <python> tests/perf/baseline.py [git 參照，預設 v2.3.2] [--label=<這台電腦的名稱>] [--runs=3] [--quality=auto|standard]
+  <python> tests/perf/baseline.py [git 參照，預設 v2.3.2] [--label=<這台電腦的名稱>] [--plan=<測試計畫 JSON>] [--quality=auto|standard]
   [--timeout=<每次執行的秒數上限，預設 7200>] [--device=auto|cpu]
 有異常時結束代碼是 1。
 """
@@ -38,13 +40,12 @@ ROOT = HERE.parents[1]
 sys.path[:0] = [str(ROOT / "tests" / "numeric"), str(ROOT / "tests" / "contract")]
 
 from baseline import KILL, TIMEOUT, device_report, kill_tree, log_alerts, machine  # noqa: E402  tests/numeric/baseline.py
-from compare_upstream import EXPORT_NOTES, write_summary, tools_dirty, OUT, _git, commit_of, export  # noqa: E402
+import plan as PLAN  # noqa: E402  tests/numeric/plan.py
+from compare_upstream import EXPORT_CLEANED, EXPORT_NOTES, write_summary, tools_dirty, OUT, _git, commit_of, export  # noqa: E402
 
 PRIVATE = ROOT / "tests" / "private"
 MODELS = PRIVATE / "models"
-SONGS = PRIVATE / "songs"
 SUMMARY = HERE / "baselines"
-AUDIO = (".flac", ".wav", ".mp3", ".m4a", ".ogg")
 KEYS = ("ws_mb", "private_mb")
 
 
@@ -237,27 +238,36 @@ def main() -> int:  # noqa: C901
     opt = dict(a[2:].split("=", 1) if "=" in a else (a[2:], "1") for a in sys.argv[1:] if a.startswith("--"))
     ref = args[0] if args else "v2.3.2"
     label = opt.get("label") or platform.node().lower()
-    runs = int(opt.get("runs", 3))
-    if runs < 1:
-        print("--runs 至少要 1")
+    if "runs" in opt:
+        print("--runs 已改成測試計畫：--plan=<JSON>（次數和歌曲都寫在計畫裡，見 tests/numeric/plan.py）")
         return 2
+    plan = PLAN.load(opt["plan"], "perf") if opt.get("plan") else None
+    runs = plan["runs"] if plan else 3
     quality = opt.get("quality", "auto")
     if not (PRIVATE / "numeric" / "inputs" / "sing.flac").exists() or not MODELS.exists():
         print("找不到 tests/private/numeric/inputs/sing.flac 或 tests/private/models（見計畫 3.8）")
         return 2
+    from sandbox import acquire_recording
+
+    notes = acquire_recording("perf/baseline.py " + " ".join(sys.argv[1:]))
+    sub = f"{label}-{plan['name']}" if plan else label  # 不同計畫的輸出、摘要不互相覆蓋
     name, code = export(ref)
-    base = OUT / name / "perf" / label
+    notes += EXPORT_CLEANED
+    if plan:
+        notes.append(f"測試計畫 {plan['name']}（{plan['path'].name}）：每首 {runs} 次；真實歌曲 "
+                     + f"{len(plan['songs'])} 首")
+    base = OUT / name / "perf" / sub
     base.mkdir(parents=True, exist_ok=True)
-    songs = [("synth", synth_song())]
-    songs += [(f"song{i + 1:02d}", p) for i, p in enumerate(sorted(x for x in SONGS.glob("*") if x.suffix.lower() in AUDIO))]
+    songs = [("synth", synth_song(), "合成（sing.flac × 7）")]
+    songs += [(s["id"], s["path"], f"測試計畫 {plan['name']}") for s in (plan["songs"] if plan else [])]
     problems: list[str] = list(EXPORT_NOTES)
     results: dict[str, dict] = {}
     first_log = ""
     first_run = None
     all_logs: dict[str, str] = {}  # 每一次的 log：實際裝置逐次列
-    for sid, song in songs:
+    for sid, song, source in songs:
         sha = hashlib.sha256(song.read_bytes()).hexdigest()
-        rec = {"sha256": sha, "source": "合成（sing.flac × 7）" if sid == "synth" else "tests/private/songs", "runs": []}
+        rec = {"sha256": sha, "source": source, "runs": []}
         for i in range(1, runs + 1):
             out = base / f"{sid}-run{i}"
             if out.exists():  # 不能讀到上一次留下的 run.json、phases.json
@@ -323,6 +333,7 @@ def main() -> int:  # noqa: C901
         "",
         "## 執行條件（和平常使用不同的地方）",
         "",
+        *[f"- {c}" for c in notes],
         *([f"- {c}" for c in (first_run or {}).get("conditions", [])] or ["（沒有 run.json，讀不到）"]),
         "",
         "## 實際使用的裝置與模型",
@@ -378,7 +389,8 @@ def main() -> int:  # noqa: C901
         "environment": {k: v for k, v in env.items() if k != "executable"},  # 不放含使用者名稱的路徑
         "commit": commit_of(code),
         "models": (first_run or {}).get("models"),
-        "conditions": (first_run or {}).get("conditions"),
+        "conditions": notes + ((first_run or {}).get("conditions") or []),
+        "plan": {"name": plan["name"], "runs": runs, "songs": [s["id"] for s in plan["songs"]]} if plan else None,
         "quality": quality,
         "units": {"*_mb": "MiB（2^20 位元組）", "gpu_mem_mb": "MiB（nvidia-smi）", "gpu_util": "%", "seconds": "秒"},
         "runs_per_song": runs,
@@ -392,8 +404,8 @@ def main() -> int:  # noqa: C901
                                  for r in rec["runs"]]}
                   for sid, rec in results.items()},
     }
-    out_json = SUMMARY / f"{name}-{label}.json"
-    why = write_summary(out_json, summary)
+    out_json = SUMMARY / f"{name}-{sub}.json"
+    why = write_summary(out_json, summary, tuple(s["id"] for s in plan["songs"]) if plan else ())
     if why:
         problems.append(why)
         (base / "perf-report.md").write_text("\n".join(rep) + f"\n\n## 摘要沒有寫入\n\n- {why}\n", "utf-8")
