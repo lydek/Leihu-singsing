@@ -47,7 +47,8 @@ def _local_only():
         abort(403)
     if request.method not in ("GET", "HEAD", "OPTIONS"):
         origin = request.headers.get("Origin")
-        if origin and origin.rstrip("/").lower() not in (f"http://127.0.0.1:{PORT}", f"http://localhost:{PORT}"):
+        mine = {f"http://{h}{'' if PORT == 80 else f':{PORT}'}" for h in ("127.0.0.1", "localhost")}
+        if origin and origin.rstrip("/").lower() not in mine:   # fork：埠是 80 時瀏覽器送的 Origin 不帶埠號
             abort(403)
         # 2.3.0 搬移歌曲庫中：會寫進歌曲庫的操作先擋住（不然搬完會少掉這段時間的修改）
         if request.path in YT_GATED and not P.load_config().get("yt_enabled"):

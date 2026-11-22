@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import math
 import os
 import sys
 import threading
@@ -34,7 +35,9 @@ def status():
     hq = P.hq_status() if (q == "high" or (q == "auto" and mods.get("cuda"))) else None
     vq = cfg.get("vocal_quality", "auto")
     hqv = P.hqv_status() if (vq == "high" or (vq == "auto" and mods.get("cuda"))) else None
-    if request.args.get("live") == "1":
+    # fork：外站網頁可以用 <img> 一直打這個網址讓背景工作一直暫停，只認本機頁面
+    # （瀏覽器會帶 Sec-Fetch-Site；本機的其他程式不帶，照常算）
+    if request.args.get("live") == "1" and request.headers.get("Sec-Fetch-Site") != "cross-site":
         P.live_touch()
     live = P.live_status(cfg)
     live["holding"] = jobs.holding
@@ -111,6 +114,20 @@ def get_config():
     return jsonify(cfg)
 
 
+def _balance(v) -> float | None:
+    """fork：設定畫面填的餘額（美元），空白是清掉。NaN／無限大寫進 config.json 後 GET /api/config 會輸出 NaN，
+    設定畫面打不開；不是數字原本回 500。"""
+    if v in (None, ""):
+        return None
+    try:
+        x = round(float(v), 2)
+    except (TypeError, ValueError, OverflowError):
+        raise P.UserError("餘額格式不正確") from None
+    if not math.isfinite(x):
+        raise P.UserError("餘額格式不正確")
+    return x
+
+
 @bp.post("/api/config")
 @_locked
 def set_config():
@@ -120,8 +137,7 @@ def set_config():
         if k not in body:
             continue
         if k == "balance_usd":
-            v = body[k]
-            v = None if v in (None, "") else round(float(v), 2)
+            v = _balance(body[k])
             if v != cfg.get("balance_usd"):
                 cfg["balance_usd"], cfg["balance_set_at"] = v, (time.time() if v is not None else None)
             continue
