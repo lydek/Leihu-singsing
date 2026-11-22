@@ -7,7 +7,7 @@
 - **版號**：3.15 的第 4 段是 fork 序號（同步時照 3.21 設成「上游版本＋.1」）。這一版會改變行為，要單獨發 2.3.4.2，還是等下一次同步上游時一起發。
 - **改上游擁有的檔案會讓同步變難**：`pipeline.py`、`gpu_worker.py`、`score_sheet.py`（M6）、`share.py`（S19）、`static/app.js`、`installer.py` 等，每多一處 fork 的修改，同步上游時就多一處要手動合併（3.21）；`--leak` 不比對後端檔案的內容，只檢查上游新增的名稱找不找得到；後端的修改只靠 3.21 步驟 4 逐一比對。真的是上游 bug 的（例如缺 `import subprocess`、`_set_priority`、M6），可以考慮回報給上游，上游修了之後同步就會帶進來；回報要你決定，也要你送出。
 - **前端**：D2（刪除處理中的歌回 400）要改 `static/app.js` 才看得到錯誤。`app.js` 是照上游同步的檔案，改了要登記在漏移檢查的 `OWN_CHANGES`。
-- **ruff 的範圍**：目前全 repo 313 個違規（`leihu/` 62 個、`tests/` 33 個，其餘在上游的檔案）。`leihu/` 是上游程式原封搬過去的（3.19），同步時 hunk 會套到這裡（3.21），清了一樣會和同步衝突；建議只在 `tests/` 啟用。
+- **ruff 的範圍**：目前全 repo 311 個違規（`leihu/` 62 個、`tests/` 35 個，其餘在上游的檔案；2026-11-23 補 `import subprocess` 後，`uvx ruff@0.17.5 check .`）。`leihu/` 是上游程式原封搬過去的（3.19），同步時 hunk 會套到這裡（3.21），清了一樣會和同步衝突；建議只在 `tests/` 啟用。
 - **`_local` 備援**（第 4 節）：拿掉才能遵守「伺服器不載入 torch」，但顯示卡子程式壞了就不能處理歌曲。
 
 ## 2. 分批
@@ -34,9 +34,10 @@ fork 對上游後端檔案的修改（同步時 3.21 步驟 4 要確認沒被蓋
 |---|---|---|---|
 | M6 | `score_sheet.py` 的 `_chunks` | 字的時間等於段落起點時不當切點（逐字時間早於句首、兩個字同一個時間時，原本會無限迴圈）；原本會正常結束的輸入，結果不變 | `tests/test_sheet_io.py` 的 `test_chunks_*`：會卡住的 3 個情境（包括改用音符切點）舊程式都卡到 30 秒逾時；`test_chunks_still_splits_long_line_between_chars` 確認一般的切法不變 |
 | 46 | `gpu_worker.py` 的 `_set_priority` | 用自己的 `WinDLL("kernel32")` 實例設 `GetCurrentProcess.restype`、`SetPriorityClass.argtypes`，64 位元 Windows 上才真的改得了優先順序；CPU 處理程式（`CPU_POOL`）從此一律是「低於標準」，顯示卡處理程式在暫停判斷成立時降低 | `tests/test_gpu_worker.py`（子行程裡讀回優先順序；舊程式兩次都是 NORMAL） |
+| `import subprocess` | `pipeline.py` 模組頂端 | 補 `import subprocess`。`_running_apps` 的 `tasklist` 備援（Windows API 查不到程式清單時）和 `_sample_gpu_load` 的 `nvidia-smi` 取樣原本丟 `NameError` 被吞掉，現在真的會跑，效果見第 2 節第 1 批「改了之後的差別」；ruff F821 從 4 個變 0 個 | `tests/test_gpu_busy.py`（替換 `subprocess.run`，舊程式分別回傳 `None`、`GPU_LOAD` 不變）；契約沙盒換掉了這兩個函式，`check_snapshot` 144 個案例兩次相同 |
 
 ## 4. 還沒確認的
 
 - 28（審查修正 A–F）沒有逐項拆開；36 的「建議與可選」各小項（佇列、下載、歌單、匯出影片、`LIANTAI_PORT` 等，目前只把重疊處理 OOM 放在第 5 批）、70 的 `cancel_song`、`on_cancel` 只依 commit 說明判斷（3.20）。開始第 2、4、5、6 批之前要逐行看 diff；看完 36 的各小項，再分到對應批次。
-- 修好 `import subprocess` 後，顯示卡忙碌判斷會開始作用：上游從來沒有真的跑過這段，門檻是否合理沒有驗證。
+- `import subprocess` 已補（2026-11-23），顯示卡忙碌判斷開始作用：上游從來沒有真的跑過這段，門檻是否合理、`nvidia-smi` 週期取樣的 CPU 使用率，都還沒在筆電（3.10）開實際的程式驗證。
 - 舊分支的測試（`test_jobs.py`、`test_values.py`）能不能直接搬，沒有確認。
