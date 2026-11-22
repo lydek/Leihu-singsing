@@ -106,37 +106,62 @@ def step(n: int, total: int, title: str) -> None:
     say(f"\n[{n}/{total}] {title}")
 
 
+RUN_TIMEOUT = 7200   # fork（O21）：pip 等子程序的整體逾時（秒）。PyTorch 約 2.8 GB，慢的網路也要留足時間
+
+
 def run(args: list[str], quiet: bool = True, on_line=None) -> int:
     LOG.write("> " + " ".join(args) + "\n")
     env = dict(os.environ, PYTHONIOENCODING="utf-8", PIP_DISABLE_PIP_VERSION_CHECK="1",
                PIP_NO_WARN_SCRIPT_LOCATION="1")
     p = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
                          encoding="utf-8", errors="replace", env=env)
-    for line in p.stdout:
-        line = line.rstrip()
-        LOG.write("  " + line + "\n")
-        if on_line:
-            on_line(line)
-        if not quiet or line.startswith("ERROR"):
-            say("  " + line[:150])
-    return p.wait()
+    import threading
+    timed_out = []
+
+    def kill():   # 網路卡住時不會永遠停在這裡：逾時就連同子程序一起結束
+        timed_out.append(True)
+        subprocess.run(["taskkill", "/PID", str(p.pid), "/T", "/F"], capture_output=True)
+    timer = threading.Timer(RUN_TIMEOUT, kill)
+    timer.daemon = True
+    timer.start()
+    try:
+        for line in p.stdout:
+            line = line.rstrip()
+            LOG.write("  " + line + "\n")
+            if on_line:
+                on_line(line)
+            if not quiet or line.startswith("ERROR"):
+                say("  " + line[:150])
+        code = p.wait()
+    finally:
+        timer.cancel()
+    if timed_out:
+        say(f"  ! 執行超過時間限制，已停止：{' '.join(args[:4])}")
+        return code or 1
+    return code
 
 
 def pip(*args: str, on_line=None) -> int:
     return run([str(PY), "-m", "pip", *args], on_line=on_line)
 
 
-def powershell(script: str) -> str:
+def powershell(script: str, **env: str) -> str:
+    """env：傳給腳本的值（腳本裡用 $env:名稱 讀）。路徑一律這樣傳，不嵌進腳本字串（fork，38：
+    路徑含「'」時腳本會語法錯誤，也能被注入指令）。"""
     enc = base64.b64encode(script.encode("utf-16-le")).decode()
     r = subprocess.run(["powershell", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass",
-                        "-EncodedCommand", enc], capture_output=True, text=True, encoding="utf-8", errors="replace")
+                        "-EncodedCommand", enc], capture_output=True, text=True, encoding="utf-8", errors="replace",
+                       env=dict(os.environ, **env))
     return r.stdout.strip()
 
 
-def probe(code: str, timeout: int = 90) -> tuple[bool, str]:
-    """另開程序執行一小段檢查；逾時就連同子程序一起結束。"""
+def probe(code: str, *args, timeout: int = 90) -> tuple[bool, str]:
+    """另開程序執行一小段檢查；逾時就連同子程序一起結束。
+    fork（M3）：路徑一律用 argv 傳，不嵌進程式碼字串（使用者名稱含「'」時會 SyntaxError，也能被注入程式碼）：
+    子程序的 sys.argv[1] 固定是 ROOT，args 從 sys.argv[2] 開始。"""
     env = dict(os.environ, PYTHONIOENCODING="utf-8")
-    p = subprocess.Popen([str(PY), "-c", f"import sys; sys.path.insert(0, r'{ROOT}')\n" + code],
+    p = subprocess.Popen([str(PY), "-c", "import sys; sys.path.insert(0, sys.argv[1])\n" + code,
+                          str(ROOT), *map(str, args)],
                          stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
                          encoding="utf-8", errors="replace", env=env)
     try:
@@ -158,8 +183,10 @@ def stop_app() -> None:
         "$all = Get-CimInstance Win32_Process;"
         "$keep = @(); $p = %d; while ($p) { $keep += $p; $p = ($all | Where-Object ProcessId -eq $p).ParentProcessId; if ($keep.Count -gt 8) { break } };"
         "$all | Where-Object { ($_.Name -like 'python*.exe') -and ($keep -notcontains $_.ProcessId) -and "
-        "($_.ExecutablePath -like '%s*') } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force; $_.ProcessId }"
-        % (os.getpid(), str(Path(sys.prefix))))
+        # fork（38）：路徑用環境變數傳、用 StartsWith 比對。嵌進單引號字串時路徑含「'」會語法錯誤，-like 還會把 [ ] 當萬用字元
+        "$_.ExecutablePath -and $_.ExecutablePath.StartsWith($env:LEIHU_PREFIX, [StringComparison]::OrdinalIgnoreCase) }"
+        " | ForEach-Object { Stop-Process -Id $_.ProcessId -Force; $_.ProcessId }"
+        % os.getpid(), LEIHU_PREFIX=str(Path(sys.prefix)) + os.sep)
     if out:
         say(f"  已關閉正在執行的雷虎練唱台（{out.count(chr(10)) + 1} 個程序）")
         time.sleep(2)
@@ -566,7 +593,7 @@ def verify(tag: str) -> bool:
         ok_all &= ok or name == "視窗介面"
     model = models_root() / "uvr" / SEP_MODELS[0]
     if tag != "cpu" and model.exists():
-        ok, out = probe("import torch, onnxruntime as o; s=o.InferenceSession(r'%s', providers=['CUDAExecutionProvider','CPUExecutionProvider']); print(s.get_providers()[0])" % model)
+        ok, out = probe("import torch, onnxruntime as o; s=o.InferenceSession(sys.argv[2], providers=['CUDAExecutionProvider','CPUExecutionProvider']); print(s.get_providers()[0])", model)
         say(f"  {'✓' if ok and 'CUDA' in out else '!'} 人聲分離使用：{out}")
     progress(1, "檢查完成")
     return ok_all
@@ -594,8 +621,8 @@ def model_ok(path: Path) -> bool:
     """模型檔存在、大小合理，而且 ONNX 能讀得起來（排除下載到一半的壞檔）。"""
     if not path.exists() or path.stat().st_size < 10_000_000:
         return False
-    ok, _ = probe(f"import onnxruntime as o; o.InferenceSession(r'{path}', providers=['CPUExecutionProvider']); print('ok')",
-                  timeout=120)
+    ok, _ = probe("import onnxruntime as o; o.InferenceSession(sys.argv[2], providers=['CPUExecutionProvider']); print('ok')",
+                  path, timeout=120)
     return ok
 
 
@@ -613,18 +640,17 @@ def prefetch_models(tag: str = "cpu") -> None:
         say("  下載人聲分離模型（約 120 MB，優先從 Hugging Face 鏡像分段下載）…")
         stop = _watch(uvr, 60e6 * len(missing), "人聲分離模型", (0, 0.2))
         # 用練唱台自己的下載程式：Hugging Face 鏡像＋GitHub 備援、多段同時下載、可續傳、核對檢查碼
-        code = ("import pipeline\n" + "".join(f"pipeline.ensure_model(r'{m}')\n" for m in missing) + "print('ok')")
-        ok, out = probe(code, timeout=3600)
+        ok, out = probe("import pipeline\nfor m in sys.argv[2:]:\n    pipeline.ensure_model(m)\nprint('ok')", *missing,
+                        timeout=3600)
+        # 備援（fork，M3：路徑用 argv 傳）：argv[2] 模型資料夾、argv[3] 輸出資料夾、argv[4:] 模型名稱
+        sep = ("import pipeline\nfrom audio_separator.separator import Separator\n"
+               "s = Separator(model_file_dir=sys.argv[2], output_dir=sys.argv[3])\nfor m in sys.argv[4:]:\n")
         if not ok:   # 萬一失敗，改用 audio-separator 內建的下載（GitHub）
-            code = ("import pipeline\nfrom audio_separator.separator import Separator\n"
-                    f"s = Separator(model_file_dir=r'{uvr}', output_dir=r'{ROOT / 'logs'}')\n"
-                    + "".join(f"s.download_model_and_data(r'{m}')\n" for m in missing) + "print('ok')")
-            ok, out = probe(code, timeout=3600)
+            ok, out = probe(sep + "    s.download_model_and_data(m)\nprint('ok')", uvr, ROOT / "logs", *missing,
+                            timeout=3600)
         if not ok:   # 舊版 audio-separator 沒有 download_model_and_data，改用 load_model 觸發下載
-            code = ("import pipeline\nfrom audio_separator.separator import Separator\n"
-                    f"s = Separator(model_file_dir=r'{uvr}', output_dir=r'{ROOT / 'logs'}')\n"
-                    + "".join(f"s.load_model(model_filename=r'{m}')\n" for m in missing) + "print('ok')")
-            ok, out = probe(code, timeout=3600)
+            ok, out = probe(sep + "    s.load_model(model_filename=m)\nprint('ok')", uvr, ROOT / "logs", *missing,
+                            timeout=3600)
         stop()
         ok = ok and all(model_ok(uvr / m) for m in missing)
         say(f"  {'✓' if ok else '✗'} 人聲分離模型{'' if ok else '下載失敗，第一次匯入歌曲時會再試：' + out}")
@@ -635,7 +661,7 @@ def prefetch_models(tag: str = "cpu") -> None:
     say(f"  下載歌詞辨識模型 {WHISPER}（約 1.6 GB，已下載的部分會接著下載）…")
     stop = _watch(wdir, max(1e8, 1.62e9 - _dir_size(wdir)), "歌詞辨識模型", (0.2, 1))
     ok, out = probe("from faster_whisper.utils import download_model; "
-                    f"download_model('{WHISPER}', cache_dir=r'{wdir}'); print('ok')", timeout=3600)
+                    "download_model(sys.argv[2], cache_dir=sys.argv[3]); print('ok')", WHISPER, wdir, timeout=3600)
     stop()
     progress(1, "模型準備完成")
     say(f"  {'✓' if ok else '✗'} 歌詞辨識模型{'' if ok else '下載失敗，第一次匯入歌曲時會再試：' + out}")

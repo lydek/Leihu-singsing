@@ -1010,6 +1010,21 @@ def _upgrade_ytdlp() -> None:
                    capture_output=True, timeout=300)
 
 
+YT_TIMEOUT = 1800   # fork（S8）：yt-dlp 整體逾時（秒），網路卡住時不會一直占著下載佇列
+
+
+def _kill_tree(p) -> None:
+    """fork（S8）：結束子程序和它開的子程序（yt-dlp 轉檔時會再開 ffmpeg），並等它結束。"""
+    if sys.platform == "win32":
+        subprocess.run(["taskkill", "/PID", str(p.pid), "/T", "/F"], capture_output=True, creationflags=0x08000000)
+    else:
+        p.kill()
+    try:
+        p.wait(10)
+    except Exception:
+        p.kill()
+
+
 def step_youtube(d: Path, url: str, report) -> None:
     import importlib.util
     import subprocess
@@ -1027,28 +1042,41 @@ def step_youtube(d: Path, url: str, report) -> None:
                 "--print", "before_dl:TITLE %(title)s",
                 "--print", "before_dl:META %(track)s\t%(artist)s\t%(uploader)s", "--no-warnings"]
         flags = 0x08000000 if sys.platform == "win32" else 0   # 不要跳出黑色視窗
-        p = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+        # fork（S8）：stderr 併進 stdout。分開讀時 stderr 寫滿管線緩衝區，會和讀 stdout 的迴圈互相卡住
+        p = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
                              encoding="utf-8", errors="replace", creationflags=flags,
                              env=dict(os.environ, PYTHONIOENCODING="utf-8"))
-        title = ""
-        for line in p.stdout:
-            line = line.strip()
-            if line.startswith("TITLE "):
-                title = line[6:]
-                if not read_meta(d).get("title_locked"):
-                    update_meta(d, title=title[:120])
-            elif line.startswith("META "):
-                track, artist, uploader = (line[5:].split("\t") + ["", "", ""])[:3]
-                clean = lambda v: "" if v in ("NA", "None") else v.strip()
-                update_meta(d, yt_track=clean(track), yt_artist=clean(artist), yt_uploader=clean(uploader))
-            elif line.startswith("PROG "):
-                m = re.search(r"([\d.]+)%", line)
-                if m:
-                    frac = float(m.group(1)) / 100
-                    report(f"從 YouTube 下載音訊 {frac * 100:.0f}%", 0.01 + 0.05 * frac)
-        err = p.stderr.read()
-        p.wait()
-        return p.returncode, title, err
+        timed_out = []
+        timer = threading.Timer(YT_TIMEOUT, lambda: (timed_out.append(True), _kill_tree(p)))
+        timer.daemon = True
+        timer.start()
+        title, other = "", []
+        try:
+            for line in p.stdout:
+                line = line.strip()
+                if line.startswith("TITLE "):
+                    title = line[6:]
+                    if not read_meta(d).get("title_locked"):
+                        update_meta(d, title=title[:120])
+                elif line.startswith("META "):
+                    track, artist, uploader = (line[5:].split("\t") + ["", "", ""])[:3]
+                    clean = lambda v: "" if v in ("NA", "None") else v.strip()
+                    update_meta(d, yt_track=clean(track), yt_artist=clean(artist), yt_uploader=clean(uploader))
+                elif line.startswith("PROG "):
+                    m = re.search(r"([\d.]+)%", line)
+                    if m:
+                        frac = float(m.group(1)) / 100
+                        report(f"從 YouTube 下載音訊 {frac * 100:.0f}%", 0.01 + 0.05 * frac)
+                elif line:
+                    other.append(line)   # 錯誤訊息（原本的 stderr）和其他輸出，判斷失敗原因用
+            p.wait()
+        finally:
+            timer.cancel()
+            if p.poll() is None:   # 按了停止（report 丟例外）或出錯：yt-dlp 不能留在背景繼續下載
+                _kill_tree(p)
+        if timed_out:
+            raise UserError(f"YouTube 下載超過 {YT_TIMEOUT // 60} 分鐘沒有完成，已停止。可以稍後再試")
+        return p.returncode, title, "\n".join(other[-50:])
 
     if YT_PAUSE["on"]:
         raise YouTubeRateLimited("YouTube 下載暫停中")
@@ -1126,6 +1154,20 @@ def prefetch_youtube(song_id: str) -> bool:
         lock.release()
 
 
+def _cancel_requested() -> bool:
+    """fork：這個工作的使用者按了停止（佇列放在 CURRENT 的檢查函式會丟 JobCancelled；只是暫停的話丟 JobDeferred）。"""
+    import gpu_worker as G
+    check = getattr(G.CURRENT, "check", None)
+    try:
+        if check:
+            check()
+    except JobCancelled:
+        return True
+    except JobDeferred:
+        return False
+    return False
+
+
 def youtube_job(song_id: str, url: str, after=None):
     """after(song_id)：整首處理完後要做的事（例如先把預設 KEY 的移調版本做好）。"""
     process = process_song(song_id, ["import", "separate", "pitch", "lyrics"])
@@ -1143,7 +1185,8 @@ def youtube_job(song_id: str, url: str, after=None):
                 else:
                     step_youtube(d, url, report)
         except JobDeferred:
-            set_dl_state(d, "queued")   # 暫停：之後會重新下載，不算取消
+            if not _cancel_requested():   # fork：讓位途中按了停止，停止的路由已經標成已取消，不能再改回排隊
+                set_dl_state(d, "queued")   # 暫停：之後會重新下載，不算取消
             raise
         except JobCancelled:
             set_dl_state(d, "cancelled")
@@ -1593,6 +1636,10 @@ def _open(url: str, start: int = 0, end: int | None = None, timeout: int = 30):
     return urllib.request.urlopen(urllib.request.Request(url, headers=hdr), timeout=timeout)
 
 
+_LINGER: dict[str, list] = {}   # fork（38）：取消時 5 秒內沒結束的下載執行緒（卡在 read），下次下載同一個檔案前先等它們
+_LINGER_LOCK = threading.Lock()
+
+
 def fetch_file(urls: list[str], dst: Path, size: int | None = None, sha256: str | None = None,
                progress=None, conns: int = 4) -> None:
     """下載檔案：大檔分成幾段同時下載（單一連線被限速時快很多），每段都能續傳；
@@ -1626,6 +1673,10 @@ def fetch_file(urls: list[str], dst: Path, size: int | None = None, sha256: str 
                 log_error(f"download {dst.name} {url}", e)
         raise last or IOError("下載失敗")
 
+    with _LINGER_LOCK:
+        old = _LINGER.pop(str(dst), [])
+    for t in old:   # 它們的 stop 已經設了，讀完那段（最多 30 秒逾時）就離開，不會再寫入；還開著 .partK 時接不起來
+        t.join()
     seg = -(-size // conns)
     ranges = [(k * seg, min(size, (k + 1) * seg)) for k in range(conns)]
     parts = [dst.with_name(f"{dst.name}.part{k}") for k in range(conns)]
@@ -1681,7 +1732,7 @@ def fetch_file(urls: list[str], dst: Path, size: int | None = None, sha256: str 
                         w0, n0 = time.time(), 0
                         while not stop.is_set():
                             chunk = r.read(256 << 10)
-                            if not chunk:
+                            if not chunk or stop.is_set():   # fork（38）：讀這段的期間按了停止，不寫
                                 break
                             f.write(chunk)
                             n0 += len(chunk)
@@ -1690,6 +1741,9 @@ def fetch_file(urls: list[str], dst: Path, size: int | None = None, sha256: str 
                                 if n0 < 30e3 * 30 and len(alive()) > 1:
                                     raise _SlowSource()
                                 w0, n0 = time.time(), 0
+                    if not wrote and not stop.is_set():
+                        # fork：回 206 後一個位元組都沒給，算一次失敗、等一下再試（原本不停頓地重連，每條執行緒佔滿一個核心）
+                        raise OSError("來源回應後沒有資料")
                 fails = 0
             except _SlowSource:
                 ui = next_src(ui)          # 太慢：換來源，不算失敗
@@ -1732,6 +1786,10 @@ def fetch_file(urls: list[str], dst: Path, size: int | None = None, sha256: str 
         stop.set()
         for t in threads:
             t.join(5)
+        stuck = [t for t in threads if t.is_alive()]
+        if stuck:   # 還卡在 read：記下來，下次下載同一個檔案前先等它們（fork，38）
+            with _LINGER_LOCK:
+                _LINGER.setdefault(str(dst), []).extend(stuck)
         raise
     if errors:
         raise errors[0]
@@ -1746,8 +1804,16 @@ def fetch_file(urls: list[str], dst: Path, size: int | None = None, sha256: str 
     parts[0].replace(dst)
 
 
+_MODEL_DATA_LOCK = threading.Lock()
+
+
 def ensure_model_data() -> None:
     """audio-separator 需要的模型設定檔；壞掉（例如下載到一半）就重新下載。"""
+    with _MODEL_DATA_LOCK:   # fork：背景下載高品質模型和處理歌曲會同時呼叫，小檔的暫存檔名固定，同時下載會互相蓋掉
+        _ensure_model_data()
+
+
+def _ensure_model_data() -> None:
     uvr = MODELS / "uvr"
     for name, (size, sha, urls) in MODEL_DATA.items():
         p = uvr / name
@@ -3411,10 +3477,11 @@ class Jobs:
         """全部暫停／繼續處理。暫停時處理中的歌在下一個進度點停下、讓出顯示卡，繼續後從頭重做這首。"""
         with self.cv:
             self.paused = on
-            if on:
-                for j in self.running:
-                    if self._pausable(self.state.get(j) or {}):
-                        self.state[j]["pause"] = True
+            for j in self.running:
+                if on and self._pausable(self.state.get(j) or {}):
+                    self.state[j]["pause"] = True
+                elif not on:   # fork：走到下一個檢查點前就按了繼續，不用讓位重做
+                    (self.state.get(j) or {}).pop("pause", None)
             self.cv.notify_all()
         try:
             cfg = load_config()
@@ -3677,6 +3744,10 @@ class Jobs:
             paused = bool(e.args) and e.args[0] == "paused"
             with self.cv:
                 self.state[jid].pop("pause", None)
+                if self.state[jid].get("cancel"):   # fork：讓位的同時按了停止，照停止處理，不排回佇列
+                    self.state[jid].update(status="cancelled", step="已取消", finished=time.time())
+                    free_gpu()
+                    return
                 self.state[jid].update(status="queued", progress=0.0,
                                        step="已全部暫停，繼續後重新開始這首" if paused else "直播中暫停，結束後重新開始")
                 if paused:
@@ -3695,8 +3766,12 @@ class Jobs:
                 self.oom_until = time.time() + 600
                 free_gpu()
                 with self.cv:
-                    self.state[jid].update(status="queued", step="顯示卡記憶體不夠，稍後重新處理", progress=0.0, oom_retry=True)
-                    self.pending.insert(0, (jid, fn))
+                    if self.state[jid].get("cancel"):   # fork：同時按了停止，不排回佇列重做
+                        self.state[jid].update(status="cancelled", step="已取消", finished=time.time())
+                    else:
+                        self.state[jid].update(status="queued", step="顯示卡記憶體不夠，稍後重新處理", progress=0.0,
+                                               oom_retry=True)
+                        self.pending.insert(0, (jid, fn))
                 log_error("parallel separation OOM", e)
             else:
                 self.update(jid, status="error", error=f"{type(e).__name__}: {e}")
