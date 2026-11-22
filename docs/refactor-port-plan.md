@@ -540,7 +540,7 @@ Codex 第 7 次審查後補的（同類問題和繞過路徑）：
 4. 套完後檢查：
    - `uv run pytest`。
    - `compare_upstream.py <新版本> --leak`：前端和安裝檔和上游比只能剩 `OWN_CHANGES`，上游新增的名稱都要找得到（它會搜尋包含 `leihu/` 的所有程式）。
-   - 契約：上游行為改變時，用 `compare_upstream.py <同步後的 commit> --record --base=<新版本>` 重錄快照（fork 和上游的差異都要符合 `RULES` 才寫入），再跑 `check_snapshot.py`。
+   - 契約：上游行為改變時，用 `compare_upstream.py <同步後的 commit> --record --base=<新版本>` 重錄快照（fork 和上游的差異都要符合 `RULES` 才寫入），再跑 `check_snapshot.py`。`compare_upstream.py`、`check_snapshot.py` 要用內嵌的 Python（`%LOCALAPPDATA%\LeihuLiantai\python\python.exe`）執行：快照是用它錄的，`.venv` 沒裝分離、音高、辨識的套件，`/api/status` 的 `modules` 會全部變成差異。上游新增路由時，`test_contract.py` 的 `CASES` 要補案例，路由數（`check_snapshot.py`、`test_contract.py`、`test_smoke.py`）一起改。
    - 數值：動到分離、音高、歌詞、評分時，挑合成素材或一首歌跑 `baseline.py <新版本>` 和 `baseline.py <同步後的 commit> --against=<新版本>`（3.8）。
    - 上游每個最上層定義都和現在的程式比對一次，比對時套用步驟 1 的改寫規則。確認沒有漏掉，fork 原本的修改也沒有被蓋掉。
 
@@ -552,6 +552,12 @@ Codex 第 7 次審查後補的（同類問題和繞過路徑）：
 - 匯出同名自動加編號：`unique_path` 照上游。上游 `take_export` 加的是「同一次錄音匯出過就加編號」，和 C 組 M4 是兩個問題（M4 是歌名有「.」時 `with_suffix` 截斷檔名、不同的歌撞名），兩個都要：編號邏輯改用 `SH.out_path` 檢查和產生檔名，`test_security.py` 加回歸測試（換回上游用 `with_suffix` 檢查的寫法會失敗）。`unique_path` 遇到歌名有「.」時編號位置不理想，但不會蓋掉檔案，照上游。
 - 驗證：v2.3.3 `app.py`、`pipeline.py` 的 467 個最上層定義都找得到；同步只改到上游 2.3.3 也改過的 13 個定義，fork 原本的修改沒有被蓋掉。漏移檢查 0 項（補登記步驟 1 的 `leihu.nsi` 清除 `leihu`）。契約快照以 v2.3.3 重錄：141 個案例 140 個相同、1 個是已登記的 F1，`check_snapshot.py` 兩次都和快照相同、92 條路由都有案例。數值（合成素材 1 次）和 v2.3.3 逐檔 14／14 相同、異常「無」。`uv run pytest` 97 passed。
 - 沒有驗證：真實歌曲的數值、效能基準、顯示卡路徑。之後重構的比對對象改成 v2.3.3，還沒用測試計畫錄 v2.3.3 的正式基準。
+
+**v2.3.4 同步（2026-11-22）**：上游 2 個 commit 各一個同步 commit，版號 2.3.4.1。
+- 歌詞移動不推擠相鄰句、九宮格 1／2／3 一句一句移動：只改前端（`app.js`、`help.html`），版號照 3.15 改。
+- 新圖示、開程式時沿用上次的音量：`/api/ui-prefs` 的 GET、POST 放 `leihu/web/system.py`（和 `/api/config` 同一個 Blueprint），程式和上游逐字相同。fork 的調整：`ui_prefs.json` 放 `P.DATA`（S28）；`conftest` 的使用者資料清單、`.gitignore` 加 `ui_prefs.json`；`build.sh` 的 `icon.png` 加在 fork 的那一行。`desktop.py` 的工作列圖示照上游，fork 原本的修改沒變。
+- 驗證：v2.3.4 的最上層定義都找得到；和上游不同的定義，同步前後只多了 `UI_PREFS`（放 `P.DATA`）。漏移檢查 0 項。契約加 3 個 `ui-prefs` 案例（路由 92 → 94），快照以 v2.3.4 重錄：144 個案例 143 個相同、1 個是已登記的 F1，原本的 141 個沒有變；`check_snapshot.py` 兩次都和快照相同、94 條路由都有案例。`uv run pytest` 97 passed。沒有改到分離、音高、歌詞、評分，數值沒有跑。
+- 沒有驗證：新圖示與工作列圖示要裝起來看（只在 Windows 的桌面視窗有作用）、安裝檔建置交給 CI。
 
 ## 4. 要先決定的事
 - 舊分支要留著（唯讀）還是封存成 tag，`claude/original-refactor-behavior-comparison-d469de` 也一樣。在搬完之前不要刪。
