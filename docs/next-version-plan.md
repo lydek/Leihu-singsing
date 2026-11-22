@@ -39,6 +39,14 @@ fork 對上游後端檔案的修改（同步時 3.21 步驟 4 要確認沒被蓋
 | M7、9 | `pipeline.py` 新增 `_TAKE_LOCK`、`write_take_info`、`write_take_audio`、`delete_take_files`，`score_take` 改用；`leihu/web/takes.py` 的 `_score`、`take_mixprep`、`take_preview`、`delete_take`、`delete_takes`、`claude_coach` | 錄音的寫入和刪除共用一把鎖：處理期間錄音被刪掉時，評分、Claude 建議不寫回 JSON（建議照樣回傳），試聽用的人聲、混音不寫、回 404 | `tests/test_takes.py`：4 個情境舊程式都留下孤兒檔或回 200；批次刪除和單筆刪除刪同樣的檔案 |
 | D2、D4（含 28 的 A2、A5） | `leihu/web/library.py` 的 `delete_song`；`pipeline.Jobs` 新增 `song_running`、`cancel_song`；`static/app.js` 的刪除按鈕（登記在 `OWN_CHANGES`） | 這首歌有工作在執行、或正在預先下載時，刪除回 400（`{error}`），排隊中的工作照舊；確定要刪才把兩條佇列裡這首歌排隊中的工作改成已取消，不再列在 `/api/status`。前端刪除失敗時顯示錯誤 | `tests/test_jobs.py` 的 `test_delete_*`；契約快照的差異登記成 `RULES` 的 `D4`（`status_*` 案例少了被刪的兩首歌的工作） |
 | D6、68 | `pipeline.Jobs` 新增 `wait_for`、`stems_busy`；`leihu/web/common.py` 的 `vjobs` | 同一首歌在 `jobs` 有會重寫分軌的工作在執行（匯入、分離、主唱補回；只重做旋律、歌詞的不算）時，這首的移調先跳過、狀態寫「等這首歌的分軌處理完」，做完後最多 5 秒內開始；別首歌的移調照常。只擋這個方向：移調已經在跑時開始的分軌不等（移調通常幾十秒，分軌最後才寫檔；分軌後舊 KEY 版本失效是第 6 批） | `tests/test_jobs.py` 的 `test_variant_*`、`test_queued_stem_job_does_not_block_variant` |
+| S15 | `leihu/web/security.py` 新增 `http_error`、`unhandled_error` | 404、405、400（壞掉的 JSON）、403 等 HTTP 錯誤回 `{"error": "請求失敗（代碼）"}`，不回 HTML，狀態碼和 `Allow` 等標頭照舊；沒處理到的例外回 500 `{error}`，traceback 照舊經 `app.logger` 寫進 app.log，另記 `log_error`。前端 `api()` 本來就把非 JSON 的錯誤顯示成「請求失敗（狀態碼）」，畫面上的字不變 | `tests/test_errors.py` 的 `test_s15_*`；契約差異登記成 `RULES` 的 `S15`（10 個 404／400 案例） |
+| D1 | `leihu/web/library.py` 的 `rename`（`PATCH /api/songs/<sid>`） | 不合法的 KEY（文字、超過 ±6、`1.5`、`true`）回 400「KEY 範圍是 ±6」，不再悄悄存成 0；空字串、`null` 照舊當成清除 | `tests/test_errors.py` 的 `test_d1_*`；契約差異登記成 `D1`（3 個案例）和 `D1-後續`（之後 8 個案例讀到的 KEY 維持 2） |
+| D3 | `leihu/web/takes.py` 的 `add_take` | 存錄音檔之前驗證：`start`、`duration` 要是有限且不小於 0 的數字，`key` 是 ±6 的整數，`speed` 在 0.5–1.5；不合法回 400、不留下錄音檔（原本不是數字回 500，超出範圍照存） | `tests/test_errors.py` 的 `test_d3_*`（契約沒有案例） |
+
+第 3 批延後（2026-11-23 決定，等重構穩定再考慮）：
+
+- **S19**：`share.safe_name` 沒有任何地方呼叫（v2.3.4 也一樣）。實際在用的 `leihu/web/common.py` 的 `_safe_name`（歌詞、混音、錄音匯出）和 `score_sheet.safe_name`（旋律譜）規則相同，只差長度上限（80／60）和名稱為空時的預設字（「歌詞」／「旋律譜」），目前沒有會出錯的情況。合併要改 `score_sheet.py`、`share.py` 兩個上游檔，會增加同步成本。
+- **D5**：上游已經在送出新工作時清掉結束超過 1 小時的工作（`Jobs.submit`），查不到的工作 `/api/jobs/<id>` 本來就回 404，「狀態從不清除」的問題已經不在；只剩保留時間是 1 小時而不是 `step2-plan.md` 的 600 秒。前端輪詢到 `done`、`error`、`cancelled` 就停。
 
 數值基準（CPU，開發機，2026-11-23）：第 2 批動到評分（`score_take` 寫檔）和匯入（`step_import`），`tests/numeric/run.py` 會跑這兩個。用 `tests/private/plans/refactor.json` 各跑 1 次：`baseline.py v2.3.4.1 --label=desktop-9900x3d-cpu`（1100.6 秒）和 `baseline.py 4262dda --label=desktop-9900x3d-cpu --against=v2.3.4.1`（1097.5 秒），兩邊每一步實際都在 CPU 上，異常都是「無」，逐檔核對 38／38 個檔案完全相同。摘要在 `tests/numeric/baselines/v2.3.4.1-desktop-9900x3d-cpu-refactor.json`、`4262dda-desktop-9900x3d-cpu-refactor.json`；`v2.3.4.1` 這份也是第 5、6、7 批開始前要對照的 CPU 數值基準（第 2 節表下說明）。只跑 1 次，同一版的穩定性沒有判定，靠和 `v2.3.4.1` 逐檔相同確認。
 
