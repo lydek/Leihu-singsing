@@ -114,6 +114,8 @@ _stub(
         "loudness_backfill",
         "live_light_upgrade",
         "lead_fix_sweep",
+        "restore_queue",
+        "queue_saver",
         "remove_duet_leftovers",
         "check_update",
         "watch_parent",

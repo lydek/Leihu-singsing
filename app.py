@@ -18,7 +18,9 @@ from leihu.web.background import (
     live_light_upgrade,
     loudness_backfill,
     prefetcher,
+    queue_saver,
     remove_duet_leftovers,
+    restore_queue,
     resume_downloads,
     watch_parent,
 )
@@ -41,6 +43,8 @@ def main():
         threading.Thread(target=loudness_backfill, daemon=True, name="loudness").start()
         threading.Thread(target=live_light_upgrade, daemon=True, name="live-light").start()
         threading.Thread(target=lead_fix_sweep, daemon=True, name="lead-fix").start()
+        restore_queue()   # 先排回上次的佇列，再開始存新的
+        threading.Thread(target=queue_saver, daemon=True, name="queue-saver").start()
         threading.Thread(target=remove_duet_leftovers, daemon=True, name="cleanup").start()
         threading.Thread(target=P.clear_false_recheck, daemon=True, name="recheck").start()
         threading.Thread(target=check_update, daemon=True, name="update").start()

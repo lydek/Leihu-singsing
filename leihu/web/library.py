@@ -51,7 +51,11 @@ def youtube_resume():
 
 @bp.get("/api/songs")
 def songs():
-    return jsonify(P.list_songs())
+    out = P.list_songs()
+    for m in out:   # 2.3.3：「精細處理排隊中」看實際的佇列，不只看歌曲資料裡的標記
+        if m.get("fine_queued"):
+            m["fine_queued"] = bool(jobs.find("process", m["id"], "fine"))
+    return jsonify(out)
 
 
 @bp.get("/api/songs/search")
