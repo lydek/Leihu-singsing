@@ -498,6 +498,20 @@ Codex 第 7 次審查後補的（同類問題和繞過路徑）：
 - 舊分支自己造成的問題：36 的錄音開始時間為負、`.server_port` 擁有者，以及 29 的 G1–G3。`refactor` 沒有那些程式，不適用。
 - 沒有逐行看 diff 的：36 的「建議與可選」各小項、70 的 `cancel_song`、`on_cancel` 細節，只依 commit 說明判成「會改變行為」。
 
+### 3.21 同步上游的流程（2026-11-22）
+`refactor` 要求線性歷史，不能 merge 上游，只能把上游的 commit 逐一套進來。步驟 1、4 之後，上游改 `app.py` 的 commit 直接 cherry-pick 一定會衝突；程式是原封搬的、函式名稱沒變，所以用 `tests/tools/upstream_map.py` 依「hunk 落在上游哪個最上層定義裡 → 那個名稱現在在哪個檔案」改寫路徑。
+
+1. `git fetch upstream --tags`，從 `refactor` 開同步分支。
+2. 列出對應並產生 patch（`tests/private/` 不進 git）：
+   ```
+   python tests/tools/upstream_map.py <上次同步的版本> <新版本> --patch=tests/private/sync/<新版本>
+   ```
+   報告列出每個 hunk 的目標檔案；標成「手動」的（模組層級的 import、常數，或橫跨兩個現在分在不同檔案的定義，或上游新增的定義）不在 patch 裡，照報告的名稱手動改。上游新增的路由，依網址放進對應的 Blueprint。
+3. 依序套用每個 commit：`git apply --index tests/private/sync/<新版本>/<序號>-<sha>.patch`，套不上就加 `--reject` 再處理 `.rej`；手動的部分改完後執行 `git commit -C <sha> --trailer "Upstream-commit: <sha>"`，作者和說明沿用上游。
+4. 套完後跑 `uv run pytest`、`compare_upstream.py <新版本> --leak`（上游新增的名稱要找得到；它會搜尋包含 `leihu/` 的所有程式）、契約比對；動到分離、音高、歌詞、評分時再挑一首歌跑數值的 `--against`（3.8）。上游行為改變造成的契約差異，照 3.7 先在 `RULES` 登記再更新快照。
+
+演練（`v2.2.0..v2.3.2`，逐個 hunk 反向套到現在的程式，只算拆檔前的 `refactor` 也套得上的 hunk）：工具能定位的 app.py 8 個、pipeline.py 30 個全部套得上；app.py 另有 3 個要手動（1 個 import 區、2 個橫跨兩個現在分在不同檔案的定義）。這段期間上游沒有改過步驟 4 搬出去的函式。其餘 hunk 在拆檔前就被上游或 C 組改過，沒有拆檔一樣要手動合併。
+
 ## 4. 要先決定的事
 - 舊分支要留著（唯讀）還是封存成 tag，`claude/original-refactor-behavior-comparison-d469de` 也一樣。在搬完之前不要刪。
 - 測試歌曲的清單和授權（3.8）。
