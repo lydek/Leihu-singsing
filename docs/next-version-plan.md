@@ -32,7 +32,7 @@ fork 對上游後端檔案的修改（同步時 3.21 步驟 4 要確認沒被蓋
 
 | 項目 | 檔案、定義 | 改了什麼 | 測試 |
 |---|---|---|---|
-| M6 | `score_sheet.py` 的 `_chunks` | 字的時間等於段落起點時不當切點（逐字時間早於句首、兩個字同一個時間時，原本會無限迴圈）；原本會正常結束的輸入，結果不變 | `tests/test_sheet_io.py` 的 `test_chunks_*`（舊程式會卡到 30 秒逾時） |
+| M6 | `score_sheet.py` 的 `_chunks` | 字的時間等於段落起點時不當切點（逐字時間早於句首、兩個字同一個時間時，原本會無限迴圈）；原本會正常結束的輸入，結果不變 | `tests/test_sheet_io.py` 的 `test_chunks_*`：會卡住的 3 個情境（包括改用音符切點）舊程式都卡到 30 秒逾時；`test_chunks_still_splits_long_line_between_chars` 確認一般的切法不變 |
 | 46 | `gpu_worker.py` 的 `_set_priority` | 用自己的 `WinDLL("kernel32")` 實例設 `GetCurrentProcess.restype`、`SetPriorityClass.argtypes`，64 位元 Windows 上才真的改得了優先順序；CPU 處理程式（`CPU_POOL`）從此一律是「低於標準」，顯示卡處理程式在暫停判斷成立時降低 | `tests/test_gpu_worker.py`（子行程裡讀回優先順序；舊程式兩次都是 NORMAL） |
 
 ## 4. 還沒確認的
