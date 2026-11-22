@@ -53,6 +53,14 @@ RULES: list[tuple[str, str, object]] = [
         "（docs/refactor-port-plan.md 3.15）",
         lambda c, d: c == "open_url",
     ),
+    (
+        "D4",
+        "下一版第 2 批：刪掉的歌的排隊工作改成已取消，不再列在 /api/status（docs/next-version-plan.md）。"
+        "song_delete_uploaded、song_delete_youtube 刪掉的兩首歌的 all、youtube 工作從清單消失，queued_total 少 2；"
+        "清單整個換掉時差異字串只到 120 字，所以只放行這兩個欄位",
+        lambda c, d: c in ("status_end", "status_live", "status_override", "status_paused")
+        and d.startswith(("~ /body/jobs: ", "~ /body/queued_total: ")),
+    ),
 ]
 
 # 刻意不移植的上游名稱 → 原因（refactor 從 v2.3.2 開始，目前沒有）
@@ -76,6 +84,8 @@ OWN_CHANGES: list[tuple[str, str]] = [
     ("installer/leihu.nsi", r"\+\s*Delete \"\$INSTDIR\\\.test-install\""),
     # E 組步驟 1：程式拆到 leihu/，修復與解除安裝時清掉舊的（3.19）
     ("installer/leihu.nsi", r"\+\s*RMDir /r \"\$INSTDIR\\leihu\""),
+    # 下一版第 2 批 D2：刪除處理中、下載中的歌回 400，顯示錯誤（next-version-plan.md）
+    ("static/app.js", r"[-+]\s*(try \{ )?await api\(`/api/songs/\$\{s\.id\}`, \{ method: \"DELETE\" \}\);.*"),
 ]
 
 # 伺服器 log 裡代表「這次執行條件和平常不同」的訊息：一律列進報告，不然結果會被誤解

@@ -31,7 +31,8 @@ def _locked(fn):
 jobs = P.Jobs(live_safe=True, pipeline=True)   # 分離、分析、辨識：直播中暫停，不搶顯示卡
 
 
-vjobs = P.Jobs()   # 移調／變速另外排隊：不會被分軌、評分卡住，也不會卡住它們
+vjobs = P.Jobs(wait_for=lambda st: jobs.stems_busy(st["song"]))   # 移調／變速另外排隊：不會被分軌、評分卡住，也不會卡住它們
+# fork（D6）：同一首歌正在重寫分軌時，這首的移調先等（不然會讀到寫到一半的分軌）
 
 
 UI_QUEUE_SHOWN = 30

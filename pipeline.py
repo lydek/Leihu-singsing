@@ -1446,11 +1446,13 @@ def step_import(d: Path, report) -> None:
     save_stem(d, "mix", y)
     for f in d.glob("original.*"):   # mix 已經是同一首歌（統一成 44.1 kHz），原始檔不用再留
         f.unlink(missing_ok=True)
-    steps = read_meta(d).get("steps", {})
-    steps["import"] = True
     peak = float(np.max(np.abs(y))) if y.size else 0.0
-    update_meta(d, duration=round(y.shape[1] / SR, 3), steps=steps,
-                lufs=integrated_loudness(y, SR), peak_db=round(20 * np.log10(max(peak, 1e-6)), 2))
+    lufs = integrated_loudness(y, SR)
+    with _META_LOCK:   # fork：讀出 steps 到寫回之間不讓別的執行緒改，免得蓋掉別人剛記下的步驟
+        steps = read_meta(d).get("steps", {})
+        steps["import"] = True
+        update_meta(d, duration=round(y.shape[1] / SR, 3), steps=steps,
+                    lufs=lufs, peak_db=round(20 * np.log10(max(peak, 1e-6)), 2))
 
 
 # ---------------------------------------------------------------- 分離
@@ -3023,6 +3025,36 @@ def onset_offset(d: Path, y16: np.ndarray, start: float, speed: float,
 TOL_FRAMES = 10   # 評分的時間容錯：±0.1 秒
 
 
+# fork（M7）：錄音的寫入和刪除共用一把鎖。評分、Claude 建議、試聽處理期間錄音被刪掉時，
+# 寫回會留下孤兒檔（錄音清單裡出現沒有錄音檔的紀錄）。運算在鎖外做完，鎖內只確認錄音還在、寫檔。
+_TAKE_LOCK = threading.Lock()
+
+
+def write_take_info(td: Path, take_id: str, info: dict) -> bool:
+    """寫回錄音資料；錄音已經被刪掉就不寫，回傳 False。"""
+    with _TAKE_LOCK:
+        if not (td / f"{take_id}.wav").exists():
+            return False
+        atomic_write_text(td / f"{take_id}.json", json.dumps(info, ensure_ascii=False))
+        return True
+
+
+def write_take_audio(td: Path, take_id: str, path: Path, y, sr: int) -> bool:
+    """寫試聽用的暫存人聲或混音；錄音已經被刪掉就不寫，回傳 False。"""
+    with _TAKE_LOCK:
+        if not (td / f"{take_id}.wav").exists():
+            return False
+        write_wav(path, y, sr)
+        return True
+
+
+def delete_take_files(td: Path, take_id: str) -> None:
+    """刪除一次錄音的資料、錄音檔和試聽用的暫存人聲、混音。"""
+    with _TAKE_LOCK:
+        for f in [td / f"{take_id}.json", td / f"{take_id}.wav", *td.glob(f"{take_id}.*.wav")]:
+            f.unlink(missing_ok=True)
+
+
 def score_take(d: Path, take_id: str, report) -> None:
     td = d / "takes"
     info = json.loads((td / f"{take_id}.json").read_text("utf-8"))
@@ -3105,7 +3137,7 @@ def score_take(d: Path, take_id: str, report) -> None:
                      "error": "沒有偵測到歌聲" + ("：錄音幾乎沒有聲音，請確認麥克風選對、音量表有動" if peak < 0.02
                                                 else "：這段時間原唱沒有旋律，或沒有唱到")})
         info.pop("pitch", None)
-        atomic_write_text(td / f"{take_id}.json", json.dumps(info, ensure_ascii=False))
+        write_take_info(td, take_id, info)
         return
     info.update({
         "offset": round(place_off, 2),
@@ -3124,7 +3156,8 @@ def score_take(d: Path, take_id: str, report) -> None:
         "algo": TAKE_ALGO,
         "key_hint": key_hint,
     })
-    atomic_write_text(td / f"{take_id}.json", json.dumps(info, ensure_ascii=False))
+    if not write_take_info(td, take_id, info):
+        return   # 評分期間錄音被刪掉了
     # 對齊位置可能變了：先前做好的人聲暫存（試聽、成品用）要重做
     for old in list(td.glob(f"{take_id}.vocal_*.wav")) + list(td.glob(f"{take_id}.preview.wav")):
         old.unlink(missing_ok=True)
@@ -3345,7 +3378,7 @@ class Jobs:
     """重工作的佇列。預設一次分離一首；分離完的那首在分析旋律、存檔時，下一首可以先開始分離（pipeline）。
     設定開啟「閒置時兩首同時分離」且沒在直播時，最多兩首同時分離。"""
 
-    def __init__(self, live_safe: bool = False, pipeline: bool = False):
+    def __init__(self, live_safe: bool = False, pipeline: bool = False, wait_for=None):
         self.pending: list[tuple[str, object]] = []   # 排隊中的工作（可以調整順序）
         self.state: dict[str, dict] = {}
         self.lock = threading.Lock()
@@ -3356,6 +3389,9 @@ class Jobs:
         self.running: dict[str, str] = {}   # 執行中的工作 → "gpu"（分離中）／"post"（分析、存檔）
         self.oom_until = 0.0                # 顯示卡記憶體不夠過：這個時間之前只同時分離一首
         self.paused = False                 # 「全部暫停」：處理歌曲的工作都先停（錄音評分、匯出照常）
+        # fork（D6）：wait_for(狀態) 為真的工作先跳過、做後面的。會拿另一條佇列的鎖：
+        # 兩條佇列要同時拿鎖時，一律先拿有 wait_for 的這條，不會互等
+        self.wait_for = wait_for
         if live_safe:
             try:
                 self.paused = bool(load_config().get("queue_paused"))
@@ -3420,6 +3456,9 @@ class Jobs:
             if hold and st.get("label") in LIVE_BACKGROUND:
                 continue
             if self.paused and self._pausable(st):
+                continue
+            if self.wait_for and self.wait_for(st):
+                st["step"] = "等這首歌的分軌處理完"
                 continue
             if not self._can_start(st, slots):
                 return None, None, False   # 依順序等前面的，不插隊
@@ -3520,6 +3559,22 @@ class Jobs:
                         j["cancel"] = True   # 執行中的工作會在下一段處理完時停下
                         n += 1
         return n
+
+    def stems_busy(self, song_id: str) -> bool:
+        """fork（D6、68）：這首歌有沒有會重寫分軌的工作在執行（匯入、分離、主唱補回；只重做旋律、歌詞的不算）。"""
+        with self.lock:
+            return any(j["song"] == song_id and j["status"] == "running" and j["kind"] == "process"
+                       and not set(j["label"].split(",")) <= {"pitch", "lyrics"} for j in self.state.values())
+
+    def song_running(self, song_id: str) -> bool:
+        """fork（D2）：這首歌有沒有工作在執行。呼叫端要拿著 self.lock。"""
+        return any(j["song"] == song_id and j["status"] == "running" for j in self.state.values())
+
+    def cancel_song(self, song_id: str) -> None:
+        """fork（D4）：取消這首歌所有排隊中的工作（刪除歌曲時）。呼叫端要拿著 self.lock。"""
+        for j in self.state.values():
+            if j["song"] == song_id and j["status"] == "queued":
+                j.update(status="cancelled", step="已取消", finished=time.time())
 
     def cancel(self, jid: str) -> bool:
         """使用者按「停止」：排隊中的直接取消；執行中的在下一個檢查點停下。"""

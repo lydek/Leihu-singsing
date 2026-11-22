@@ -49,7 +49,7 @@ def _score(d, tid, report):
         try:
             info = json.loads(j.read_text("utf-8"))
             info.update(status="error", error=f"評分失敗：{e}")
-            P.atomic_write_text(j, json.dumps(info, ensure_ascii=False))
+            P.write_take_info(j.parent, tid, info)   # fork（M7）：錄音已刪就不寫
         except Exception:
             pass
         raise
@@ -122,7 +122,8 @@ def take_mixprep(sid, tid):
     if not vp.exists():
         for old in (d / "takes").glob(f"{tid}.vocal_*.wav"):
             old.unlink(missing_ok=True)
-        P.write_wav(vp, SH.vocal_track(d, tid, opts, sr, n), sr)
+        if not P.write_take_audio(d / "takes", tid, vp, SH.vocal_track(d, tid, opts, sr, n), sr):
+            abort(404)   # fork（9）：處理期間錄音被刪掉了
     q = f"key={key}&speed={speed}"
     start = (float(info.get("start", 0)) + float(info.get("offset", 0))) / speed
     return jsonify(vocal=f"/api/songs/{sid}/takes/{tid}/vocal/{tag}?t={int(vp.stat().st_mtime)}",
@@ -152,9 +153,8 @@ def delete_takes(sid):
     ids = (request.get_json(force=True) or {}).get("ids") or []
     n = 0
     for tid in ids:
-        _, j, w = _take_paths(sid, str(tid))
-        for f in [j, w, *w.parent.glob(f"{tid}.*.wav")]:
-            f.unlink(missing_ok=True)
+        _, _, w = _take_paths(sid, str(tid))
+        P.delete_take_files(w.parent, str(tid))
         n += 1
     return jsonify(deleted=n)
 
@@ -166,7 +166,8 @@ def take_preview(sid, tid):
     if need:
         return jsonify(need_job=need)
     y, sr, _ = SH.mix_take(d, tid, _share_opts())
-    P.write_wav(d / "takes" / f"{tid}.preview.wav", y, sr)
+    if not P.write_take_audio(d / "takes", tid, d / "takes" / f"{tid}.preview.wav", y, sr):
+        abort(404)   # fork（9）：處理期間錄音被刪掉了
     return jsonify(url=f"/api/songs/{sid}/takes/{tid}/preview.wav?t={int(time.time() * 1000)}")
 
 
@@ -214,11 +215,8 @@ def take_audio(sid, tid):
 
 @bp.delete("/api/songs/<sid>/takes/<tid>")
 def delete_take(sid, tid):
-    _, j, w = _take_paths(sid, tid)
-    j.unlink(missing_ok=True)
-    w.unlink(missing_ok=True)
-    for f in w.parent.glob(f"{tid}.*.wav"):   # 試聽用的暫存人聲
-        f.unlink(missing_ok=True)
+    _, _, w = _take_paths(sid, tid)
+    P.delete_take_files(w.parent, tid)   # 含試聽用的暫存人聲
     return jsonify(ok=True)
 
 
@@ -247,5 +245,5 @@ def claude_coach(sid):
     )
     text, usage = C.ask_text(prompt, 3000, "coach", title)
     t["coach"] = text
-    P.atomic_write_text(j, json.dumps(t, ensure_ascii=False))
+    P.write_take_info(j.parent, j.stem, t)   # fork（M7）：等 Claude 回覆期間錄音可能被刪掉，照樣回傳建議
     return jsonify(text=text, usage=usage)
