@@ -4116,6 +4116,41 @@
   "headers": {},
   "status": 200
  },
+ "ui_prefs_get": {
+  "body": {
+   "lastVol": {
+    "vocal": 0.5
+   },
+   "masterVol": 0.8
+  },
+  "content_type": "application/json",
+  "files": {},
+  "headers": {},
+  "status": 200
+ },
+ "ui_prefs_get_empty": {
+  "body": {},
+  "content_type": "application/json",
+  "files": {},
+  "headers": {},
+  "status": 200
+ },
+ "ui_prefs_set": {
+  "body": {
+   "ok": true
+  },
+  "content_type": "application/json",
+  "files": {
+   "DATA/+ui_prefs.json": {
+    "lastVol": {
+     "vocal": 0.5
+    },
+    "masterVol": 0.8
+   }
+  },
+  "headers": {},
+  "status": 200
+ },
  "update_install": {
   "body": {
    "error": "這個版本沒辦法在程式裡更新，請到下載頁下載新版安裝檔"
