@@ -29,9 +29,10 @@ def test_data_paths_follow_liantai_data(app_module):
     assert data / "usage.json" == C.USAGE_PATH
     assert data / "setlist.json" == app_module.SETLIST_PATH
     assert data / "setlists" == app_module.SETLIST_DIR
-    from leihu.web import background
+    from leihu.web import background, system
 
     assert data / "queue.json" == background.QUEUE_FILE  # 2.3.3 的佇列保存：上游寫在 ROOT，fork 跟著 S28 放 DATA
+    assert data / "ui_prefs.json" == system.UI_PREFS  # 2.3.4 的音量設定：同上
     assert P.ROOT == ROOT  # 程式本身的位置不跟著改
     assert P.MODELS == P.DEFAULT_MODELS == ROOT / "models"  # 模型不是使用者資料，留在程式資料夾
 

@@ -1,6 +1,7 @@
 """狀態、設定、處理佇列的操作、遠端開歌、開啟網址與資料夾。"""
 from __future__ import annotations
 
+import json
 import os
 import sys
 import threading
@@ -72,6 +73,33 @@ def remote_open():
     with _remote_lock:
         REMOTE.update(seq=REMOTE["seq"] + 1, id=sid, key=key)
         return jsonify(seq=REMOTE["seq"])
+
+
+UI_PREFS = P.DATA / "ui_prefs.json"   # fork：上游寫在 ROOT，跟著 S28 放使用者資料夾
+UI_PREF_KEYS = {"masterVol", "micGain", "lastVol"}
+
+
+@bp.get("/api/ui-prefs")
+def ui_prefs_get():
+    """2.3.4：介面的音量設定（主音量、麥克風增益、各音軌音量），開程式時沿用上次關閉時的值。"""
+    try:
+        return jsonify(json.loads(UI_PREFS.read_text("utf-8")))
+    except Exception:
+        return jsonify({})
+
+
+@bp.post("/api/ui-prefs")
+def ui_prefs_set():
+    b = request.get_json(force=True) or {}
+    try:
+        cur = json.loads(UI_PREFS.read_text("utf-8")) if UI_PREFS.exists() else {}
+    except Exception:
+        cur = {}
+    for k, v in b.items():
+        if k in UI_PREF_KEYS:
+            cur[k] = v
+    P.atomic_write_text(UI_PREFS, json.dumps(cur, ensure_ascii=False))
+    return jsonify(ok=True)
 
 
 @bp.get("/api/config")

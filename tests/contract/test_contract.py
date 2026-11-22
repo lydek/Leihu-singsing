@@ -1,6 +1,6 @@
 """API 契約快照（docs/step0-plan.md 0f、rust-architecture-and-test-plan.md 4.5）。
 
-逐一呼叫 2.3.2 的 92 個路由（93 個扣掉 /api/debug/stacks），比對狀態碼、Content-Type、白名單標頭、
+逐一呼叫 2.3.4 的 94 個路由（95 個扣掉 /api/debug/stacks），比對狀態碼、Content-Type、白名單標頭、
 正規化後的 JSON，以及請求前後資料資料夾和下載資料夾的檔案差異。
 
 步驟 0 的範圍：背景工作只錄送出時的回應（Jobs 只排隊不執行），連網的路由只錄參數驗證和錯誤案例。
@@ -74,6 +74,10 @@ CASES = [
         {"content": '{"font": "sans"}', "headers": {"Content-Type": "text/plain"}},
     ),
     ("config_no_content_type", "POST", "/api/config", {"content": '{"font": "huninn"}'}),
+    # 2.3.4：介面音量設定，只存 UI_PREF_KEYS 裡的欄位
+    ("ui_prefs_get_empty", "GET", "/api/ui-prefs", {}),
+    ("ui_prefs_set", "POST", "/api/ui-prefs", {"json": {"masterVol": 0.8, "lastVol": {"vocal": 0.5}, "other": 1}}),
+    ("ui_prefs_get", "GET", "/api/ui-prefs", {}),
     ("songs", "GET", "/api/songs", {}),
     ("songs_search", "GET", "/api/songs/search?q=合成", {}),
     ("song_get", "GET", S, {}),
@@ -597,7 +601,7 @@ def uncovered_routes(app_module) -> tuple[set[str], int]:
     """沒有案例的路由（endpoint＋方法）和路由總數。test_contract_snapshot、check_snapshot.py 共用。"""
     # 2.1.0 加了 /api/live/override、/api/upgrade-separation；2.2.0 加了 /api/jobs/pause-all、/api/jobs/<jid>/top、
     # /api/songs/<sid>/prioritize；2.3.0 加了 /api/storage/location、move、adopt、delete-old，/api/setlist/history，
-    # /api/export/setlist、songlist，/api/setlist/remove、delete；2.3.1 加了 /api/yt-unlock（共 92 條）
+    # /api/export/setlist、songlist，/api/setlist/remove、delete；2.3.1 加了 /api/yt-unlock；2.3.4 加了 /api/ui-prefs 的 GET、POST（共 94 條）
     adapter = app_module.app.url_map.bind(f"127.0.0.1:{app_module.PORT}")
     ids = {
         "new": F.NEW,
@@ -628,7 +632,7 @@ def test_contract_snapshot(tmp_path, app_module):
 
     missing, n = uncovered_routes(app_module)
     assert not missing, f"沒有案例的路由：{sorted(missing)}"
-    assert n == 92
+    assert n == 94
 
     compare_snapshot(result, SNAPSHOT)
 

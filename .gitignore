@@ -8,6 +8,7 @@ bin/
 downloads/
 installed.json
 queue.json
+ui_prefs.json
 # Python
 __pycache__/
 *.pyc

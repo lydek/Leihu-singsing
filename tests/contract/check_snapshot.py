@@ -36,6 +36,6 @@ with tempfile.TemporaryDirectory(prefix="leihu-routes-") as d:
     import app
 
     missing, n = T.uncovered_routes(app)
-if missing or n != 92:
-    sys.exit(f"路由涵蓋不完整：共 {n} 條（應為 92），沒有案例的 {sorted(missing)}")
+if missing or n != 94:
+    sys.exit(f"路由涵蓋不完整：共 {n} 條（應為 94），沒有案例的 {sorted(missing)}")
 print(f"路由涵蓋：{n} 條都有案例", flush=True)
