@@ -180,3 +180,42 @@ def test_render_sheet_without_melody(P, sheet, tmp_path):
     _pitch_song(tmp_path / "song", [[0.0, 0.01, 60]])  # 太短的音符不算
     with pytest.raises(P.UserError, match="還沒有旋律"):
         sheet.render(tmp_path / "song", {}, tmp_path / "out")
+
+
+# ---------------------------------------------------------------- _chunks：長句切段（M6）
+
+
+def _chunks_in_subprocess(line: dict, max_chars: int, max_span: float) -> list:
+    """在子行程裡跑：回歸時卡住的是子行程（30 秒逾時），不會拖住整個測試。環境變數沿用 conftest 設好的。"""
+    import os
+    import subprocess
+    import sys
+    from pathlib import Path
+
+    code = (
+        "import json, sys, score_sheet as SS; "
+        f"print(json.dumps([[c['t'], c['end'], ''.join(x['c'] for x in c['chars'])] "
+        f"for c in SS._chunks(json.loads(sys.argv[1]), [], {max_chars}, {max_span})]))"
+    )
+    root = Path(__file__).resolve().parents[1]
+    r = subprocess.run([sys.executable, "-c", code, json.dumps(line)], cwd=root, env=os.environ.copy(),
+                       capture_output=True, text=True, encoding="utf-8", timeout=30)
+    assert r.returncode == 0, r.stderr
+    return json.loads(r.stdout.strip().splitlines()[-1])
+
+
+def test_chunks_terminates_when_cut_equals_segment_start():
+    """M6：切點剛好等於段落起點時，會切出空段、再處理同一段，一直重複。"""
+    # 逐字時間早於句首（手動調整過時間常見）：兩個字都會被算成句首，句長超過 9 秒要切
+    early = {"t": 0.0, "end": 12.0, "text": "ab", "chars": [{"c": "a", "t": -1.0}, {"c": "b", "t": -0.5}]}
+    assert _chunks_in_subprocess(early, 20, 9.0) == [[0.0, 12.0, "ab"]]
+    # 兩個字同一個時間：切到第二段時，第二個字的時間就是段落起點
+    same = {"t": 0.0, "end": 12.0, "text": "abc",
+            "chars": [{"c": "a", "t": 0.0}, {"c": "b", "t": 6.0}, {"c": "c", "t": 6.0}]}
+    assert _chunks_in_subprocess(same, 1, 100.0) == [[0.0, 6.0, "a"], [6.0, 12.0, "bc"]]
+
+
+def test_chunks_still_splits_long_line_between_chars():
+    line = {"t": 0.0, "end": 12.0, "text": "abcd",
+            "chars": [{"c": c, "t": t} for c, t in zip("abcd", (0.0, 3.0, 6.0, 9.0))]}
+    assert _chunks_in_subprocess(line, 2, 100.0) == [[0.0, 6.0, "ab"], [6.0, 12.0, "cd"]]
