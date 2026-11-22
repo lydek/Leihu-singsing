@@ -59,7 +59,7 @@
 | # | commit | 內容 | 初判 | 備註 |
 |---|---|---|---|---|
 | 4 | `a142c98` | 環境變數覆寫 S28、import 副作用 S31 | 重做 | 2.3.2 新增了 `library_dir`、`models_dir`，覆寫順序要重新設計。S31 延後：會改變行為（import 時的 `SetErrorMode`、`ffmpeg_path()` 搬走） |
-| 5 | `e2168c4` | M1–M7 修正與回歸測試 | 重做 | M4、M5 這版做；M1/M2 不做；M3、M7 延後（3.13）；M6 在下一版做（`next-version-plan.md` 第 1 批） |
+| 5 | `e2168c4` | M1–M7 修正與回歸測試 | 重做 | M4、M5 這版做；M1/M2 不做；M3、M7 延後（3.13）；M6 下一版第 1 批已修（`next-version-plan.md`） |
 | 6 | `7ee7791` | R1–R3 資源浪費 | 不做 | R1（具名 mutex 判斷已有執行個體）不做：慢的問題 3.18 已用同時檢查連接埠解決；延後：效能調整（R2 `/api/status` 不 import torch、R3 `OPENBLAS_NUM_THREADS`）（3.20） |
 | 7 | `da59e07` | 錯誤格式統一 S15 | 重做 | 延後：會改變行為（錯誤回應的內容）；以後做時，2.3.2 新增的路由要一起統一 |
 | 9 | `dee8f6b` | 步驟 0 審查修正 | 不做 | R1 接手跟著 #6 不做；`claude_api.record` 寫檔失敗照常回傳已在 C 組 M5 做（3.13）；試聽檔在錄音刪除後才寫和 M7 同類，延後：會改變行為（3.20） |
@@ -148,7 +148,7 @@ F 組的修正跟著程式落點放進對應的步驟；改變行為的修正依
 |---|---|---|---|
 | 1 web Blueprint | `90d0357` | 28 的輸入驗證、42 | 2.3.2 新增的路由（歌單、搬移、搜尋範圍、直播歌單）、`_local_only` 已有的 Host／Origin 檢查 |
 | 2 值物件、背景工作佇列（不做，3.19） | `3d0fd5f` | 28 的並行、68 的 leadfix 互斥（依 3.1 延後） | 上游 2.2.0 之後的重疊處理、全部暫停、優先處理 |
-| 3 推論子程式（這個版本不實作，3.19） | `c84046a` 的非 ml-worker 部分 | 46 的優先順序修正（延後，3.6） | **沿用上游 `gpu_worker.py`，不做 ml-worker**（評估見 3.6） |
+| 3 推論子程式（這個版本不實作，3.19） | `c84046a` 的非 ml-worker 部分 | 46 的優先順序修正（延後，3.6；下一版第 1 批已修） | **沿用上游 `gpu_worker.py`，不做 ml-worker**（評估見 3.6） |
 | 4 只拆音高後處理、歌詞文字（改用，3.19） | `7247929` | 45、39 的拆 `process_song` 不做；22、28 的 rms／ext_url、38 的濾波分段沒有進這一步，之後逐項看 | 2.3.2 的 `library_dir`、`models_dir`、搬移流程（`docs/upstream-sync-2.3.2.md` 的 D3） |
 
 步驟 4 拆 `pipeline.py` 時，要保留 `gpu_worker.py` 用到的名稱：`P._sep_progress`、`P._outputs`、`P._track_pitch_local`、`P._whisper_model`、`P.pick_language`、`P._collect_words`、`P.cuda_ok`、`P.MODELS`、`P.SR`、`P.PITCH_SR` 等（`git show v2.3.2:gpu_worker.py | grep -oE 'P\.[A-Za-z_]+'`）。優先在 `pipeline` 保留這些名稱；如果改了 worker 的 import 或呼叫，要另外測 TASKS 的分離、音高、歌詞路徑。契約測試會把 worker 換成假的，不能證明這些依賴還能用。
@@ -217,12 +217,12 @@ F 組的修正跟著程式落點放進對應的步驟；改變行為的修正依
 | JSON 協定（不用 pickle） | 兩邊都只在本機溝通，上游有隨機 authkey，不搬 |
 
 **在上游 `gpu_worker.py` 上要補的修正（延後，3.1 的原則）：**
-- **`_set_priority` 的優先順序從來沒生效**（舊分支 `1b5074b`）。上游 `gpu_worker.py:42` 一樣沒有設 `GetCurrentProcess` 的 `restype` 和 `SetPriorityClass` 的 `argtypes`，64 位元 Windows 上 `SetPriorityClass` 會失敗（回傳 0，不丟例外），上游沒有檢查回傳值，所以完全沒有訊息。直播中的低優先順序在上游也沒有生效。修了會讓直播中的低優先順序真的生效，屬於改變行為，這個版本不修。以後要修時，修法照 `1b5074b` 搬，放在 `gpu_worker.py`。回歸測試也照搬，但上游沒有失敗訊息，只保留「子行程讀回 `GetPriorityClass` 是 `0x4000`、`0x20`」的斷言，載入的檔案改成 `gpu_worker.py`、呼叫 `_set_priority`。
+- **`_set_priority` 的優先順序從來沒生效**（舊分支 `1b5074b`）。上游 `gpu_worker.py:42` 一樣沒有設 `GetCurrentProcess` 的 `restype` 和 `SetPriorityClass` 的 `argtypes`，64 位元 Windows 上 `SetPriorityClass` 會失敗（回傳 0，不丟例外），上游沒有檢查回傳值，所以完全沒有訊息。直播中的低優先順序在上游也沒有生效。修了會讓直播中的低優先順序真的生效，屬於改變行為，這個版本不修。以後要修時，修法照 `1b5074b` 搬，放在 `gpu_worker.py`。回歸測試也照搬，但上游沒有失敗訊息，只保留「子行程讀回 `GetPriorityClass` 是 `0x4000`、`0x20`」的斷言，載入的檔案改成 `gpu_worker.py`、呼叫 `_set_priority`。（2026-11-23：下一版第 1 批已照這個做法修，用自己的 `WinDLL("kernel32")` 實例設型別，見 `next-version-plan.md`。）
 - `dcd5ce4` 的 GpuStalled 放鎖順序，commit 說明寫「和上游 `gpu_worker.call` 一致」，所以上游不用修。`cuda_ok` 交握卡住是 ml-worker 才有的問題，上游 `track_pitch` 判斷用 CPU 時不會呼叫 `cuda_ok`，不用處理。
 - 36 的混合精度 OOM：commit 說明寫「上游 2.2.0 漏移植」，上游 `pipeline.py:2069` 遇到 out of memory 不標壞、交給外層退回標準模型，預計不搬，review 時確認。
 
 **連帶影響：**
-- F 組：46 延後，以後改修在 `gpu_worker._set_priority`；68 的 WorkerPool 和 `cuda_ok` 兩項不做；68 的 leadfix 互斥照原計畫查，上游沒有的話延後（3.1）。
+- F 組：46 延後，以後改修在 `gpu_worker._set_priority`（下一版第 1 批已修）；68 的 WorkerPool 和 `cuda_ok` 兩項不做；68 的 leadfix 互斥照原計畫查，上游沒有的話延後（3.1）。
 - 舊步驟 3 的其他部分照原計畫逐項評估：數值比對與量測工具（`tests/numeric/`、`tests/test_numeric.py`，D 組要用；評估結果：`measure_r4.py` 不搬，`child_hook.py` 取代 `worker_nodither.py`，見 3.19）、`LIANTAI_URL_BASE`、背景工作契約快照、伺服器不載入 librosa／scipy／numba（`leihu/dsp.py`、soxr）。其中 dsp 改寫會跟上游 pipeline 的改動衝突，要用 3.4 第 3 點判斷；改寫若讓輸出數值改變，就是效能調整，延後。
 - 刻意不移植清單裡的上游 `_local_only` 和「2.2.0 `gpu_worker` 機制的 7 個名稱」都不再成立，比對工具（`tests/contract/compare_upstream.py`）的登記要拿掉。
 - 3.6 推翻了舊分支 2026-11-17 的決定（`docs/upstream-sync-2.2.0.md` 第 2 節：保留 ml-worker）。
@@ -455,7 +455,7 @@ Codex 第 7 次審查後補的（同類問題和繞過路徑）：
 - 測試：`tests/test_security.py` 補上這幾項的回歸測試，installer 改從暫存副本載入（不再寫到 repo 的 `logs/`）；`test_without_env_still_opens_programs` 改成看有沒有新的 `Jobs._run` 執行緒（CPU 很忙時其他執行緒的增減會讓計數不準）。`uv run pytest` 30 個通過；`check_snapshot.py` 141 個案例兩次相同、92 條路由都有案例。
 - Codex 第 8 次審查後再修：上面 O12、O13、`keep_corrupt` 的說明是修正後的版本；O14 補上實際執行 `install.ps1` 下載函式的測試（假的下載、含 `[ ]` 的路徑、檢查碼不符兩次就停止並刪檔）。第 9 次審查後再補：O13 重試次數的測試、`_files_ready` 只 stat 一次（檔案剛好被 `ensure_model` 刪掉時當成還沒好，狀態 API 不會 500）。`uv run pytest` 36 個通過。
 
-其他項目不是安全或資料遺失，依 3.1 延後：M3（installer 的 probe 把路徑嵌進程式碼字串）、M6（旋律譜切點無限迴圈）、M7（錄音刪除後才寫回的 JSON）、S8（yt-dlp 取消與逾時）、O21（installer 整體逾時）、S19（三份 `safe_name`）。
+其他項目不是安全或資料遺失，依 3.1 延後：M3（installer 的 probe 把路徑嵌進程式碼字串）、M6（旋律譜切點無限迴圈，下一版第 1 批已修）、M7（錄音刪除後才寫回的 JSON）、S8（yt-dlp 取消與逾時）、O21（installer 整體逾時）、S19（三份 `safe_name`）。
 
 ### 3.14 測試版安裝檔（2026-11-21）
 - 為了和上游的正式版裝在同一台電腦測試，`installer/build.sh` 加開關：`LEIHU_TEST=1 sh installer/build.sh` 用 `makensis -DTEST_BUILD` 建測試版。不加開關時，安裝檔的名稱、安裝位置、登錄檔和原本完全相同。

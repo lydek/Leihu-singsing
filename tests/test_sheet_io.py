@@ -185,7 +185,7 @@ def test_render_sheet_without_melody(P, sheet, tmp_path):
 # ---------------------------------------------------------------- _chunks：長句切段（M6）
 
 
-def _chunks_in_subprocess(line: dict, max_chars: int, max_span: float) -> list:
+def _chunks_in_subprocess(line: dict, max_chars: int, max_span: float, notes: list | None = None) -> list:
     """在子行程裡跑：回歸時卡住的是子行程（30 秒逾時），不會拖住整個測試。環境變數沿用 conftest 設好的。"""
     import os
     import subprocess
@@ -195,10 +195,10 @@ def _chunks_in_subprocess(line: dict, max_chars: int, max_span: float) -> list:
     code = (
         "import json, sys, score_sheet as SS; "
         f"print(json.dumps([[c['t'], c['end'], ''.join(x['c'] for x in c['chars'])] "
-        f"for c in SS._chunks(json.loads(sys.argv[1]), [], {max_chars}, {max_span})]))"
+        f"for c in SS._chunks(json.loads(sys.argv[1]), json.loads(sys.argv[2]), {max_chars}, {max_span})]))"
     )
     root = Path(__file__).resolve().parents[1]
-    r = subprocess.run([sys.executable, "-c", code, json.dumps(line)], cwd=root, env=os.environ.copy(),
+    r = subprocess.run([sys.executable, "-c", code, json.dumps(line), json.dumps(notes or [])], cwd=root, env=os.environ.copy(),
                        capture_output=True, text=True, encoding="utf-8", timeout=30)
     assert r.returncode == 0, r.stderr
     return json.loads(r.stdout.strip().splitlines()[-1])
@@ -219,3 +219,16 @@ def test_chunks_still_splits_long_line_between_chars():
     line = {"t": 0.0, "end": 12.0, "text": "abcd",
             "chars": [{"c": c, "t": t} for c, t in zip("abcd", (0.0, 3.0, 6.0, 9.0))]}
     assert _chunks_in_subprocess(line, 2, 100.0) == [[0.0, 6.0, "ab"], [6.0, 12.0, "cd"]]
+
+
+def test_chunks_terminates_with_char_just_before_segment_start():
+    """5.9995 秒的字比段落起點 6 秒早不到 1 毫秒，仍算進第二段；剩下同時間的字不能當切點。"""
+    line = {"t": 0.0, "end": 12.0, "text": "abcd",
+            "chars": [{"c": c, "t": t} for c, t in zip("abcd", (0.0, 5.9995, 6.0, 6.0))]}
+    assert _chunks_in_subprocess(line, 1, 100.0) == [[0.0, 6.0, "a"], [6.0, 12.0, "bcd"]]
+
+
+def test_chunks_falls_back_to_notes_when_char_cuts_cannot_advance():
+    """字的時間都不能當切點時，改用音符之間切。"""
+    line = {"t": 0.0, "end": 12.0, "text": "ab", "chars": [{"c": "a", "t": -1.0}, {"c": "b", "t": -0.5}]}
+    assert _chunks_in_subprocess(line, 20, 9.0, [[6.0, 7.0, 60]]) == [[0.0, 6.0, "ab"], [6.0, 12.0, ""]]
