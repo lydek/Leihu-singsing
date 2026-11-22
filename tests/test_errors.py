@@ -146,3 +146,64 @@ def test_d3_valid_take_is_accepted(client, song, monkeypatch):
     assert r.status_code == 200
     info = json.loads((song / "takes" / f"{r.get_json()['id']}.json").read_text("utf-8"))
     assert (info["start"], info["key"], info["speed"], info["duration"]) == (12.345, -2, 0.8, 30.5)
+
+
+# ---------------------------------------------------------------- 36 留下的輸入驗證（第 4 批一起做）
+
+
+@pytest.fixture
+def keep_config(app_module):
+    import pipeline as P
+
+    before = P.load_config()
+    yield P
+    P.save_config(before)
+
+
+@pytest.mark.parametrize("v", ["nan", "inf", "-inf", "abc", "1e400"])
+def test_balance_rejects_non_finite(client, keep_config, v):
+    """NaN／無限大寫進 config.json 後 GET /api/config 會輸出 NaN（不是合法的 JSON），設定畫面打不開；
+    不是數字原本回 500。"""
+    P = keep_config
+    P.save_config({**P.load_config(), "balance_usd": 5.0})
+    r = client.post("/api/config", json={"balance_usd": v})
+    assert r.status_code == 400
+    assert "餘額" in r.get_json()["error"]
+    assert P.load_config()["balance_usd"] == 5.0
+    client.get("/api/config").get_json()  # 設定畫面讀得到
+
+
+@pytest.mark.parametrize(("v", "saved"), [("12.345", 12.35), (3, 3), ("", None), (None, None)])
+def test_balance_valid_or_empty(client, keep_config, v, saved):
+    r = client.post("/api/config", json={"balance_usd": v})
+    assert r.status_code == 200
+    assert keep_config.load_config()["balance_usd"] == saved
+
+
+@pytest.mark.parametrize(("site", "touched"), [("cross-site", False), ("same-origin", True), (None, True)])
+def test_status_live_ignores_cross_site(client, monkeypatch, site, touched):
+    """外站網頁可以用 <img> 一直打 /api/status?live=1，讓背景工作一直暫停：只認本機頁面
+    （瀏覽器會帶 Sec-Fetch-Site；本機的其他程式不帶，照常算）。"""
+    import pipeline as P
+
+    calls = []
+    monkeypatch.setattr(P, "live_touch", lambda: calls.append(1))
+    headers = {"Sec-Fetch-Site": site} if site else {}
+    assert client.get("/api/status?live=1", headers=headers).status_code == 200
+    assert bool(calls) is touched
+
+
+@pytest.mark.parametrize(("port", "origin", "ok"), [
+    (80, "http://127.0.0.1", True),
+    (80, "http://localhost", True),
+    (80, "http://evil.example", False),
+    (8765, "http://127.0.0.1", False),
+    (8765, "http://127.0.0.1:8765", True),
+])
+def test_origin_check_without_port_when_port_80(client, monkeypatch, port, origin, ok):
+    """LIANTAI_PORT=80 時瀏覽器送的 Origin 不帶埠號，原本寫入類請求都被擋。"""
+    from leihu.web import security
+
+    monkeypatch.setattr(security, "PORT", port)
+    r = client.post("/api/jobs/nojob/cancel", headers={"Origin": origin})
+    assert (r.status_code != 403) is ok
