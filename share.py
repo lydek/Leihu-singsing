@@ -520,18 +520,27 @@ def export_video(d: Path, info: dict, timing: dict, title: str, audio: Path, out
            "-c:a", "aac", "-b:a", "192k", "-shortest", "-movflags", "+faststart", str(out)]
     proc = subprocess.Popen(cmd, stdin=subprocess.PIPE, stderr=subprocess.PIPE, creationflags=flags)
     t_last = 0.0
+    done = False
     try:
-        for k in range(total):
-            proc.stdin.write(painter.frame(k / FPS).tobytes())
-            if time.time() - t_last > 0.5:
-                report(f"製作影片：{k / FPS:.0f}/{timing['dur']:.0f} 秒", 0.2 + 0.78 * k / max(1, total))
-                t_last = time.time()
-        proc.stdin.close()
-    except BrokenPipeError:
-        pass
-    err = proc.stderr.read().decode("utf-8", "replace")
-    if proc.wait():
-        raise P.UserError("影片轉檔失敗：" + err[-300:])
+        try:
+            for k in range(total):
+                proc.stdin.write(painter.frame(k / FPS).tobytes())
+                if time.time() - t_last > 0.5:
+                    report(f"製作影片：{k / FPS:.0f}/{timing['dur']:.0f} 秒", 0.2 + 0.78 * k / max(1, total))
+                    t_last = time.time()
+            proc.stdin.close()
+        except BrokenPipeError:
+            pass
+        err = proc.stderr.read().decode("utf-8", "replace")
+        if proc.wait():
+            raise P.UserError("影片轉檔失敗：" + err[-300:])
+        done = True
+    finally:
+        if not done:   # fork：按了停止或失敗：結束 ffmpeg、刪掉半截影片
+            if proc.poll() is None:
+                proc.kill()
+                proc.wait()
+            out.unlink(missing_ok=True)
     return out
 
 

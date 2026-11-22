@@ -42,6 +42,12 @@ fork 對上游後端檔案的修改（同步時 3.21 步驟 4 要確認沒被蓋
 | S15 | `leihu/web/security.py` 新增 `http_error`、`unhandled_error` | 404、405、400（壞掉的 JSON）、403 等 HTTP 錯誤回 `{"error": "請求失敗（代碼）"}`，不回 HTML，狀態碼和 `Allow` 等標頭照舊；沒處理到的例外回 500 `{error}`，traceback 照舊經 `app.logger` 寫進 app.log，另記 `log_error`。前端 `api()` 本來就把非 JSON 的錯誤顯示成「請求失敗（狀態碼）」，畫面上的字不變 | `tests/test_errors.py` 的 `test_s15_*`；契約差異登記成 `RULES` 的 `S15`（10 個 404／400 案例） |
 | D1 | `leihu/web/library.py` 的 `rename`（`PATCH /api/songs/<sid>`） | 不合法的 KEY（文字、超過 ±6、`1.5`、`true`）回 400「KEY 範圍是 ±6」，不再悄悄存成 0；空字串、`null` 照舊當成清除 | `tests/test_errors.py` 的 `test_d1_*`；契約差異登記成 `D1`（3 個案例）和 `D1-後續`（之後 8 個案例讀到的 KEY 維持 2） |
 | D3 | `leihu/web/takes.py` 的 `add_take` | 存錄音檔之前驗證：`start`、`duration` 要是有限且不小於 0 的數字，`key` 是 ±6 的整數，`speed` 在 0.5–1.5；不合法回 400、不留下錄音檔（原本不是數字回 500，超出範圍照存） | `tests/test_errors.py` 的 `test_d3_*`（契約沒有案例） |
+| S8 | `pipeline.py` 的 `step_youtube`，新增 `YT_TIMEOUT`、`_kill_tree` | yt-dlp 的 stderr 併進 stdout（分開讀時 stderr 寫滿管線緩衝區會互相卡住）；整體逾時 30 分鐘；按停止、出錯、逾時都連同 yt-dlp 開的 ffmpeg 一起結束 | `tests/test_downloads.py` 的 `test_s8_*`（用假的 yt-dlp：stderr 灌 300 KB、一直不結束） |
+| 38 的 `.partK`、36 的 206 空資料 | `pipeline.py` 的 `fetch_file`，新增 `_LINGER` | 讀一段的期間按了停止，讀完的那段不寫；取消時 5 秒內沒結束的下載執行緒記下來，下次下載同一個檔案前先等它們（還開著 `.partK`）。回 206 後沒有資料算一次失敗、等 2 秒再試（原本不停頓地重連）。重做 38 時沒有用 `alive` 當變數名稱（舊分支 39 的 `TypeError` 就是蓋掉了內部的 `alive()`） | `test_no_write_after_stop`、`test_next_download_waits_for_stuck_thread`、`test_206_without_data_waits_before_retry` |
+| 36 的 `ensure_model_data` 鎖 | `pipeline.py` 的 `ensure_model_data`（本體改名 `_ensure_model_data`） | 整段在一把鎖內：背景下載高品質模型和處理歌曲同時呼叫時，小檔的暫存檔名固定，原本會互相蓋掉 | `test_ensure_model_data_runs_one_at_a_time` |
+| 36 的佇列與 YouTube 讓位 | `pipeline.Jobs` 的 `set_paused`、`_work`；`youtube_job`，新增 `_cancel_requested` | 按「繼續」清掉執行中工作的暫停標記；讓位、兩首同時處理顯示卡記憶體不夠重試時，同時按了停止就標成已取消、不排回佇列（其他例外照舊是錯誤）；YouTube 下載讓位途中按了停止，不再改回「排隊下載」 | `test_resume_clears_pause_of_running_job`、`test_deferred_job_with_cancel_is_not_requeued`、`test_oom_retry_with_cancel_is_not_requeued`、`test_youtube_deferral_keeps_cancelled_state` |
+| 36 的匯出影片 | `share.py` 的 `export_video` | 中途按停止或失敗時結束 ffmpeg、刪掉半截影片 | `test_export_video_cancel_stops_ffmpeg_and_removes_partial`（用真的 ffmpeg） |
+| O21、M3、38 的 PowerShell 路徑 | `installer.py` 的 `run`（新增 `RUN_TIMEOUT`）、`probe`、`powershell`、`stop_app` 和 8 處 probe 呼叫；`installer/leihu.nsi` 的 `StopApp`（登記在 `OWN_CHANGES`） | pip 等子程序整體逾時 2 小時，逾時連同子程序結束、回傳失敗；probe 的路徑改用 argv 傳、PowerShell 的路徑改用環境變數傳、用 `StartsWith` 比對（路徑含「'」「[ ]」時原本會語法錯誤或比對錯，也能被注入） | `tests/test_installer_robust.py`；`leihu.nsi` 沒有自動測試 |
 
 第 3 批延後（2026-11-23 決定，等重構穩定再考慮）：
 
@@ -53,5 +59,11 @@ fork 對上游後端檔案的修改（同步時 3.21 步驟 4 要確認沒被蓋
 ## 4. 還沒確認的
 
 - 28（審查修正 A–F）只拆出 A2、A5（第 2 批已做），其餘沒有逐項拆開；36 的「建議與可選」各小項（佇列、下載、歌單、匯出影片、`LIANTAI_PORT` 等，目前只把重疊處理 OOM 放在第 5 批）、70 的 `cancel_song`、`on_cancel` 只依 commit 說明判斷（3.20）。開始第 4、5、6 批之前要逐行看 diff（第 2 批開始前看過 28、70 的 commit 說明：70 的 `cancel_song`、`on_cancel` 是舊分支 `leihu/jobs.py` 的，目前的 `Jobs` 沒有 `on_cancel`，不適用）；看完 36 的各小項，再分到對應批次。
+- 36（`891b78e`）的「建議與可選」2026-11-23 逐行看過 diff，對照目前的程式：
+  - 還在、和下載或取消有關，放進第 4 批（已修）：分段下載回 206 後沒有資料時不停頓地重連（每條下載執行緒佔滿一個核心）；`ensure_model_data` 沒有鎖（背景下載高品質模型和處理歌曲同時呼叫，暫存檔名固定）；YouTube 下載讓位途中按停止，又被改回「排隊下載」；`Jobs` 按「繼續」沒清掉執行中工作的 `pause`（走到下一個檢查點前就按繼續，照樣讓位重做）、讓位與顯示卡記憶體不夠重試時沒看 `cancel`（同時按了停止還排回佇列）；匯出影片中途停止或失敗時 ffmpeg 沒結束，留下半截影片。
+  - 還在、屬於輸入驗證，第 3 批之後另外處理：`balance_usd` 收 `nan`、`inf`（寫進 config.json 後設定畫面打不開）；外站網頁可以一直打 `/api/status?live=1` 讓背景工作暫停；`LIANTAI_PORT=80` 時瀏覽器的 `Origin` 不帶埠號，寫入類請求被擋（fork 的 S28 才會遇到）。
+  - 第 5 批已列：重疊處理時記憶體不夠交給佇列、旋律分析沉默上限依長度放寬。
+  - 不適用：ml-worker 才有的（worker 自己設優先順序、stdout 關閉後再 kill、`gpu_probe_ml.json`；gpu_worker 有沒有「非歌詞工作前放掉 Whisper、CPU 重跑前放掉顯示卡模型」的記憶體問題沒有查）；全部來源找不到時訊息帶檔名（上游已有）；直播橫幅條件（上游原本就是）；`claude_coach` 沒帶錄音編號（目前已回 400）；`delete_song`（第 2 批已做）；`_Draw`／`_hex` 搬檔、`build.sh`、CI（舊分支的結構）。
+  - 不做：`setlist_add` 先寫歌單再記次數。目前在歌單的鎖內記次數、例外都吞掉，不會漏記歌單，只差拿著歌單的鎖等 `_META_LOCK`。
 - `import subprocess` 已補（2026-11-23），顯示卡忙碌判斷開始作用：上游從來沒有真的跑過這段，門檻是否合理、`nvidia-smi` 週期取樣的 CPU 使用率，都還沒在筆電（3.10）開實際的程式驗證。
 - 舊分支的測試（`test_jobs.py`、`test_values.py`）能不能直接搬，沒有確認。

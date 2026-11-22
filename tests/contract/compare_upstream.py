@@ -106,6 +106,10 @@ OWN_CHANGES: list[tuple[str, str]] = [
     ("installer/leihu.nsi", r"\+\s*Delete \"\$INSTDIR\\\.test-install\""),
     # E 組步驟 1：程式拆到 leihu/，修復與解除安裝時清掉舊的（3.19）
     ("installer/leihu.nsi", r"\+\s*RMDir /r \"\$INSTDIR\\leihu\""),
+    # 下一版第 4 批 38：停止程式時路徑用環境變數傳給 PowerShell、用 StartsWith 比對（next-version-plan.md）
+    ("installer/leihu.nsi", r"-\s*nsExec::Exec .*ExecutablePath -like '\$\{DIR\}\\python\\\*'.*"),
+    ("installer/leihu.nsi", r"\+\s*System::Call 'kernel32::SetEnvironmentVariable\(t \"LEIHU_STOP_DIR\".*"),
+    ("installer/leihu.nsi", r"\+\s*nsExec::Exec .*StartsWith\(\$\$env:LEIHU_STOP_DIR.*"),
     # 下一版第 2 批 D2：刪除處理中、下載中的歌回 400，顯示錯誤（next-version-plan.md）
     ("static/app.js", r"[-+]\s*(try \{ )?await api\(`/api/songs/\$\{s\.id\}`, \{ method: \"DELETE\" \}\);.*"),
 ]

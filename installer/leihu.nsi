@@ -76,7 +76,10 @@ FunctionEnd
   ${IfNot} ${FileExists} "$PS"
     StrCpy $PS "$SYSDIR\WindowsPowerShell\v1.0\powershell.exe"
   ${EndIf}
-  nsExec::Exec `"$PS" -NoProfile -NonInteractive -Command "Get-CimInstance Win32_Process | Where-Object { $$_.ExecutablePath -like '${DIR}\python\*' } | ForEach-Object { Stop-Process -Id $$_.ProcessId -Force }"`
+  ; fork（38）：路徑用環境變數傳（子程序會繼承）、用 StartsWith 比對。嵌進單引號字串時路徑含「'」會語法錯誤，
+  ; -like 還會把 [ ] 當萬用字元
+  System::Call 'kernel32::SetEnvironmentVariable(t "LEIHU_STOP_DIR", t "${DIR}\python\")i'
+  nsExec::Exec `"$PS" -NoProfile -NonInteractive -Command "Get-CimInstance Win32_Process | Where-Object { $$_.ExecutablePath -and $$_.ExecutablePath.StartsWith($$env:LEIHU_STOP_DIR, [StringComparison]::OrdinalIgnoreCase) } | ForEach-Object { Stop-Process -Id $$_.ProcessId -Force }"`
   Pop $0
   Sleep 1500
 !macroend
