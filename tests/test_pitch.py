@@ -84,8 +84,10 @@ def tone(midi: float, frames: int, harmonics=(1, 2, 3, 4)) -> np.ndarray:
 def test_octave_low_score_tells_real_low_note_from_octave_up():
     low = tone(60, 40)  # 真的是 C4：第 1～4 泛音都有
     up = tone(72, 40, (1, 2))  # 其實是 C5：C4 的第 1、3 泛音位置沒有能量
-    assert PT.octave_low_score(low, 0, 40, 60) >= 0.35
+    no_fundamental = tone(60, 40, (2, 3, 4))  # （第 1＋3）÷（第 2＋4）＝ 1 ÷ 2
+    assert np.isclose(PT.octave_low_score(low, 0, 40, 60), 1.0, rtol=0.02)
     assert PT.octave_low_score(up, 0, 40, 60) <= 0.12
+    assert np.isclose(PT.octave_low_score(no_fundamental, 0, 40, 60), 0.5, rtol=0.02)
 
 
 def test_octave_low_score_none_when_too_short_or_silent():
@@ -136,6 +138,35 @@ def test_fix_octaves_moves_low_note_up():
     assert same(PT.fix_octaves(m, level(True)), melody(60))  # 往下差八度又比較小聲：往上移
     # 泛音顯示低音確實存在：保留
     assert same(PT.fix_octaves(m, level(True), audio(tone(48, B - A))), m)
+    # 泛音顯示低音位置沒有能量（其實是高八度）：音量正常也移
+    assert same(PT.fix_octaves(m, level(False), audio(tone(60, B - A, (1, 2)))), melody(60))
+
+
+def test_fix_octaves_diff_and_level_boundaries():
+    """差 10～14 個半音才算八度錯（移 12、保留零頭）；比周圍小聲要低於一半。"""
+    for target, want in ((45.99, 45.99), (46, 58), (50, 62), (50.01, 50.01), (70, 58), (74, 62), (74.01, 74.01)):
+        assert same(PT.fix_octaves(melody(target), level(True)), melody(want))
+    for lvl, want in ((0.49, 60), (0.5, 72)):
+        rms = level(False)
+        rms[A:B] = lvl
+        assert same(PT.fix_octaves(melody(72), rms), melody(want))
+
+
+def test_fix_octaves_score_thresholds(monkeypatch):
+    """泛音分數：往下移（候選音偏高）要 ≥ 0.35 才確定、≤ 0.12 就否決；往上移相反。中間看音量。"""
+    y = audio(np.zeros((B - A) * PT.HOP, np.float32))
+    cases = [  # 分數, 偏高時（音量正常、小聲）移不移, 偏低時（音量正常、小聲）移不移
+        (0.12, (False, False), (True, True)),
+        (0.120001, (False, True), (False, True)),
+        (0.349999, (False, True), (False, True)),
+        (0.35, (True, True), (False, False)),
+    ]
+    for score, up, down in cases:
+        monkeypatch.setattr(PT, "octave_low_score", lambda *a, s=score: s)
+        for target, moves in ((72, up), (48, down)):
+            for weak, move in zip((False, True), moves):
+                got = PT.fix_octaves(melody(target), level(weak), y)
+                assert same(got, melody(60 if move else target)), (score, target, weak)
 
 
 def test_fix_octaves_short_tail_after_long_note():
@@ -143,6 +174,40 @@ def test_fix_octaves_short_tail_after_long_note():
     m = arr((60, 40), (NAN, 5), (60, 41), (NAN, 5), (72, 20), (NAN, 5), (60, 40))
     want = arr((60, 40), (NAN, 5), (60, 41), (NAN, 5), (60, 20), (NAN, 5), (60, 40))
     assert same(PT.fix_octaves(m), want)
+    # 尾音和周圍（60）差 24，和前一個音（72）差 12：照前一個音移
+    m = arr((60, 100), (NAN, 5), (72, 61), (NAN, 5), (84, 20))
+    assert same(PT.fix_octaves(m), arr((60, 100), (NAN, 5), (72, 61), (NAN, 5), (72, 20)))
+
+
+def test_fix_octaves_context_is_length_weighted_and_needs_30_frames():
+    # 周圍是 1 段 100 格的 60 和 2 段 35 格的 72：依長度加權的中位數是 60（一般中位數會是 72）
+    m = arr((60, 100), (NAN, 5), (72, 35), (NAN, 5), (72, 35), (NAN, 5), (72, 35))
+    rms = np.ones(len(m), np.float32)
+    rms[105:140] = 0.1
+    want = m.copy()
+    want[105:140] = 60
+    assert same(PT.fix_octaves(m, rms), want)
+    # 2 秒內的周圍加起來不到 30 格：不移（空隙 51 格，避免周圍的短音被當成句尾短尾音）
+    for last, moved in ((14, 72), (15, 60)):
+        m = arr((72, 35), (NAN, 51), (60, 15), (NAN, 51), (60, last))
+        rms = np.ones(len(m), np.float32)
+        rms[:35] = 0.1
+        want = m.copy()
+        want[:35] = moved
+        assert same(PT.fix_octaves(m, rms), want)
+
+
+def test_fix_octaves_second_pass_and_moves_each_run_once():
+    # 第一輪只修得到最後一段（48），中段（72）的周圍要等最後一段修好才變準
+    m = arr((60, 35), (NAN, 5), (72, 35), (NAN, 5), (48, 35))
+    rms = np.ones(len(m), np.float32)
+    rms[40:115] = 0.1
+    assert same(PT.fix_octaves(m, rms), arr((60, 35), (NAN, 5), (60, 35), (NAN, 5), (60, 35)))
+    # 小聲的尾音第一輪移到 60 之後，第二輪和周圍（加權中位數 72）比又差八度：每段只移一次，不會被移回去
+    m = arr((72, 80), (NAN, 5), (60, 80), (NAN, 5), (72, 20), (NAN, 5), (84, 80))
+    rms = np.ones(len(m), np.float32)
+    rms[170:190] = 0.1
+    assert same(PT.fix_octaves(m, rms), arr((72, 80), (NAN, 5), (60, 80), (NAN, 5), (60, 20), (NAN, 5), (84, 80)))
 
 
 def test_fix_octaves_keeps_long_notes_and_few_runs():
