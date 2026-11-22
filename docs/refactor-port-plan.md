@@ -104,7 +104,7 @@
 | # | commit | 內容 | 初判 | 備註 |
 |---|---|---|---|---|
 | 32 | `bfc3f0d` | 量測真實歌曲的速度和記憶體 | 搬 | 腳本搬；數字要重量 |
-| 43 | `2f3d2f2` | 補測試：歌詞文字、Claude 價格、歌單解析、旋律譜匯出 | 搬 | 已搬：`tests/test_lyrics_text.py`、`tests/test_sheet_io.py`，import 改成 `leihu.lyrics_text`、`pipeline`、`claude_api`、`score_sheet`，原本的斷言都保留，在目前的程式上全部通過；未知版面那個測試另外多驗圖片尺寸；另加 `tests/test_pitch.py`（`leihu/pitch.py`，`fix_octaves`、`octave_low_score` 除外） |
+| 43 | `2f3d2f2` | 補測試：歌詞文字、Claude 價格、歌單解析、旋律譜匯出 | 搬 | 已搬：`tests/test_lyrics_text.py`、`tests/test_sheet_io.py`，import 改成 `leihu.lyrics_text`、`pipeline`、`claude_api`、`score_sheet`，原本的斷言都保留，在目前的程式上全部通過；未知版面那個測試另外多驗圖片尺寸；另加 `tests/test_pitch.py`（`leihu/pitch.py` 的全部函式） |
 | 47 | `6705dd4` | 效能分析、量測腳本 | 重做 | `tests/perf/` 的 `profile_song.py`、`load_profile.py`、`worker_capped.py` 依賴 ml-worker（3.6 不做）；改成量 `gpu_worker` 的父子程式，舊數字只當舊架構的紀錄 |
 | 37、44 | `c9c1411`、`f063ed7` | 修正紀錄、ruff 文件 | 重做 | 跟著修正一起寫，不單獨搬 |
 
@@ -569,5 +569,5 @@ Codex 第 7 次審查後補的（同類問題和繞過路徑）：
 - 初判只看了 commit 標題、檔案清單，以及 M1、M2、M5、S19 四處抽查，其他 commit 都還沒看 diff。
 - 「上游 2.3.2 也有這些問題」只根據 commit 說明，還沒有在 `v2.3.2` 上重現。
 - 顯示卡路徑只有筆電的一份基準（3.10）：只錄真實歌曲 2 首的效能（合成歌在顯示卡上失敗）和 `refactor` 計畫的數值各 1 次；CUDA 失敗時的退回、顯示卡記憶體不足沒有被觸發過；顯示卡的相似度基準（`similarity.py --fixed`）沒錄。
-- 背景工作（線上歌詞搜尋、更新檢查、下載）沒有契約快照（3.19 決定不做）；#43 的歌詞文字測試在步驟 4 之後才加入（3.1 第 6 點要求在拆分之前）；步驟 4 搬的函式當時靠「AST 相同」和數值基準驗證。`fix_octaves`、`octave_low_score` 還沒有單元測試，目前靠數值基準；可以用合成的音高、RMS 和泛音訊號補，真實歌曲的修正效果仍要實際錄音驗證。
+- 背景工作（線上歌詞搜尋、更新檢查、下載）沒有契約快照（3.19 決定不做）；#43 的歌詞文字測試在步驟 4 之後才加入（3.1 第 6 點要求在拆分之前）；步驟 4 搬的函式當時靠「AST 相同」和數值基準驗證。`fix_octaves`、`octave_low_score` 的單元測試用合成的音高、RMS 和泛音訊號，只確認判斷的分支和門檻；真實歌曲的修正效果仍要實際錄音驗證。
 - 步驟 4 沒跑 `tests/perf/baseline.py`，多 import 兩個模組對啟動時間的影響沒有量（3.19）。
