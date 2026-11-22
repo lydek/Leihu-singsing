@@ -897,7 +897,7 @@ function renderSongs() {
         setTimeout(() => { delete del.dataset.armed; del.textContent = "刪除"; }, 3000);
         return;
       }
-      await api(`/api/songs/${s.id}`, { method: "DELETE" });
+      try { await api(`/api/songs/${s.id}`, { method: "DELETE" }); } catch (err) { toast(err.message); return; }   // 處理中、下載中的歌不能刪
       if (S.song && S.song.id === s.id) { S.song = null; $("#nav-practice").disabled = true; }
       loadSongs();
     };

@@ -35,9 +35,13 @@ fork 對上游後端檔案的修改（同步時 3.21 步驟 4 要確認沒被蓋
 | M6 | `score_sheet.py` 的 `_chunks` | 字的時間等於段落起點時不當切點（逐字時間早於句首、兩個字同一個時間時，原本會無限迴圈）；原本會正常結束的輸入，結果不變 | `tests/test_sheet_io.py` 的 `test_chunks_*`：會卡住的 3 個情境（包括改用音符切點）舊程式都卡到 30 秒逾時；`test_chunks_still_splits_long_line_between_chars` 確認一般的切法不變 |
 | 46 | `gpu_worker.py` 的 `_set_priority` | 用自己的 `WinDLL("kernel32")` 實例設 `GetCurrentProcess.restype`、`SetPriorityClass.argtypes`，64 位元 Windows 上才真的改得了優先順序；CPU 處理程式（`CPU_POOL`）從此一律是「低於標準」，顯示卡處理程式在暫停判斷成立時降低 | `tests/test_gpu_worker.py`（子行程裡讀回優先順序；舊程式兩次都是 NORMAL） |
 | `import subprocess` | `pipeline.py` 模組頂端 | 補 `import subprocess`。`_running_apps` 的 `tasklist` 備援（Windows API 查不到程式清單時）和 `_sample_gpu_load` 的 `nvidia-smi` 取樣原本丟 `NameError` 被吞掉，現在真的會跑，效果見第 2 節第 1 批「改了之後的差別」；ruff F821 從 4 個變 0 個 | `tests/test_gpu_busy.py`（替換 `subprocess.run`，舊程式分別回傳 `None`、`GPU_LOAD` 不變）；契約沙盒換掉了這兩個函式，`check_snapshot` 144 個案例兩次相同 |
+| `step_import` 補鎖 | `pipeline.py` 的 `step_import` | 讀出 `steps` 到寫回之間拿著 `_META_LOCK`（`integrated_loudness` 移到鎖外先算），不再蓋掉期間別人記下的步驟 | `tests/test_jobs.py` 的 `test_step_import_keeps_steps_written_meanwhile`（另一個執行緒在讀出後寫進 `separate`，舊程式被蓋掉） |
+| M7、9 | `pipeline.py` 新增 `_TAKE_LOCK`、`write_take_info`、`write_take_audio`、`delete_take_files`，`score_take` 改用；`leihu/web/takes.py` 的 `_score`、`take_mixprep`、`take_preview`、`delete_take`、`delete_takes`、`claude_coach` | 錄音的寫入和刪除共用一把鎖：處理期間錄音被刪掉時，評分、Claude 建議不寫回 JSON（建議照樣回傳），試聽用的人聲、混音不寫、回 404 | `tests/test_takes.py`：4 個情境舊程式都留下孤兒檔或回 200；批次刪除和單筆刪除刪同樣的檔案 |
+| D2、D4（含 28 的 A2、A5） | `leihu/web/library.py` 的 `delete_song`；`pipeline.Jobs` 新增 `song_running`、`cancel_song`；`static/app.js` 的刪除按鈕（登記在 `OWN_CHANGES`） | 這首歌有工作在執行、或正在預先下載時，刪除回 400（`{error}`），排隊中的工作照舊；確定要刪才把兩條佇列裡這首歌排隊中的工作改成已取消，不再列在 `/api/status`。前端刪除失敗時顯示錯誤 | `tests/test_jobs.py` 的 `test_delete_*`；契約快照的差異登記成 `RULES` 的 `D4`（`status_*` 案例少了被刪的兩首歌的工作） |
+| D6、68 | `pipeline.Jobs` 新增 `wait_for`、`stems_busy`；`leihu/web/common.py` 的 `vjobs` | 同一首歌在 `jobs` 有會重寫分軌的工作在執行（匯入、分離、主唱補回；只重做旋律、歌詞的不算）時，這首的移調先跳過、狀態寫「等這首歌的分軌處理完」，做完後最多 5 秒內開始；別首歌的移調照常。只擋這個方向：移調已經在跑時開始的分軌不等（移調通常幾十秒，分軌最後才寫檔；分軌後舊 KEY 版本失效是第 6 批） | `tests/test_jobs.py` 的 `test_variant_*`、`test_queued_stem_job_does_not_block_variant` |
 
 ## 4. 還沒確認的
 
-- 28（審查修正 A–F）沒有逐項拆開；36 的「建議與可選」各小項（佇列、下載、歌單、匯出影片、`LIANTAI_PORT` 等，目前只把重疊處理 OOM 放在第 5 批）、70 的 `cancel_song`、`on_cancel` 只依 commit 說明判斷（3.20）。開始第 2、4、5、6 批之前要逐行看 diff；看完 36 的各小項，再分到對應批次。
+- 28（審查修正 A–F）只拆出 A2、A5（第 2 批已做），其餘沒有逐項拆開；36 的「建議與可選」各小項（佇列、下載、歌單、匯出影片、`LIANTAI_PORT` 等，目前只把重疊處理 OOM 放在第 5 批）、70 的 `cancel_song`、`on_cancel` 只依 commit 說明判斷（3.20）。開始第 4、5、6 批之前要逐行看 diff（第 2 批開始前看過 28、70 的 commit 說明：70 的 `cancel_song`、`on_cancel` 是舊分支 `leihu/jobs.py` 的，目前的 `Jobs` 沒有 `on_cancel`，不適用）；看完 36 的各小項，再分到對應批次。
 - `import subprocess` 已補（2026-11-23），顯示卡忙碌判斷開始作用：上游從來沒有真的跑過這段，門檻是否合理、`nvidia-smi` 週期取樣的 CPU 使用率，都還沒在筆電（3.10）開實際的程式驗證。
 - 舊分支的測試（`test_jobs.py`、`test_values.py`）能不能直接搬，沒有確認。
