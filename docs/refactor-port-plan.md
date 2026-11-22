@@ -76,10 +76,10 @@
 ### E. 重構本體（`leihu/` 套件、ml-worker）
 | # | commit | 內容 | 初判 | 備註 |
 |---|---|---|---|---|
-| 11 | `90d0357` | 步驟 1：`app.py` 拆成 `leihu/web` Blueprint | 重做 | 2.3.2 的 `app.py` 和 2.0.0 差很多，沒辦法 cherry-pick |
-| 12 | `3d0fd5f` | 步驟 2：值物件、`update_song`、背景工作佇列 | 重做 | 上游 2.2.0 之後已經有自己的佇列和優先處理 |
-| 13 | `c84046a` | 步驟 3：ml-worker、外部網址、伺服器記憶體 | 重做 | 沿用上游 `gpu_worker.py`，不做 ml-worker（3.6）；只評估非 ml-worker 部分 |
-| 21 | `7247929` | 步驟 4：拆出 config、dsp、media、lyrics、llm、render | 重做 | |
+| 11 | `90d0357` | 步驟 1：`app.py` 拆成 `leihu/web` Blueprint | 重做 | 2.3.2 的 `app.py` 和 2.0.0 差很多，沒辦法 cherry-pick；已完成（3.19） |
+| 12 | `3d0fd5f` | 步驟 2：值物件、`update_song`、背景工作佇列 | 不做 | 不做：上游 2.3.2 已有 `meta.json` 的鎖、原子寫入、`update_meta` 和佇列；API 變更與補鎖延後：會改變行為（3.19） |
+| 13 | `c84046a` | 步驟 3：ml-worker、外部網址、伺服器記憶體 | 不做 | 沿用上游 `gpu_worker.py`，不做 ml-worker（3.6）；其餘部分已做、不做或延後（3.19） |
+| 21 | `7247929` | 步驟 4：拆出 config、dsp、media、lyrics、llm、render | 重做 | 改用：只拆上游 v1.6 以來沒改過的純運算（音高後處理、歌詞文字），原因：上游常改 `pipeline.py`，整個拆開同步成本太高（3.19） |
 | 22 | `34b292d` | BS-Roformer 補強 | 待查 | HF 網址上游 2.2.0 `d2e7e44` 已修；失敗退回上游 `pipeline.py:2063` 起已有兩層；剩 auto 模式 6 GB 門檻要查 |
 | 45 | `07c4be0` | 拆 `read_sheet`、`sheet.render` | 併入 | 跟步驟 4 一起 |
 
@@ -464,10 +464,29 @@ Codex 第 7 次審查後補的（同類問題和繞過路徑）：
 - 速度修正，依 3.1 本來要延後；開啟太慢影響使用，決定這版做。
 - 2026-11-22 量測：沒有練唱台在跑時從 22.01 秒變 0.51 秒；練唱台在 8767 時 0.53 秒找到。測試在 `tests/test_desktop_ports.py`。
 
+### 3.19 E 組進度（2026-11-22）
+- **步驟 1（`app.py` 拆成 `leihu/web` Blueprint）**：完成。路由依功能分成 8 個 Blueprint，共用狀態在 `leihu/web/common.py`，啟動時的背景工作在 `leihu/web/background.py`；程式原封搬移，只把 `@app.X` 改成 `@bp.X`（錯誤處理、`before_request` 用 `app_` 版本），`app.static_folder`、`app.response_class` 改用 `current_app`。`app.py` 只建立 app 和 `main()`，`main()` 照舊用 `app` 模組裡的名稱呼叫背景工作（契約沙盒從這裡替換），測試用到的 `app.<名稱>` 由 `app.py` 轉出。
+  - 驗證：94 條路由的網址、方法、函式名稱和拆檔前相同；`uv run pytest` 通過；契約比對（`compare_upstream.py`，1 次）141 個案例和快照相同、異常「無」，沙盒的 8 個背景工作都有替換到。數值、效能基準沒有重跑：這一步不碰 `pipeline.py`。
+  - 拆檔的風險逐項查過：`leihu/web` 沒有 `global` 重新指派（跨檔共用的都是同一個物件）；`current_app` 只在路由裡用；沒有用到 `url_for`、`request.endpoint`（Blueprint 會改 endpoint 名稱）。
+- **步驟 2（值物件、`update_song`、背景工作佇列）**：不做。
+  - 上游 2.3.2 已有：`meta.json` 讀寫共用 `_META_LOCK`、先寫暫存檔再取代、鎖內讀改寫的 `update_meta`；`Jobs` 的 Condition、取消、優先處理、全部暫停。
+  - 延後（會改變行為）：舊 commit 的 API 變更 D1–D6（KEY 不合法回 400、刪除處理中的歌回 400 等）；`step_import`（`pipeline.py:1395`）讀改寫 `meta.json` 沒有上鎖，是上游既有的並行問題。
+  - 不做：值物件、把 `Jobs` 搬出 `pipeline`。不改行為，但要動 `pipeline.py`，以後同步上游要對應的地方變多（3.4 第 3 點），效益不夠。
+- **步驟 3 的非 ml-worker 部分**：這個版本不實作。
+  - 已做：`LIANTAI_NO_JOBS` 從 `LIANTAI_NO_BACKGROUND` 拆出（C 組 S28）；數值比對工具（D 組，改成配合 `gpu_worker`，`child_hook.py` 取代 `worker_nodither.py`；`measure_r4.py` 不搬）。
+  - 延後（效能調整，3.8 第二階段）：伺服器不載入 librosa、scipy、numba（`leihu/dsp.py`、soxr）。伺服器行程的 `read_audio`、`_block_power`、`separate_dsp`、`shift_audio`、`share._resample`、`share.peak_limit` 會載入它們；改用 soxr 重新取樣的結果不同（舊 commit 寫人聲頻段差 < −50 dB），不是行為等價。`test_server_memory` 一起延後。
+  - 不做：`LIANTAI_URL_BASE` 與背景工作契約快照（`fake_net.py`、`contract_jobs.json`）。沒設定時行為不變，但要改 `pipeline.py` 約 12 處外部網址（LRCLIB、網易雲、酷狗、GitHub 更新），同步上游的成本大於讓測試離線跑歌詞搜尋、更新檢查的好處（3.4 第 3 點）。
+- **步驟 4（拆 `pipeline.py`）**：改用只拆穩定區塊。
+  - 依據：`v2.0.0`～`v2.3.2`（10 天）上游有 25 個 commit 改 `pipeline.py`；從 `v1.6` 算起 40 個 commit，沒改過的定義只占 26% 的行數。最常改的是 `Jobs`、`USER_AGENT`、`process_song`、`DEFAULT_CONFIG`、`separate_uvr`，舊步驟 4 的 config、dsp、media、lyrics 每一類都有。
+  - 搬出去的（`v1.6` 以來沒改過、只依賴標準函式庫和 numpy）：`leihu/pitch.py`（`bridge_gaps`、`octave_low_score`、`fix_octaves`、`trim_glides`、`clean_pitch`、`segment_notes`，連同 `PITCH_SR`、`HOP`、`HOP_S`）；`leihu/lyrics_text.py`（`fmt_lrc_time`、`parse_lrc`、`to_lrc`、`lyric_queries`、`to_simplified`、`clean_lrc`、`_norm`、`similarity`、`srt_to_lrc`、`align_to_recognized`，連同 `_NOISE`、`_CREDIT`）。21 個定義的 AST 和搬移前相同，`pipeline` 只多了轉出這些名稱的 import，`P.<名稱>` 拿到的是同一個物件。
+  - 沒搬的：假名（`tw_to_ja` 用 `log_error`，`furigana` 用安裝狀態 `_kana_lock`、`_KANA_TK`）、`align_by_voice`（用上游常改的 `voice_phrases`）、線上歌詞搜尋（測試會替換 `P._http_json`）、`gpu_worker` 用到的名稱。測試或沙盒會替換的 `P.<名稱>` 都留在 `pipeline`：搬走的話，搬過去的模組直接呼叫它，替換就會靜默失效。
+  - 安裝檔：`build.sh` 改成複製 `leihu/*.py`。
+  - 驗證：`uv run pytest` 通過，ruff 違規數和步驟 1 後相同；契約比對 141 個案例和快照相同、異常「無」；數值基準只跑合成素材 1 次（測試計畫只有 numeric、沒有真實歌曲），和 `f3bf3df` 逐檔核對 14／14 個檔案完全相同、異常「無」。效能基準沒有重跑：搬的是同一份程式碼，只多一層 import。
+
 ## 4. 要先決定的事
 - 舊分支要留著（唯讀）還是封存成 tag，`claude/original-refactor-behavior-comparison-d469de` 也一樣。在搬完之前不要刪。
 - 測試歌曲的清單和授權（3.8）。
-- 延後到後面版本的項目（會改變行為，3.1）：`pipeline.py` 缺 `import subprocess`（3.11）、S31、`_set_priority`（3.6）、長音訊旋律分析逾時放寬（3.6）、M3、M6、M7、S8、O21、S19（3.13）、69 和 70 不屬於防止資料遺失的部分；C、F 組其餘逐項確認後補列。
+- 延後到後面版本的項目（會改變行為，3.1）：`pipeline.py` 缺 `import subprocess`（3.11）、步驟 2 的 API 變更 D1–D6 與 `step_import` 補鎖（3.19）、步驟 3 的伺服器不載入 librosa／scipy／numba（效能調整，3.19）、S31、`_set_priority`（3.6）、長音訊旋律分析逾時放寬（3.6）、M3、M6、M7、S8、O21、S19（3.13）、69 和 70 不屬於防止資料遺失的部分；C、F 組其餘逐項確認後補列。
 - 上游 `gpu_worker` 的主程式備援（`_local`）要保留還是拿掉：保留則子程式壞了仍能處理歌曲，但伺服器會載入 torch；拿掉則遵守「伺服器不載入 torch」，子程式壞了就不能處理（3.6）。拿掉會改變行為，依 3.1 屬於後面的版本，這個版本先保留。
 
 ## 5. 沒有驗證的部分

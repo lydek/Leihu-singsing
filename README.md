@@ -46,6 +46,7 @@ sh installer/build.sh
 | `leihu/web/` | 本機伺服器的路由（Flask Blueprint，依功能分檔）與共用狀態 |
 | `desktop.py` | 桌面視窗（pywebview），伺服器在另一個行程執行 |
 | `pipeline.py` | 分軌、音高、歌詞辨識、線上歌詞搜尋、歌曲庫 |
+| `leihu/pitch.py`、`leihu/lyrics_text.py` | 音高曲線後處理；LRC／SRT 轉換、歌詞清理與比對（`pipeline.py` 轉出同樣的名稱） |
 | `claude_api.py` | 呼叫 Claude 並記錄 token 用量與費用 |
 | `share.py` | 錄音混音、匯出音訊、直式影片與成績卡 |
 | `installer.py` | 安裝時偵測顯示卡、安裝套件、下載模型 |
