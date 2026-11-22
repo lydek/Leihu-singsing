@@ -74,6 +74,8 @@ OWN_CHANGES: list[tuple[str, str]] = [
     ("installer/leihu.nsi", r"[-+](OutFile|InstallDir|VIProductVersion) .*"),
     ("installer/leihu.nsi", r"\+\s*File(Open|Write|Close) \$0.*"),
     ("installer/leihu.nsi", r"\+\s*Delete \"\$INSTDIR\\\.test-install\""),
+    # E 組步驟 1：程式拆到 leihu/，修復與解除安裝時清掉舊的（3.19）
+    ("installer/leihu.nsi", r"\+\s*RMDir /r \"\$INSTDIR\\leihu\""),
 ]
 
 # 伺服器 log 裡代表「這次執行條件和平常不同」的訊息：一律列進報告，不然結果會被誤解
