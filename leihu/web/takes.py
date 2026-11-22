@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import math
 import time
 import uuid
 
@@ -24,16 +25,23 @@ def add_take(sid):
     f = request.files.get("file")
     if not f:
         raise P.UserError("沒有收到錄音")
+    # fork（D3）：存錄音檔之前先驗證。不是數字原本回 500，超出範圍照存（之後評分可能除以零）
+    try:
+        start, duration = float(request.form.get("start", 0)), float(request.form.get("duration", 0))
+        key, speed = int(request.form.get("key", 0)), float(request.form.get("speed", 1))
+    except (TypeError, ValueError):
+        raise P.UserError("錄音的開始時間、長度、KEY 或速度格式不正確") from None
+    if not (math.isfinite(start) and math.isfinite(duration) and start >= 0 and duration >= 0):
+        raise P.UserError("錄音的開始時間或長度不正確")
+    if not -6 <= key <= 6 or not 0.5 <= speed <= 1.5:
+        raise P.UserError("KEY 範圍是 ±6，速度範圍是 50%–150%")
     td = d / "takes"
     td.mkdir(exist_ok=True)
     tid = time.strftime("%Y%m%d-%H%M%S") + "-" + uuid.uuid4().hex[:4]
     f.save(td / f"{tid}.wav")
     info = {
         "id": tid, "created": time.time(), "status": "scoring",
-        "start": float(request.form.get("start", 0)),
-        "key": int(request.form.get("key", 0)),
-        "speed": float(request.form.get("speed", 1)),
-        "duration": float(request.form.get("duration", 0)),
+        "start": start, "key": key, "speed": speed, "duration": duration,
     }
     P.atomic_write_text(td / f"{tid}.json", json.dumps(info, ensure_ascii=False))
     jid = jobs.submit("take", sid, lambda report: _score(d, tid, report), label=tid)

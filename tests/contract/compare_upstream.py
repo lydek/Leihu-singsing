@@ -61,6 +61,28 @@ RULES: list[tuple[str, str, object]] = [
         lambda c, d: c in ("status_end", "status_live", "status_override", "status_paused")
         and d.startswith(("~ /body/jobs: ", "~ /body/queued_total: ")),
     ),
+    (
+        "S15",
+        "下一版第 3 批：404、405、400（壞掉的 JSON）等 HTTP 錯誤改回 {\"error\": \"請求失敗（代碼）\"}，不回 HTML；"
+        "狀態碼不變（docs/next-version-plan.md）",
+        lambda c, d: re.fullmatch(r'~ /content_type: "(application/json|text/html; charset=utf-8)" -> '
+                                  r'"(application/json|text/html; charset=utf-8)"', d) is not None
+        or re.fullmatch(r'[+-] /body=\{"error": "請求失敗（[0-9]{3}）"\}', d) is not None,
+    ),
+    (
+        "D1",
+        "下一版第 3 批：PATCH 歌曲帶不合法的 KEY（文字、1.5、true）回 400，不再悄悄存成 0（docs/next-version-plan.md）",
+        lambda c, d: c in ("song_patch_key_text", "song_patch_key_float", "song_patch_key_bool")
+        and re.match(r"(~ /status: (400 -> 200|200 -> 400)|[+-] /body/|[+-] /files/DATA/~library/songnew001/meta\.json=)", d)
+        is not None,
+    ),
+    (
+        "D1-後續",
+        "D1 的連帶差異：上面三個案例不再把 songnew001 的 KEY 改成 0，之後案例讀到的 KEY 維持 2",
+        lambda c, d: re.fullmatch(
+            r"~ (/body(\[\d+\])?|/files/DATA/~library/songnew001/meta\.json)/key: (2 -> 0|0 -> 2)", d
+        ) is not None,
+    ),
 ]
 
 # 刻意不移植的上游名稱 → 原因（refactor 從 v2.3.2 開始，目前沒有）

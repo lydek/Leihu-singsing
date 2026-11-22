@@ -1,7 +1,10 @@
 """只給本機用的檢查（Host、Origin、功能開關、搬移中擋寫入）與錯誤格式。"""
 from __future__ import annotations
 
-from flask import Blueprint, abort, jsonify, request
+import sys
+
+from flask import Blueprint, abort, current_app, jsonify, request
+from werkzeug.exceptions import HTTPException
 
 import pipeline as P
 
@@ -13,6 +16,23 @@ bp = Blueprint("security", __name__)
 @bp.app_errorhandler(P.UserError)
 def user_error(e):
     return jsonify(error=str(e)), 400
+
+
+@bp.app_errorhandler(HTTPException)
+def http_error(e):
+    """fork（S15）：404、405 等也回 {error}，不回 HTML；狀態碼和 Allow 等標頭照舊。"""
+    resp = e.get_response()
+    resp.set_data(current_app.json.dumps({"error": f"請求失敗（{e.code}）"}))
+    resp.content_type = "application/json"
+    return resp
+
+
+@bp.app_errorhandler(Exception)
+def unhandled_error(e):
+    """fork（S15）：沒處理到的例外回 500 {error}。traceback 照舊經 app.logger 寫進 app.log，另記 log_error。"""
+    current_app.log_exception(sys.exc_info())
+    P.log_error(f"{request.method} {request.path}", e)
+    return jsonify(error="請求失敗（500）"), 500
 
 
 @bp.before_app_request

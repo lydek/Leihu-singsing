@@ -283,6 +283,8 @@ def rename(sid):
         changes["title_locked"] = True
     if "key" in body:   # 預設 KEY：打開這首歌時自動切到這個 KEY，並先做好移調版本
         k = P.parse_key(body.get("key"))
+        if k is None and str(body.get("key") or "").strip():   # fork（D1）：空白＝清除；寫錯的值不再悄悄存成 0
+            raise P.UserError("KEY 範圍是 ±6")
         changes.update(key=k or 0, key_set_at=time.time())
     if "lyrics_flag" in body:   # 歌詞待修標記（直播中發現不準先標起來，下播再處理）
         changes["lyrics_flag"] = bool(body.get("lyrics_flag"))

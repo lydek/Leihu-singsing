@@ -61,9 +61,9 @@
 | 4 | `a142c98` | 環境變數覆寫 S28、import 副作用 S31 | 重做 | 2.3.2 新增了 `library_dir`、`models_dir`，覆寫順序要重新設計。S31 延後：會改變行為（import 時的 `SetErrorMode`、`ffmpeg_path()` 搬走） |
 | 5 | `e2168c4` | M1–M7 修正與回歸測試 | 重做 | M4、M5 這版做；M1/M2 不做；M3 延後（3.13）；M7 下一版第 2 批已修；M6 下一版第 1 批已修（`next-version-plan.md`） |
 | 6 | `7ee7791` | R1–R3 資源浪費 | 不做 | R1（具名 mutex 判斷已有執行個體）不做：慢的問題 3.18 已用同時檢查連接埠解決；延後：效能調整（R2 `/api/status` 不 import torch、R3 `OPENBLAS_NUM_THREADS`）（3.20） |
-| 7 | `da59e07` | 錯誤格式統一 S15 | 重做 | 延後：會改變行為（錯誤回應的內容）；以後做時，2.3.2 新增的路由要一起統一 |
+| 7 | `da59e07` | 錯誤格式統一 S15 | 重做 | 延後：會改變行為（錯誤回應的內容）；以後做時，2.3.2 新增的路由要一起統一；下一版第 3 批已修（`next-version-plan.md`） |
 | 9 | `dee8f6b` | 步驟 0 審查修正 | 不做 | R1 接手跟著 #6 不做；`claude_api.record` 寫檔失敗照常回傳已在 C 組 M5 做（3.13）；試聽檔在錄音刪除後才寫和 M7 同類，延後：會改變行為（3.20）；下一版第 2 批已修（`next-version-plan.md`） |
-| 10 | `dfcb0b9` | yt-dlp 取消／逾時、檢查碼、pip 逾時、`safe_name` 合併 | 重做 | 檢查碼（O12–O14）這版做；S8、O21、S19 延後（3.13） |
+| 10 | `dfcb0b9` | yt-dlp 取消／逾時、檢查碼、pip 逾時、`safe_name` 合併 | 重做 | 檢查碼（O12–O14）這版做；S8、O21、S19 延後（3.13）；S19 下一版第 3 批查過後仍延後（`next-version-plan.md`） |
 
 ### D. 契約快照與比對工具
 | # | commit | 內容 | 初判 | 備註 |
@@ -79,7 +79,7 @@
 | # | commit | 內容 | 初判 | 備註 |
 |---|---|---|---|---|
 | 11 | `90d0357` | 步驟 1：`app.py` 拆成 `leihu/web` Blueprint | 重做 | 2.3.2 的 `app.py` 和 2.0.0 差很多，沒辦法 cherry-pick；已完成（3.19） |
-| 12 | `3d0fd5f` | 步驟 2：值物件、`update_song`、背景工作佇列 | 不做 | 上游 2.3.2 已有 `meta.json` 的鎖、原子寫入、`update_meta` 和佇列；延後：會改變行為（`step2-plan.md` 的 API 變更 D1–D6、`step_import` 補鎖，3.19）；D2、D4、D6、`step_import` 補鎖下一版第 2 批已修（`next-version-plan.md`） |
+| 12 | `3d0fd5f` | 步驟 2：值物件、`update_song`、背景工作佇列 | 不做 | 上游 2.3.2 已有 `meta.json` 的鎖、原子寫入、`update_meta` 和佇列；延後：會改變行為（`step2-plan.md` 的 API 變更 D1–D6、`step_import` 補鎖，3.19）；D2、D4、D6、`step_import` 補鎖下一版第 2 批已修，D1、D3 下一版第 3 批已修，D5 延後（`next-version-plan.md`） |
 | 13 | `c84046a` | 步驟 3：ml-worker、外部網址、伺服器記憶體 | 不做 | 沿用上游 `gpu_worker.py`，不做 ml-worker（3.6）；延後：效能調整（伺服器不載入 librosa／scipy／numba，3.19）；`LIANTAI_URL_BASE` 不做；`LIANTAI_NO_JOBS`、數值比對工具已做（3.19） |
 | 21 | `7247929` | 步驟 4：拆出 config、dsp、media、lyrics、llm、render | 重做 | 改用：只拆上游 v1.6 以來沒改過的純運算（音高後處理、歌詞文字），原因：上游常改 `pipeline.py`，整個拆開同步成本太高（3.19） |
 | 22 | `34b292d` | BS-Roformer 補強 | 延後 | HF 網址上游 2.2.0 已修；主唱與合音分離失敗退回、讓位（`JobDeferred` 是 `JobCancelled` 的子類別）不標壞混合精度，上游都已有；延後：會改變行為（第一段分離的兩層退回、auto 模式 6 GB 門檻）（3.20） |
@@ -562,7 +562,7 @@ Codex 第 7 次審查後補的（同類問題和繞過路徑）：
 ## 4. 要先決定的事
 - 舊分支要留著（唯讀）還是封存成 tag，`claude/original-refactor-behavior-comparison-d469de` 也一樣。在搬完之前不要刪。
 - 測試歌曲的清單和授權（3.8）。
-- 延後到後面版本的項目（會改變行為，3.1）：`pipeline.py` 缺 `import subprocess`（3.11，下一版第 1 批已修）、步驟 2 的 API 變更（`step2-plan.md` 的 D1–D6）與 `step_import` 補鎖（3.19；D2、D4、D6、`step_import` 下一版第 2 批已修）、步驟 3 的伺服器不載入 librosa／scipy／numba（效能調整，3.19）、S31、長音訊旋律分析逾時放寬（3.6）、M3、M7（下一版第 2 批已修）、S8、O21、S19（3.13）、69、70（3.20）、6 的 R2／R3、9 的試聽檔（下一版第 2 批已修）、22 的第一段退回與 6 GB 門檻、36 的建議與可選、38 的 `.partK`／PowerShell 路徑／濾波分段、68 的主唱補回與移調互斥（3.20，下一版第 2 批已修）；C、F 組其餘逐項確認後補列。
+- 延後到後面版本的項目（會改變行為，3.1）：`pipeline.py` 缺 `import subprocess`（3.11，下一版第 1 批已修）、步驟 2 的 API 變更（`step2-plan.md` 的 D1–D6）與 `step_import` 補鎖（3.19；D2、D4、D6、`step_import` 下一版第 2 批已修，D1、D3 下一版第 3 批已修）、步驟 3 的伺服器不載入 librosa／scipy／numba（效能調整，3.19）、S31、長音訊旋律分析逾時放寬（3.6）、M3、M7（下一版第 2 批已修）、S8、O21、S19（3.13）、69、70（3.20）、6 的 R2／R3、9 的試聽檔（下一版第 2 批已修）、22 的第一段退回與 6 GB 門檻、36 的建議與可選、38 的 `.partK`／PowerShell 路徑／濾波分段、68 的主唱補回與移調互斥（3.20，下一版第 2 批已修）；C、F 組其餘逐項確認後補列。
 - 上游 `gpu_worker` 的主程式備援（`_local`）要保留還是拿掉：保留則子程式壞了仍能處理歌曲，但伺服器會載入 torch；拿掉則遵守「伺服器不載入 torch」，子程式壞了就不能處理（3.6）。拿掉會改變行為，依 3.1 屬於後面的版本，這個版本先保留。
 
 ## 5. 沒有驗證的部分
