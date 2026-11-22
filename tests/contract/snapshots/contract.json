@@ -450,6 +450,7 @@
     "duration": 2.0,
     "fine_queued": true,
     "id": "songnew001",
+    "kana_at": {},
     "kana_fix": {
      "今日": "きょう"
     },
@@ -544,6 +545,11 @@
      "label": "下一句對準"
     },
     {
+     "default": "",
+     "id": "prev-line",
+     "label": "上一句對準"
+    },
+    {
      "default": "Ctrl+Alt+Comma",
      "id": "minus",
      "label": "目前這句提早 0.1 秒"
@@ -595,7 +601,8 @@
     "now": "Ctrl+Alt+A",
     "pause-all": "Ctrl+Alt+P",
     "play": "Ctrl+Alt+Space",
-    "plus": "Ctrl+Alt+Period"
+    "plus": "Ctrl+Alt+Period",
+    "prev-line": ""
    },
    "enabled": true,
    "status": null
@@ -642,7 +649,8 @@
     "now": "Ctrl+Alt+A",
     "pause-all": "Ctrl+Alt+P",
     "play": "Ctrl+Alt+Space",
-    "plus": "Ctrl+Alt+Period"
+    "plus": "Ctrl+Alt+Period",
+    "prev-line": ""
    }
   },
   "content_type": "application/json",
@@ -669,7 +677,8 @@
      "now": "Ctrl+Alt+A",
      "pause-all": "Ctrl+Alt+P",
      "play": "Ctrl+Alt+Space",
-     "plus": "Ctrl+Alt+Period"
+     "plus": "Ctrl+Alt+Period",
+     "prev-line": ""
     },
     "karaoke_model": "UVR_MDXNET_KARA_2.onnx",
     "karaoke_overlap": 2,
@@ -776,7 +785,8 @@
      "now": "Ctrl+Alt+A",
      "pause-all": "Ctrl+Alt+P",
      "play": "Ctrl+Alt+Space",
-     "plus": "Ctrl+Alt+Period"
+     "plus": "Ctrl+Alt+Period",
+     "prev-line": ""
     },
     "karaoke_model": "UVR_MDXNET_KARA_2.onnx",
     "karaoke_overlap": 2,
@@ -832,7 +842,8 @@
      "now": "Ctrl+Alt+A",
      "pause-all": "Ctrl+Alt+P",
      "play": "Ctrl+Alt+Space",
-     "plus": "Ctrl+Alt+Period"
+     "plus": "Ctrl+Alt+Period",
+     "prev-line": ""
     },
     "karaoke_model": "UVR_MDXNET_KARA_2.onnx",
     "karaoke_overlap": 2,
@@ -862,6 +873,7 @@
  },
  "kana": {
   "body": {
+   "kana_at": {},
    "kana_fix": {
     "今日": "きょう"
    }
@@ -884,6 +896,7 @@
     "created": 1577836800.0,
     "duration": 2.0,
     "id": "songnew001",
+    "kana_at": {},
     "kana_fix": {
      "今日": "きょう"
     },
@@ -943,6 +956,7 @@
     "created": 1577836800.0,
     "duration": 2.0,
     "id": "songnew001",
+    "kana_at": {},
     "kana_fix": {
      "今日": "きょう"
     },
@@ -1038,6 +1052,7 @@
  "lyrics_get": {
   "body": {
    "auto": "[00:00.20]辨識第一句\n[00:01.10]辨識第二句\n",
+   "kana_at": {},
    "kana_fix": {},
    "language": null,
    "lrc": "[00:00.20]第一句\n[00:01.10]第二句\n",
@@ -1078,6 +1093,7 @@
     "created": 1577836800.0,
     "duration": 2.0,
     "id": "songnew001",
+    "kana_at": {},
     "kana_fix": {
      "今日": "きょう"
     },
@@ -1121,6 +1137,7 @@
  "lyrics_old_get": {
   "body": {
    "auto": "",
+   "kana_at": {},
    "kana_fix": {},
    "language": null,
    "lrc": "[00:00.20]第一句\n[00:01.10]第二句\n",
@@ -1140,6 +1157,7 @@
  "lyrics_old_get_again": {
   "body": {
    "auto": "",
+   "kana_at": {},
    "kana_fix": {},
    "language": null,
    "lrc": "[00:00.20]第一句\n[00:01.10]第二句\n",
@@ -1179,6 +1197,7 @@
     "created": 1577836800.0,
     "duration": 2.0,
     "id": "songnew001",
+    "kana_at": {},
     "kana_fix": {
      "今日": "きょう"
     },
@@ -1247,6 +1266,7 @@
     "created": 1577836800.0,
     "duration": 2.0,
     "id": "songnew001",
+    "kana_at": {},
     "kana_fix": {
      "今日": "きょう"
     },
@@ -1772,6 +1792,7 @@
     "duration": 2.0,
     "fine_queued": true,
     "id": "songnew001",
+    "kana_at": {},
     "kana_fix": {
      "今日": "きょう"
     },
@@ -2798,6 +2819,7 @@
     "duration": 2.0,
     "fine_queued": true,
     "id": "songnew001",
+    "kana_at": {},
     "kana_fix": {
      "今日": "きょう"
     },
@@ -4315,7 +4337,8 @@
      "now": "Ctrl+Alt+A",
      "pause-all": "Ctrl+Alt+P",
      "play": "Ctrl+Alt+Space",
-     "plus": "Ctrl+Alt+Period"
+     "plus": "Ctrl+Alt+Period",
+     "prev-line": ""
     },
     "karaoke_model": "UVR_MDXNET_KARA_2.onnx",
     "karaoke_overlap": 2,
