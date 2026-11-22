@@ -5,7 +5,7 @@ ManifestDPIAware true
 !include "x64.nsh"
 !include "LogicLib.nsh"
 
-!define VERSION "2.3.3.1"
+!define VERSION "2.3.4.1"
 !ifdef TEST_BUILD
   ; 測試版（LEIHU_TEST=1 sh installer/build.sh）：名稱、安裝位置、登錄檔都和正式版不同，兩個可以裝在同一台電腦
   !define APPNAME "雷虎練唱台 測試版"
@@ -25,7 +25,7 @@ InstallDirRegKey HKCU "${REGKEY}" "InstallLocation"
 RequestExecutionLevel user
 SetCompressor /SOLID lzma
 BrandingText "${APPNAME} ${VERSION}"
-VIProductVersion "2.3.3.1"
+VIProductVersion "2.3.4.1"
 VIAddVersionKey /LANG=1028 "ProductName" "${APPNAME}"
 VIAddVersionKey /LANG=1028 "FileDescription" "${APPNAME} ${VERSION} 安裝程式"
 VIAddVersionKey /LANG=1028 "FileVersion" "${VERSION}"
