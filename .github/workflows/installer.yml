@@ -17,6 +17,7 @@ on:
       - "setup/**"
       - "static/**"
       - "*.py"
+      - "leihu/**"
       - "VERSION"
       - "requirements-win.txt"
       - ".gitattributes"
