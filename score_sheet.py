@@ -77,7 +77,8 @@ def _chunks(line: dict, notes: list, max_chars: int, max_span: float) -> list[di
             out.append((a, b))
             continue
         # 候選切點：字與字之間（沒有逐字時間就用音符之間）
-        cuts = [c["t"] for c in cs[1:]] or [n[0] for n in notes if a + 0.5 < n[0] < b - 0.5]
+        # fork（M6）：字的時間等於段落起點時不能當切點，否則切出空段後又處理同一段，無限迴圈
+        cuts = [c["t"] for c in cs[1:] if c["t"] > a] or [n[0] for n in notes if a + 0.5 < n[0] < b - 0.5]
         if not cuts:
             out.append((a, b))
             continue
