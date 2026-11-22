@@ -40,6 +40,8 @@ fork 對上游後端檔案的修改（同步時 3.21 步驟 4 要確認沒被蓋
 | D2、D4（含 28 的 A2、A5） | `leihu/web/library.py` 的 `delete_song`；`pipeline.Jobs` 新增 `song_running`、`cancel_song`；`static/app.js` 的刪除按鈕（登記在 `OWN_CHANGES`） | 這首歌有工作在執行、或正在預先下載時，刪除回 400（`{error}`），排隊中的工作照舊；確定要刪才把兩條佇列裡這首歌排隊中的工作改成已取消，不再列在 `/api/status`。前端刪除失敗時顯示錯誤 | `tests/test_jobs.py` 的 `test_delete_*`；契約快照的差異登記成 `RULES` 的 `D4`（`status_*` 案例少了被刪的兩首歌的工作） |
 | D6、68 | `pipeline.Jobs` 新增 `wait_for`、`stems_busy`；`leihu/web/common.py` 的 `vjobs` | 同一首歌在 `jobs` 有會重寫分軌的工作在執行（匯入、分離、主唱補回；只重做旋律、歌詞的不算）時，這首的移調先跳過、狀態寫「等這首歌的分軌處理完」，做完後最多 5 秒內開始；別首歌的移調照常。只擋這個方向：移調已經在跑時開始的分軌不等（移調通常幾十秒，分軌最後才寫檔；分軌後舊 KEY 版本失效是第 6 批） | `tests/test_jobs.py` 的 `test_variant_*`、`test_queued_stem_job_does_not_block_variant` |
 
+數值基準（CPU，開發機，2026-11-23）：第 2 批動到評分（`score_take` 寫檔）和匯入（`step_import`），`tests/numeric/run.py` 會跑這兩個。用 `tests/private/plans/refactor.json` 各跑 1 次：`baseline.py v2.3.4.1 --label=desktop-9900x3d-cpu`（1100.6 秒）和 `baseline.py 4262dda --label=desktop-9900x3d-cpu --against=v2.3.4.1`（1097.5 秒），兩邊每一步實際都在 CPU 上，異常都是「無」，逐檔核對 38／38 個檔案完全相同。摘要在 `tests/numeric/baselines/v2.3.4.1-desktop-9900x3d-cpu-refactor.json`、`4262dda-desktop-9900x3d-cpu-refactor.json`；`v2.3.4.1` 這份也是第 5、6、7 批開始前要對照的 CPU 數值基準（第 2 節表下說明）。只跑 1 次，同一版的穩定性沒有判定，靠和 `v2.3.4.1` 逐檔相同確認。
+
 ## 4. 還沒確認的
 
 - 28（審查修正 A–F）只拆出 A2、A5（第 2 批已做），其餘沒有逐項拆開；36 的「建議與可選」各小項（佇列、下載、歌單、匯出影片、`LIANTAI_PORT` 等，目前只把重疊處理 OOM 放在第 5 批）、70 的 `cancel_song`、`on_cancel` 只依 commit 說明判斷（3.20）。開始第 4、5、6 批之前要逐行看 diff（第 2 批開始前看過 28、70 的 commit 說明：70 的 `cancel_song`、`on_cancel` 是舊分支 `leihu/jobs.py` 的，目前的 `Jobs` 沒有 `on_cancel`，不適用）；看完 36 的各小項，再分到對應批次。
