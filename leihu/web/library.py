@@ -224,6 +224,7 @@ def mixdown(sid):
     out = P.unique_path(P.downloads_dir() / P.APP_NAME / f"{_safe_name(meta.get('title', '歌曲'))[:50]}_{vname}_{kname}{sname}.{fmt}")
 
     def run(report):
+        d = P.song_dir(sid)   # fork（70）：開始時才取路徑（排隊期間可能搬移了歌曲庫）
         if not P.variant_ready(d, key, speed):   # fork（70）：排隊期間分軌改過、這個 KEY 版本失效了
             raise P.UserError("這個 KEY／速度的版本已經過期，請重新播放一次再匯出")
         report("混音中", 0.2)
@@ -247,16 +248,18 @@ def mixdown(sid):
 
 @bp.get("/api/songs/<sid>")
 def song(sid):
-    d = P.song_dir(sid)
-    meta = P.read_meta(d)
-    if time.time() - (meta.get("last_opened") or 0) > 3600:   # 記下最近開過的時間（大量重新處理時常唱的先做）
-        meta = P.update_meta(d, last_opened=time.time())
-    if "acapella" not in meta and P.stem_path(d, "inst").exists() and P.stem_path(d, "lead").exists():
-        meta = P.update_meta(d, acapella=P.is_acapella(d))   # 舊歌曲補上清唱判斷
-    if meta.get("lufs") is None and meta.get("steps", {}).get("import"):
-        meta = P.measure_loudness(d)   # 舊歌曲第一次開啟時補量響度（約 1 秒）
-    if meta.get("steps", {}).get("separate"):
-        meta = P.measure_stem_loudness(d)   # 各音軌組合的響度（只算一次，分軌重新處理後重算）
+    # fork（70）：搬移中只讀，下面這些補寫到舊位置，搬完就不見了（下次開啟再補）；沒在搬移時登記成寫入者
+    with P.library_write_slot() as w:
+        d = P.song_dir(sid)
+        meta = P.read_meta(d)
+        if w and time.time() - (meta.get("last_opened") or 0) > 3600:   # 記下最近開過的時間（大量重新處理時常唱的先做）
+            meta = P.update_meta(d, last_opened=time.time())
+        if w and "acapella" not in meta and P.stem_path(d, "inst").exists() and P.stem_path(d, "lead").exists():
+            meta = P.update_meta(d, acapella=P.is_acapella(d))   # 舊歌曲補上清唱判斷
+        if w and meta.get("lufs") is None and meta.get("steps", {}).get("import"):
+            meta = P.measure_loudness(d)   # 舊歌曲第一次開啟時補量響度（約 1 秒）
+        if w and meta.get("steps", {}).get("separate"):
+            meta = P.measure_stem_loudness(d)   # 各音軌組合的響度（只算一次，分軌重新處理後重算）
     meta["norm_gain_db"] = P.norm_gain_db(meta)
     meta["norm_target"] = P.TARGET_LUFS
     meta["norm_range"] = [P.NORM_MIN_DB, P.NORM_MAX_DB]
@@ -364,7 +367,7 @@ def variant(sid):
     label = f"{key}:{speed}"
     vjobs.cancel_queued("variant", sid, label)   # 連按時，中間不要的 KEY 不用再算
     jid = vjobs.find("variant", sid, label) or vjobs.submit(
-        "variant", sid, lambda report: P.step_variant(d, key, speed, report), label=label)
+        "variant", sid, lambda report: P.step_variant(P.song_dir(sid), key, speed, report), label=label)  # 開始時才取路徑（搬移歌曲庫）
     return jsonify(ready=False, job=jid)
 
 

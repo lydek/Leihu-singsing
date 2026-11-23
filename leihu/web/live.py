@@ -293,12 +293,14 @@ def setlist_add():
         if not (last and last["id"] == item["id"] and now - last["t"] < 600):   # 同一首十分鐘內不重複記
             d["items"].append(item)
             try:
-                sd = P.song_dir(item["id"])
-                with P._META_LOCK:
-                    m = P.read_meta(sd)
-                    m["sung"] = (m.get("sung") or 0) + 1
-                    m["last_sung"] = now
-                    P.write_meta(sd, m)
+                with P.library_write_slot() as w:   # fork（70）：搬移中只記在歌單裡，次數寫到舊位置搬完會不見
+                    if w:
+                        sd = P.song_dir(item["id"])
+                        with P._META_LOCK:
+                            m = P.read_meta(sd)
+                            m["sung"] = (m.get("sung") or 0) + 1
+                            m["last_sung"] = now
+                            P.write_meta(sd, m)
             except Exception:
                 pass   # 歌曲已刪除或編號不對：只記在歌單裡
         _setlist_save_current(d)

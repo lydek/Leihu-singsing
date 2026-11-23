@@ -44,7 +44,7 @@ def add_take(sid):
         "start": start, "key": key, "speed": speed, "duration": duration,
     }
     P.atomic_write_text(td / f"{tid}.json", json.dumps(info, ensure_ascii=False))
-    jid = jobs.submit("take", sid, lambda report: _score(d, tid, report), label=tid)
+    jid = jobs.submit("take", sid, lambda report: _score(P.song_dir(sid), tid, report), label=tid)  # 開始時才取路徑
     return jsonify(id=tid, job=jid)
 
 
@@ -80,10 +80,10 @@ def get_take(sid, tid):
 
 @bp.post("/api/songs/<sid>/takes/<tid>/rescore")
 def rescore_take(sid, tid):
-    d, j, w = _take_paths(sid, tid)
+    _, j, w = _take_paths(sid, tid)
     if not (j.exists() and w.exists()):
         abort(404)
-    jid = jobs.find("take", sid, tid) or jobs.submit("take", sid, lambda report: _score(d, tid, report), label=tid)
+    jid = jobs.find("take", sid, tid) or jobs.submit("take", sid, lambda report: _score(P.song_dir(sid), tid, report), label=tid)
     return jsonify(job=jid)
 
 
@@ -110,7 +110,7 @@ def _need_variant(d, sid, tid):
         return None
     label = f"{key}:{speed}"
     return vjobs.find("variant", sid, label) or vjobs.submit(
-        "variant", sid, lambda report: P.step_variant(d, key, speed, report), label=label)
+        "variant", sid, lambda report: P.step_variant(P.song_dir(sid), key, speed, report), label=label)  # 開始時才取路徑
 
 
 @bp.post("/api/songs/<sid>/takes/<tid>/mixprep")
@@ -209,7 +209,7 @@ def take_export(sid, tid):
         base = base.with_name(f"{base.name} ({n})")
     files = ([str(SH.out_path(base, "_成績卡.png"))] if "png" in opts["formats"] else []) + \
         [str(SH.out_path(base, "." + f)) for f in ("wav", "mp3", "mp4") if f in opts["formats"]]
-    jid = jobs.submit("export", sid, lambda report: SH.export_take(d, tid, opts, base, report), label=tid)
+    jid = jobs.submit("export", sid, lambda report: SH.export_take(P.song_dir(sid), tid, opts, base, report), label=tid)  # 開始時才取路徑
     return jsonify(job=jid, files=files)
 
 

@@ -15,6 +15,11 @@ bp = Blueprint("lyrics", __name__)
 
 @bp.get("/api/songs/<sid>/lyrics")
 def get_lyrics(sid):
+    with P.library_write_slot() as w:   # fork（70）：搬移中只讀，修正過的歌詞這次不存回（下次開啟再存）
+        return _get_lyrics(sid, w)
+
+
+def _get_lyrics(sid, w):
     d = P.song_dir(sid)
 
     meta = P.read_meta(d)
@@ -26,12 +31,14 @@ def get_lyrics(sid):
         if n == "lyrics_auto.lrc" or (n == "lyrics.lrc" and meta.get("lyrics_source") in (None, "whisper")):
             c = P.strip_hallucinations(t)   # 辨識結果裡「優優獨播劇場」之類的幻覺句子
             if c != t:
-                P.atomic_write_text(d / n, c)
+                if w:
+                    P.atomic_write_text(d / n, c)
                 t = c
         if P.is_japanese(t):   # 1.5 以前把日文歌詞轉成了台灣繁體（来→來）：改回日文字形並存回去
             j = P.tw_to_ja(t)
             if j != t:
-                P.atomic_write_text(d / n, j)
+                if w:
+                    P.atomic_write_text(d / n, j)
                 t = j
         return t
     meta = P.read_meta(d)
@@ -214,15 +221,16 @@ def lyrics_search(sid):
 
 @bp.get("/api/songs/<sid>/lyrics/candidates")
 def lyrics_candidates(sid):
-    d = P.song_dir(sid)
-    p = d / "lyrics_candidates.json"
-    meta = P.read_meta(d)
-    if not p.exists() and meta.get("lyrics_source") in (None, "whisper") and (d / "lyrics_auto.lrc").exists():
-        try:   # 1.1 之前匯入的歌：第一次開啟時補做線上歌詞比對
-            P.find_and_store_candidates(d, P.load_config())
-            meta = P.read_meta(d)
-        except Exception:
-            pass
+    with P.library_write_slot() as w:   # fork（70）：搬移中不補做（寫到舊位置搬完會不見，下次開啟再補）
+        d = P.song_dir(sid)
+        p = d / "lyrics_candidates.json"
+        meta = P.read_meta(d)
+        if w and not p.exists() and meta.get("lyrics_source") in (None, "whisper") and (d / "lyrics_auto.lrc").exists():
+            try:   # 1.1 之前匯入的歌：第一次開啟時補做線上歌詞比對
+                P.find_and_store_candidates(d, P.load_config())
+                meta = P.read_meta(d)
+            except Exception:
+                pass
     cands = json.loads(p.read_text("utf-8")) if p.exists() else []
     return jsonify(pending=bool(meta.get("lyrics_pending")), results=cands,
                    recognized=P.recognized_text(d)[:300])

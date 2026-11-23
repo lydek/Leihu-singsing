@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import sys
 
-from flask import Blueprint, abort, current_app, jsonify, request
+from flask import Blueprint, abort, current_app, g, jsonify, request
 from werkzeug.exceptions import HTTPException
 
 import pipeline as P
@@ -53,8 +53,18 @@ def _local_only():
         # 2.3.0 搬移歌曲庫中：會寫進歌曲庫的操作先擋住（不然搬完會少掉這段時間的修改）
         if request.path in YT_GATED and not P.load_config().get("yt_enabled"):
             raise P.UserError("這個功能尚未開啟")
-        if P.STORAGE["moving"] and request.method != "GET" and request.path.startswith(MOVE_BLOCK):
-            raise P.UserError("正在搬移歌曲庫，搬完才能操作歌曲（大約幾分鐘，進度在處理清單）")
+        # fork（69）：搬移開始前已經進來的寫入請求算寫入者，搬移等它們做完才複製；搬移中進來的照舊擋住
+        if request.path.startswith(MOVE_BLOCK):
+            w = P.library_writer(wait=False)
+            w.__enter__()   # 搬移中丟 UserError
+            g.library_writer = w
+
+
+@bp.teardown_app_request
+def _library_writer_done(_exc):
+    w = g.pop("library_writer", None)
+    if w is not None:
+        w.__exit__(None, None, None)
 
 
 # 2.3.1：YouTube 下載、歌單批次匯入要先開啟（點左上標題五下）才能用
