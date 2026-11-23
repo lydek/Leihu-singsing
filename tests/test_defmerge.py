@@ -230,3 +230,173 @@ def test_other_files_added_or_removed(tmp_path, old, new, fork, want):
         return {} if t is None else {"f.txt": t}
     r, _ = merge(tmp_path, files(old), files(new), files(fork), extra=["f.txt"])
     assert r["report"][-1].startswith(want)
+
+
+# ---------------------------------------------------------------- Codex 審查（2026-11-24）r3
+
+
+def test_insert_and_replace_at_same_point(tmp_path):
+    """r3-1：a() 後面緊接 b()（沒有空行），上游在中間新增 c()、同時改 b()：原本留下舊版的 b() 蓋掉新版。"""
+    old = "def a():\n    return 1\ndef b():\n    return 2\n"
+    new = "def a():\n    return 1\n\n\ndef c():\n    return 3\ndef b():\n    return 22\n"
+    _, out = merge(tmp_path, {"pipeline.py": old}, {"pipeline.py": new}, {"pipeline.py": old})
+    got = out("pipeline.py")
+    assert got.count("def b") == 1 and "return 22" in got and "return 2\n" not in got
+    assert got.index("def a") < got.index("def c") < got.index("def b")
+
+
+def test_consecutive_new_definitions_keep_order(tmp_path):
+    """r3-2：連續新增的 A = 10、B = A + 1 原本反序，變成先用到 A。"""
+    new = OLD + "\n\nA = 10\nB = A + 1\n"
+    _, out = merge(tmp_path, {"pipeline.py": OLD}, {"pipeline.py": new}, {"pipeline.py": OLD})
+    got = out("pipeline.py")
+    assert got.index("A = 10") < got.index("B = A + 1")
+
+
+def test_chained_assignment_is_manual(tmp_path):
+    """r3-3：A = B = 1 原本被當成兩個定義、同一個範圍編輯兩次，甚至整行刪掉。"""
+    old = OLD + "\n\nA = B = 1\n"
+    new = OLD + "\n\nB = 2\n"
+    r, _ = merge(tmp_path, {"pipeline.py": old}, {"pipeline.py": new}, {"pipeline.py": old})
+    assert r["stats"]["manual"] >= 1 and "pipeline.py" not in r["files"]
+
+
+@pytest.mark.parametrize("stmt", ["A, B = {}, 2", "CONFIG['x'] = {}"])
+def test_unsupported_assignments_are_reported(tmp_path, stmt):
+    """r3-4：解包指定、CONFIG["x"] = 兩邊都被忽略，上游改了卻回報零變更。"""
+    old = OLD + "\n\nCONFIG = {}\n" + stmt.format(1) + "\n"
+    new = old.replace(stmt.format(1), stmt.format(10))
+    r, _ = merge(tmp_path, {"pipeline.py": old}, {"pipeline.py": new}, {"pipeline.py": old})
+    assert any("模組層級" in x for x in r["report"]) and r["stats"]["manual"] >= 1
+
+
+def test_same_file_duplicate_names_are_manual(tmp_path):
+    """r3-5：同一個檔案 X = 1、SNAPSHOT = X、X = 2，上游只改第一個 X：原本改動直接消失。"""
+    old = OLD + "\n\nX = 1\nSNAPSHOT = X\nX = 2\n"
+    new = old.replace("X = 1\n", "X = 100\n")
+    r, _ = merge(tmp_path, {"pipeline.py": old}, {"pipeline.py": new}, {"pipeline.py": old})
+    assert r["stats"]["manual"] >= 1 and "pipeline.py" not in r["files"]
+
+
+def test_removed_with_duplicate_in_fork_is_manual(tmp_path):
+    """r3-6：上游刪除 b()，fork 兩個檔案都有 b()：原本靜默略過。"""
+    new = OLD.replace("\n\ndef b():\n    return 2\n", "\n")
+    r, _ = merge(tmp_path, {"pipeline.py": OLD}, {"pipeline.py": new},
+                 {"pipeline.py": OLD, "leihu/other.py": "def b():\n    return 2\n"})
+    assert r["stats"]["manual"] == 1 and r["files"] == []
+
+
+def test_removed_module_statement_and_import_are_reported(tmp_path):
+    """r3-7：上游刪除 start_worker()、刪除 import：原本不報告，fork 照樣保留並執行。"""
+    old = OLD.replace("import os\n", "import os\nimport side_effect\n") + "\nstart_worker()\n"
+    r, _ = merge(tmp_path, {"pipeline.py": old}, {"pipeline.py": OLD}, {"pipeline.py": old})
+    rep = "\n".join(r["report"])
+    assert "模組層級刪除" in rep and "start_worker" in rep and "import side_effect" in rep
+
+
+def test_import_for_moved_definition_is_manual(tmp_path):
+    """r3-8：b() 搬到 leihu/core/b.py，上游新增 import re 並讓 b() 用 re：原本把 import 加在 pipeline.py。"""
+    new = OLD.replace("import os\n", "import os\nimport re\n").replace("    return 2\n", "    return re.compile('x')\n")
+    fork_main = OLD.replace("\n\ndef b():\n    return 2\n", "\n")
+    r, _ = merge(tmp_path, {"pipeline.py": OLD}, {"pipeline.py": new},
+                 {"pipeline.py": fork_main, "leihu/core/b.py": "def b():\n    return 2\n"})
+    assert any("leihu/core/b.py" in x and "import re" in x for x in r["report"] if x.startswith("手動"))
+    assert "pipeline.py" not in r["files"]
+
+
+def test_future_import_is_manual(tmp_path):
+    """r3-9：上游新增 from __future__ import annotations，放在一般 import 後面是 SyntaxError。"""
+    new = OLD.replace('"""上游 pipeline。"""\n', '"""上游 pipeline。"""\nfrom __future__ import annotations\n')
+    r, _ = merge(tmp_path, {"pipeline.py": OLD}, {"pipeline.py": new}, {"pipeline.py": OLD})
+    assert any("__future__" in x for x in r["report"] if x.startswith("手動"))
+
+
+def test_import_used_before_insert_point_is_manual(tmp_path):
+    """r3-9：import 加在最後一個 import 後面，前面的模組層級指定已經用到它。"""
+    old = "import os\nPAT = None\nimport sys\n"
+    new = "import os\nimport re\nPAT = re.compile('x')\nimport sys\n"
+    r, _ = merge(tmp_path, {"pipeline.py": old}, {"pipeline.py": new}, {"pipeline.py": old})
+    assert any("之前就用到 re" in x for x in r["report"])
+
+
+def test_parenthesized_decorator_is_replaced_whole(tmp_path):
+    """r3-10：`@(` 換行再寫裝飾器，AST 的行號不含 `@(`，原本替換後留下半個裝飾器。"""
+    old = "def deco(f):\n    return f\n\n\n@(\n    deco\n)\ndef f():\n    return 1\n"
+    new = "def deco(f):\n    return f\n\n\n@deco\ndef f():\n    return 2\n"
+    _, out = merge(tmp_path, {"pipeline.py": old}, {"pipeline.py": new}, {"pipeline.py": old})
+    got = out("pipeline.py")
+    assert "@(" not in got and "@deco\ndef f():\n    return 2" in got
+    compile(got, "pipeline.py", "exec")
+
+
+def test_blueprint_rewrite_keeps_strings(tmp_path):
+    """r3-11：Blueprint 改寫原本套在整段定義上，回傳的 "support@app.example" 會被改成 @bp。"""
+    old = '@app.get("/a")\ndef a():\n    return "support@app.example"\n'
+    new = old.replace("example", "example.tw")
+    _, out = merge(tmp_path, {"app.py": old}, {"app.py": new},
+                   {"app.py": "", "leihu/web/x.py": old.replace("@app.get", "@bp.get")})
+    assert out("leihu/web/x.py") == '@bp.get("/a")\ndef a():\n    return "support@app.example.tw"\n'
+
+
+def test_trailing_whitespace_in_string_counts(tmp_path):
+    """r3-12：只改三引號字串裡的行尾空白，原本判定上游沒改。"""
+    old = OLD + '\n\nTEXT = """first\nsecond"""\n'
+    new = old.replace('"""first\n', '"""first  \n')
+    r, out = merge(tmp_path, {"pipeline.py": old}, {"pipeline.py": new}, {"pipeline.py": old})
+    assert r["stats"]["fast"] == 1 and '"""first  \nsecond"""' in out("pipeline.py")
+
+
+def test_expect_compares_by_group_and_name(tmp_path):
+    """r3-13：--expect 只用名稱：app.py 的 f 不同、pipeline.py 的 f 相同時原本回報沒有差異。"""
+    app_old = '@app.get("/f")\ndef f():\n    return 1\n'
+    app_new = app_old.replace("return 1", "return 2")
+    pipe = "def f():\n    return 9\n"
+    mine = app_old.replace("@app", "@bp")
+    old = tree(tmp_path / "old", {"app.py": app_old, "pipeline.py": pipe})
+    new = tree(tmp_path / "new", {"app.py": app_new, "pipeline.py": pipe})
+    fork = tree(tmp_path / "fork", {"app.py": "", "leihu/web/x.py": mine, "pipeline.py": pipe})
+    expect = tree(tmp_path / "expect", {"app.py": "", "leihu/web/x.py": mine.replace("return 1", "return 3"),
+                                        "pipeline.py": pipe})
+    r = D.run(old, new, fork, tmp_path / "out", expect=expect)
+    assert r["diffs"] == ["app.py:f：內容不同（leihu/web/x.py）"]
+
+
+def test_whole_file_merge_keeps_trailing_blank_lines(tmp_path):
+    """r3-14：整檔合併原本去掉所有檔尾換行、最多補回一個。"""
+    old = "a\nb\nc\nd\ne\n\n\n"
+    _, out = merge(tmp_path, {"data.txt": old}, {"data.txt": old.replace("e\n", "E\n")},
+                   {"data.txt": old.replace("a\n", "A\n")}, extra=["data.txt"])
+    assert out("data.txt") == "A\nb\nc\nd\nE\n\n\n"
+
+
+def test_version_followed_by_period():
+    """r3-15：版號後面接句點（句尾）原本不換，結果仍是 2.3.5.，沒有 .1。"""
+    assert D.unver("version 2.3.4.", "2.3.4") == f"version {D.VER_MARK}."
+    assert D.unver("2.3.4.1.", "2.3.4") == f"{D.VER_MARK}."
+    assert D.unver("2.3.40", "2.3.4") == "2.3.40"
+
+
+def test_git_errors_are_not_missing_files():
+    """r3-16：參照打錯、讀取失敗原本都當成檔案不存在，可能變成「上游刪掉所有定義」。"""
+    import subprocess
+
+    with pytest.raises(SystemExit):
+        D.check_ref("no-such-ref-defmerge-test")
+    assert D.show("HEAD", "no/such/file.py") is None
+    with pytest.raises(subprocess.CalledProcessError):   # 不存在的參照：git 錯誤要丟出去
+        D.show("no-such-ref-defmerge-test", "pipeline.py")
+
+
+def test_mixed_alias_imports_sort():
+    """r3-17：同時新增 import re 和 import re as regex，排序時 None 和字串比較丟 TypeError。"""
+    assert D.import_lines({("import", "re", None), ("import", "re", "regex"),
+                           ("from", "a", "x", None), ("from", "a", "x", "y")}) == [
+        "import re", "import re as regex", "from a import x, x as y"]
+
+
+def test_expect_both_deleted_is_same(tmp_path):
+    """r3-18：定義正確刪除、預期也沒有，原本回報「合併結果沒有這個定義」。"""
+    new = OLD.replace("\n\ndef b():\n    return 2\n", "\n")
+    old_s, new_s = tree(tmp_path / "old", {"pipeline.py": OLD}), tree(tmp_path / "new", {"pipeline.py": new})
+    fork, expect = tree(tmp_path / "fork", {"pipeline.py": OLD}), tree(tmp_path / "expect", {"pipeline.py": new})
+    assert D.run(old_s, new_s, fork, tmp_path / "out", expect=expect)["diffs"] == []
