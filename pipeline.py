@@ -1211,12 +1211,14 @@ def youtube_job(song_id: str, url: str, after=None):
     return run
 
 
-def read_audio(path: Path, sr: int = SR, mono: bool = False) -> np.ndarray:
-    """回傳 (ch, n) 或 mono 時 (n,) 的 float32。"""
+def read_audio(path: Path, sr: int = SR, mono: bool = False, fallback: bool = True) -> np.ndarray:
+    """回傳 (ch, n) 或 mono 時 (n,) 的 float32。
+    fallback=False（fork）：讀自己的分軌時，soundfile 讀不了就報錯，不退回 audioread（可能讀出殘缺的音訊又不報錯）。
+    傳 SoundFile 物件給 librosa 走的是同一段讀法，數值和預設完全相同。"""
     import librosa
     if path.suffix.lower() not in (".wav", ".flac", ".ogg"):
         ffmpeg_path()  # m4a、mp3 等格式需要 ffmpeg
-    y, _ = librosa.load(str(path), sr=sr, mono=mono)
+    y, _ = librosa.load(str(path) if fallback else sf.SoundFile(str(path)), sr=sr, mono=mono)
     y = np.asarray(y, dtype=np.float32)
     if mono:
         return y
@@ -1281,6 +1283,11 @@ def compact_song(d: Path, busy=lambda: False) -> int:
             w = base / f"{name}.wav"
             if not w.exists():
                 continue
+            if (base / f"{name}.flac").exists():   # fork：已經有 FLAC（新的分軌，舊 WAV 當時刪不掉）：以 FLAC 為準，不能拿舊 WAV 蓋掉
+                before = w.stat().st_size
+                w.unlink()
+                saved += before
+                continue
             info = sf.info(str(w))
             y, sr = sf.read(str(w), dtype="int16" if info.subtype == "PCM_16" else "float32", always_2d=True)
             tmp = base / f"{name}.tmp.flac"
@@ -1324,6 +1331,60 @@ def save_stem(base: Path, name: str, y: np.ndarray, sr: int = SR) -> Path:
     if STEM_EXT != ".wav":
         (base / f"{name}.wav").unlink(missing_ok=True)
     return out
+
+
+def _replace_stems(base: Path, stems: dict, sr: int = SR) -> None:
+    """fork（70）：幾軌一起換（主唱補回同時改主唱、合音）。全部先寫好暫存檔才換；換之前複製一份原檔，
+    換到一半失敗就換回原本的，不會留下一新一舊。用複製不用改名：程式在任何時間點被關掉，分軌檔都還在。
+    shortcut: 兩次改名之間被強制關閉（或換回也失敗）仍可能一新一舊，沒有開機復原；先標記 KEY 版本失效、
+    旋律待重做只會讓它們重做，修不好一新一舊的分軌（要重新分離；換不回的原檔在 .bak）。分軌都能從 mix
+    重新分離，所以先接受；要完全避免時改成寫交易紀錄、開機時依紀錄復原。"""
+    tmps: dict[str, Path] = {}
+    try:
+        for name, y in stems.items():
+            tmps[name] = base / f"{name}.tmp{STEM_EXT}"
+            write_wav(tmps[name], y, sr)
+        _swap_stems(base, tmps)
+    finally:
+        for t in tmps.values():   # 換成功的已經不在了
+            t.unlink(missing_ok=True)
+    if STEM_EXT != ".wav":
+        for name in stems:
+            try:   # 新的 FLAC 已經生效（stem_path 先找 FLAC）；舊 WAV 刪不掉只是佔空間，不能讓呼叫端以為沒換成
+                (base / f"{name}.wav").unlink(missing_ok=True)
+            except OSError as e:
+                log_error(f"replace_stems {name}.wav", e)
+
+
+def _swap_stems(base: Path, tmps: dict) -> None:
+    """暫存檔換成正式檔；換到一半失敗就把已經換掉的換回原本的。"""
+    baks: dict[str, Path] = {}
+    done: list[str] = []
+    try:
+        for name, t in tmps.items():
+            out = base / f"{name}{STEM_EXT}"
+            if out.exists():   # 原本是舊的 WAV 時新檔寫到 FLAC，不會蓋到它，不用備份
+                baks[name] = out.with_name(out.name + ".bak")
+                shutil.copy2(out, baks[name])
+            _replace_retry(t, out)
+            done.append(name)
+    except BaseException:
+        for name in done:   # 每一軌各自盡力換回；換不回的備份檔留在磁碟上（不在 baks 裡，下面不會刪）
+            out = base / f"{name}{STEM_EXT}"
+            try:
+                if name in baks:
+                    _replace_retry(baks.pop(name), out)
+                else:
+                    out.unlink(missing_ok=True)   # 舊的 WAV 還在，stem_path 會再用它
+            except OSError as e:
+                log_error(f"replace_stems 換回 {name}", e)
+        raise
+    finally:
+        for p in baks.values():
+            try:   # 已經換好（或換回）了，備份刪不掉只是佔空間，不能改變結果
+                p.unlink(missing_ok=True)
+            except OSError as e:
+                log_error(f"replace_stems 刪備份 {p.name}", e)
 
 
 def fit_length(y: np.ndarray, n: int) -> np.ndarray:
@@ -1930,8 +1991,8 @@ FINE_HARMONY = 0.5   # 合音能量達到主唱的一半以上，建議用最精
 
 def harmony_ratio(d: Path) -> float | None:
     """主唱有聲音的段落裡，合音和主唱的音量比（0＝幾乎沒有合音，1＝和主唱一樣大聲）。"""
-    lead = read_audio(stem_path(d, "lead"), sr=PITCH_SR, mono=True)
-    back = read_audio(stem_path(d, "back"), sr=PITCH_SR, mono=True)
+    lead = read_audio(stem_path(d, "lead"), sr=PITCH_SR, mono=True, fallback=False)
+    back = read_audio(stem_path(d, "back"), sr=PITCH_SR, mono=True, fallback=False)
     n = min(len(lead), len(back)) // 1600 * 1600
     if n < 1600 * 10:
         return None
@@ -2047,13 +2108,17 @@ def fix_lead_gaps(d: Path) -> float:
     lp, bp = stem_path(d, "lead"), stem_path(d, "back")
     if not lp.exists() or not bp.exists():
         return 0.0
-    lead, back = read_audio(lp), read_audio(bp)
+    lead, back = read_audio(lp, fallback=False), read_audio(bp, fallback=False)
     n = min(lead.shape[-1], back.shape[-1])
     lead, back = lead[..., :n], back[..., :n]
     g, sec, stats = _lead_gap_gain(lead.mean(axis=0), back.mean(axis=0), SR, _lyric_spans(d))
     if g is not None:
-        save_stem(d, "lead", lead + back * g)
-        save_stem(d, "back", back * (1 - g))
+        # fork（69、70）：改分軌之前先標記：舊的 KEY 版本是用修正前的分軌做的、旋律要重新分析（step_pitch 做完才清）。
+        # 換分軌途中失敗或被關掉，最多多做一次 KEY 版本和旋律，不會把舊的當成有效
+        invalidate_variants(d)
+        update_meta(d, pitch_stale=True)
+        _replace_stems(d, {"lead": lead + back * g, "back": back * (1 - g)})   # 兩軌一起換
+        invalidate_variants(d)   # 換的期間做好的 KEY 版本（移調在換之前就開始了）也是舊的
         print(f"[separate] 主唱有 {sec:.0f} 秒（{stats['moved_lines']} 句歌詞）被分到合音，已搬回主唱", flush=True)
     _split_note(d, stats)
     update_meta(d, lead_fix=LEAD_FIX_V, lead_fix_sec=round(sec, 1), lead_fix_lrc=_lrc_stamp(d))
@@ -2065,7 +2130,8 @@ def lead_fix_job(song_id: str, after=None):
     def run(report):
         d = song_dir(song_id)
         report("檢查主唱有沒有被分到合音", 0.05)
-        if fix_lead_gaps(d) > 0:
+        # fork（69）：上次分軌改了、旋律還沒分析完就停止的，這次就算沒有要搬的也重新分析旋律
+        if fix_lead_gaps(d) > 0 or read_meta(d).get("pitch_stale"):
             step_pitch(d, load_config(), report)
             if after:
                 after(song_id)
@@ -2098,11 +2164,12 @@ def fine_job(song_id: str, after=None):
         full = hq_models_ready(cfg)   # 高品質模型都在：這次就等於直播後的補做
         lrc = (d / "lyrics.lrc").exists()
         fit_before = lyrics_timing_fit(d) if lrc else None
-        step_separate(d, cfg, report)
+        used_light = step_separate(d, cfg, report)
         getattr(report, "gpu_done", lambda: None)()
         step_pitch(d, cfg, report)
+        # fork（70）：依實際的分離方式。顯示卡卡住、中途改用 CPU＋標準模型時不算補做完成
         update_meta(d, fine_suggest=False, fine_done=True, fine_queued=False,
-                    **({"live_light": False} if full else {}))
+                    **({"live_light": False} if full and not used_light else {}))
         if lrc:
             try:
                 check_lyrics_after_reseparate(d, fit_before)
@@ -2344,9 +2411,15 @@ def is_acapella(d: Path) -> bool:
         return False
 
 
-def step_separate(d: Path, cfg: dict, report) -> None:
+def step_separate(d: Path, cfg: dict, report) -> bool:
+    """fork（69）：回傳這次實際上是不是用輕量設定（CPU＋標準模型）分離的；顯示卡卡住時會中途改用。"""
     notes = []
     method = "dsp"
+    light = bool(cfg.get("_cpu"))
+    # fork（70）：分離會寫分軌，先讓 KEY 版本失效（刪不掉時留記號）、標記旋律待重做（step_pitch 做完才清），
+    # 中途失敗或被關掉也不會把舊的當成有效；中途停止時背景會補做旋律
+    invalidate_variants(d)
+    update_meta(d, pitch_stale=True)
     if module_status()["uvr"]:
         try:
             try:
@@ -2357,6 +2430,7 @@ def step_separate(d: Path, cfg: dict, report) -> None:
                 # 2.3.2：顯示卡被其他程式佔滿、分離沒有進度 → 改用 CPU＋標準模型重做，之後自動補做高品質
                 print("[gpu] 顯示卡太忙，這首改用 CPU＋標準模型分離（之後自動補做高品質）", flush=True)
                 cfg = dict(cfg, **LIGHT_CFG)
+                light = True
                 update_meta(d, live_light=True)
                 report("顯示卡太忙：改用 CPU 輕量處理（之後自動補做高品質）", 0.08)
                 separate_uvr(d, cfg, report)
@@ -2368,8 +2442,7 @@ def step_separate(d: Path, cfg: dict, report) -> None:
     else:
         notes.append("沒有安裝 audio-separator，使用聲像分離（品質較差）")
         separate_dsp(d, report)
-    for old in [*d.glob("v_*"), *d.glob("v2_*")]:
-        shutil.rmtree(old, ignore_errors=True)
+    invalidate_variants(d)   # fork：分離期間做好的 KEY 版本（移調在分離之前就開始了）也是舊的
     acap = is_acapella(d)   # 要讀音訊，先在鎖外面算好
     with _META_LOCK:   # 讀出到寫回之間不讓別的執行緒改這首歌的資料
         meta = read_meta(d)
@@ -2378,6 +2451,7 @@ def step_separate(d: Path, cfg: dict, report) -> None:
         meta["acapella"] = acap
         meta["notes"] = [x for x in meta.get("notes", []) if "分離" not in x] + notes
         write_meta(d, meta)
+    return light
 
 
 # ---------------------------------------------------------------- 音高
@@ -2457,9 +2531,9 @@ def analysis_vocal(d: Path) -> np.ndarray:
     """旋律分析與歌詞辨識用的人聲（16 kHz 單聲道）。
     1.6.5：多人輪流唱的歌（例如 S.H.E），分離模型常把某位成員唱的整句歸到「合音」，主唱軌就斷斷續續；
     這種歌設定成「合唱模式」後，改用主唱＋合音一起分析，音高追蹤會跟著當下最大聲（通常就是旋律）的那個人。"""
-    lead = read_audio(stem_path(d, "lead"), sr=PITCH_SR, mono=True)
+    lead = read_audio(stem_path(d, "lead"), sr=PITCH_SR, mono=True, fallback=False)
     if read_meta(d).get("vocal_mode") == "all" and stem_path(d, "back").exists():
-        back = read_audio(stem_path(d, "back"), sr=PITCH_SR, mono=True)
+        back = read_audio(stem_path(d, "back"), sr=PITCH_SR, mono=True, fallback=False)
         n = min(len(lead), len(back))
         lead = lead[:n] + back[:n]
     return lead
@@ -2485,6 +2559,7 @@ def step_pitch(d: Path, cfg: dict, report) -> None:
         meta = read_meta(d)
         meta["steps"]["pitch"] = True
         meta["pitch_algo"] = PITCH_ALGO
+        meta.pop("pitch_stale", None)   # fork（69、70）：分軌改過之後的旋律已經重新分析
         write_meta(d, meta)
 
 
@@ -2746,6 +2821,23 @@ def variant_dir(d: Path, key: int, speed: float) -> Path:
     return d / f"v2_k{key:+d}_s{int(round(speed * 100))}"
 
 
+VARIANT_STALE = ".stale"   # fork（70）：原調分軌改過、這個 KEY 版本還沒重做（資料夾刪不掉時留下的記號）
+
+
+def variant_stale(vd: Path) -> bool:
+    return (vd / VARIANT_STALE).exists()
+
+
+def invalidate_variants(d: Path) -> None:
+    """fork（70）：原調分軌要改了，KEY 版本都要重做。Windows 上檔案正在被讀（例如畫面正在播放）時資料夾刪不掉，
+    就在裡面留記號：variant_ready、音訊路由不再把它當成有效版本，step_variant 會整份重做。
+    刪不掉、記號也寫不進去時丟出 OSError：呼叫端要在改分軌之前呼叫，這時就停下、不改分軌。"""
+    for old in [*d.glob("v_*"), *d.glob("v2_*")]:
+        shutil.rmtree(old, ignore_errors=True)
+        if old.exists():
+            (old / VARIANT_STALE).write_text("1", "utf-8")
+
+
 def shift_audio(y: np.ndarray, sr: int, semis: int, speed: float) -> np.ndarray:
     try:
         from pedalboard import time_stretch
@@ -2814,9 +2906,11 @@ def step_variant(d: Path, key: int, speed: float, report) -> None:
     vd.mkdir(exist_ok=True)
     for old in d.glob("v_k*"):   # 1.3 以前產生的版本（時間會漂移），用不到了
         shutil.rmtree(old, ignore_errors=True)
-    todo = [s for s in STEMS if not stem_path(vd, s).exists()]
+    stale = variant_stale(vd)   # fork（70）：原調分軌改過，已經在的檔案也是舊的，整份重做
+    todo = [s for s in STEMS if stale or not stem_path(vd, s).exists()]
     if not todo:
         return
+    src = _stems_sig(d)   # fork：算到一半原調分軌被換掉的話，做出來的是舊的，結束時不能當成有效
     label = f"移調 {key:+d}、速度 {int(speed * 100)}%"
     cpus = max(1, os.cpu_count() or 1)
     try:
@@ -2848,12 +2942,16 @@ def step_variant(d: Path, key: int, speed: float, report) -> None:
     for stem, (y, sr, parts) in data.items():
         out = join_pieces(results[stem], parts, y.shape[1], sr, speed)
         save_stem(vd, stem, out, sr)
+    if _stems_sig(d) == src:
+        (vd / VARIANT_STALE).unlink(missing_ok=True)
+    else:   # 期間原調分軌換過（重新分離、主唱補回）：留記號，下次整份重做
+        (vd / VARIANT_STALE).write_text("1", "utf-8")
     report(f"{label}：完成", 1.0)
 
 
 def variant_ready(d: Path, key: int, speed: float) -> bool:
     vd = variant_dir(d, key, speed)
-    return all(stem_path(vd, s).exists() for s in STEMS)
+    return all(stem_path(vd, s).exists() for s in STEMS) and (vd == d or not variant_stale(vd))
 
 
 # ---------------------------------------------------------------- 錄音評分
@@ -3806,8 +3904,9 @@ def process_song(song_id: str, steps: list[str], cfg_override: dict | None = Non
                 cfg.update(light)
                 update_meta(d, live_light=True)
                 report("直播中：改用輕量模型分離（下播後自動補做高品質）", 0.1)
-            step_separate(d, cfg, report)
-            if not light and meta.get("live_light"):
+            used_light = step_separate(d, cfg, report)
+            # fork（69）：依實際的分離方式。補做時顯示卡又卡住、中途改用 CPU＋標準模型，還要再補做高品質
+            if not light and not used_light and meta.get("live_light"):
                 update_meta(d, live_light=False)   # 高品質補做完成
             recognize = "lyrics" in steps and not ("import" in steps and not cfg.get("auto_recognize_lyrics", False))
             if not recognize:   # 接下來只剩分析旋律、存檔：下一首可以先開始分離
@@ -4274,10 +4373,10 @@ def vocal_energy_phrases(d: Path, gap: float = 0.35, min_len: float = 0.3) -> li
     """2.3.2：還沒分析旋律時，用「主唱＋合音」的音量找有在唱的段落。
     主唱被分到合音的副歌也算得到，所以拿來對歌詞時間不會因為主唱分錯而對歪。"""
     try:
-        y = read_audio(stem_path(d, "lead"), sr=PITCH_SR, mono=True)
+        y = read_audio(stem_path(d, "lead"), sr=PITCH_SR, mono=True, fallback=False)
         b = stem_path(d, "back")
         if b.exists():
-            yb = read_audio(b, sr=PITCH_SR, mono=True)
+            yb = read_audio(b, sr=PITCH_SR, mono=True, fallback=False)
             n = min(len(y), len(yb))
             y = y[:n] + yb[:n]
     except Exception:

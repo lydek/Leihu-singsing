@@ -224,6 +224,8 @@ def mixdown(sid):
     out = P.unique_path(P.downloads_dir() / P.APP_NAME / f"{_safe_name(meta.get('title', '歌曲'))[:50]}_{vname}_{kname}{sname}.{fmt}")
 
     def run(report):
+        if not P.variant_ready(d, key, speed):   # fork（70）：排隊期間分軌改過、這個 KEY 版本失效了
+            raise P.UserError("這個 KEY／速度的版本已經過期，請重新播放一次再匯出")
         report("混音中", 0.2)
         vd = P.variant_dir(d, key, speed)
         parts, sr = [], P.SR
@@ -381,7 +383,7 @@ def audio(sid, stem):
     key, speed = _key_speed()
     base = d if stem == "mix" else P.variant_dir(d, key, speed)
     p = P.stem_path(base, stem)
-    if not p.exists():
+    if not p.exists() or (base != d and P.variant_stale(base)):   # fork（70）：原調分軌改過、還沒重做的 KEY 版本
         abort(404)
     return send_file(p, mimetype="audio/flac" if p.suffix == ".flac" else "audio/wav", conditional=True, max_age=0)
 

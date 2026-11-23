@@ -113,23 +113,34 @@ def lead_fix_sweep() -> None:
         time.sleep(300)
 
 
+_PITCH_RETRIED: set[str] = set()   # 這次開程式已經排過補做旋律的歌（pitch_stale）
+
+
 def _lead_fix_scan() -> None:
     try:
         with _SETLIST_LOCK:
             sl = {i.get("id") for i in _setlist_read()["items"]}
         songs = sorted(P.list_songs(), key=lambda m: (-P.usage_score(m, sl), -(m.get("created") or 0)))
         for s in songs:
-            if not P.lead_fix_needed(s):
+            # fork（69、70）：分軌改了、旋律還沒重新分析就停止的歌，排一次工作補做（同一次開程式只排一次，避免一直失敗一直重排）
+            if s.get("pitch_stale") and s.get("id") in _PITCH_RETRIED:
+                continue   # 這次開程式已經補做過一次（失敗了）：不再走下面的一般檢查一直重排
+            stale = s.get("pitch_stale") and (s.get("steps") or {}).get("separate")   # 沒分離完的新歌不用補旋律
+            if not stale and not P.lead_fix_needed(s):
                 continue
             while P.live_status()["hold"] or P.STORAGE.get("moving"):
                 time.sleep(30)
             sid = s["id"]
             if any(jobs.find("process", sid, lb) for lb in ("upgrade", "max", "fine", "all", "youtube", "leadfix")):
                 continue
+            if stale:
+                _PITCH_RETRIED.add(sid)
+                jobs.submit("process", sid, P.lead_fix_job(sid, after=prerender_key), label="leadfix")
+                continue
             d = P.song_dir(sid)
             try:
-                lead = P.read_audio(P.stem_path(d, "lead"), sr=P.PITCH_SR, mono=True)
-                back = P.read_audio(P.stem_path(d, "back"), sr=P.PITCH_SR, mono=True)
+                lead = P.read_audio(P.stem_path(d, "lead"), sr=P.PITCH_SR, mono=True, fallback=False)
+                back = P.read_audio(P.stem_path(d, "back"), sr=P.PITCH_SR, mono=True, fallback=False)
                 g, sec, stats = P._lead_gap_gain(lead, back, P.PITCH_SR, P._lyric_spans(d))
             except Exception as e:
                 P.log_error("lead_fix_sweep", e)
