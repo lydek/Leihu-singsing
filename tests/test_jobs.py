@@ -261,3 +261,20 @@ def test_delete_failure_keeps_queued_jobs(app_module, queues, song, monkeypatch)
     assert r.status_code == 400 and "刪不掉" in r.get_json()["error"]
     assert d.exists()
     assert jobs.get(a)["status"] == "queued" and vjobs.get(b)["status"] == "queued"
+
+
+def test_waiting_for_stems_is_not_reported_as_live_hold(app_module):
+    """Codex r4-8：所有排隊的工作都因為等分軌（wait_for）被跳過時，_next 原本也回報「只剩直播中暫停的工作」，
+    _run 就把「等這首歌的分軌處理完」改寫成「直播中暫停（直播中）」。只有真的因為直播跳過才算。"""
+    import pipeline as P
+
+    q = P.Jobs(wait_for=lambda st: st.get("song") == "busysong1")
+    jid = q.submit("variant", "busysong1", lambda r: None, label="2:1.0")
+    with q.lock:
+        got, fn, held = q._next(hold=False, slots=1)
+    assert got is None and held is False
+    assert q.state[jid]["step"] == "等這首歌的分軌處理完"
+    q2 = P.Jobs()
+    q2.submit("process", "bgsong001", lambda r: None, label="upgrade")
+    with q2.lock:
+        assert q2._next(hold=True, slots=1)[2] is True   # 直播中跳過背景工作：照舊回報
