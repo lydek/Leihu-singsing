@@ -4,7 +4,7 @@
 
 ## 1. 先決定的事
 
-- **版號**：3.15 的第 4 段是 fork 序號（同步時照 3.21 設成「上游版本＋.1」）。**2026-11-23 決定：第 6b 批完成後單獨發 2.3.4.2**，不等下一次同步上游。
+- **版號**：3.15 的第 4 段是 fork 序號（同步時照 3.21 設成「上游版本＋.1」）。**2026-11-23 決定：第 6b 批完成後單獨發 2.3.4.2**，不等下一次同步上游。改了 `VERSION`、`leihu/web/common.py` 的 `VERSION`、`leihu.nsi` 的 `VERSION`／`VIProductVersion`、`pipeline.USER_AGENT`、說明頁與標題列，漏移檢查的 `OWN_CHANGES` 跟著改；契約快照的 `version` 是會變動的欄位，不用重錄。發版照 3.16：合併後在 `refactor` 打 `v2.3.4.2` tag，CI 建 draft release。
 - **改上游擁有的檔案會讓同步變難**：`pipeline.py`、`gpu_worker.py`、`score_sheet.py`（M6）、`share.py`（S19）、`static/app.js`、`installer.py` 等，每多一處 fork 的修改，同步上游時就多一處要手動合併（3.21）；`--leak` 不比對後端檔案的內容，只檢查上游新增的名稱找不找得到；後端的修改只靠 3.21 步驟 4 逐一比對。真的是上游 bug 的（例如缺 `import subprocess`、`_set_priority`、M6），可以考慮回報給上游，上游修了之後同步就會帶進來；回報要你決定，也要你送出。
 - **前端**：D2（刪除處理中的歌回 400）要改 `static/app.js` 才看得到錯誤。`app.js` 是照上游同步的檔案，改了要登記在漏移檢查的 `OWN_CHANGES`。
 - **ruff 的範圍**：目前全 repo 311 個違規（`leihu/` 62 個、`tests/` 35 個，其餘在上游的檔案；2026-11-23 補 `import subprocess` 後，`uvx ruff@0.17.5 check .`）。`leihu/` 是上游程式原封搬過去的（3.19），同步時 hunk 會套到這裡（3.21），清了一樣會和同步衝突；建議只在 `tests/` 啟用。
