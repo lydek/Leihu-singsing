@@ -2755,7 +2755,8 @@ def to_taiwan(text: str) -> str:
     return text
 
 
-def _whisper_model(cfg):
+def _whisper_model(cfg, raise_oom: bool = False):
+    """raise_oom（fork，Codex r2-3）：顯示卡記憶體不夠時直接丟出去，不改用 CPU（重疊處理時交給佇列）。"""
     try:
         import torch  # noqa: F401  Whisper 需要的 cublas64_12.dll 由 PyTorch 提供
     except Exception:
@@ -2773,9 +2774,13 @@ def _whisper_model(cfg):
             model.detect_language(np.zeros(16000, dtype=np.float32), vad_filter=False)
             return model
         except RuntimeError as e:
+            if raise_oom and "out of memory" in str(e).lower():
+                raise
             print(f"[lyrics] 顯示卡無法執行語音辨識，改用 CPU（比較慢）：{e}", flush=True)
             del model
-    except Exception:
+    except Exception as e:
+        if raise_oom and "out of memory" in str(e).lower():
+            raise
         traceback.print_exc()
     try:
         return WhisperModel(name, device="cpu", compute_type="int8", download_root=root)
@@ -2890,8 +2895,9 @@ def step_lyrics(d: Path, cfg: dict, report) -> None:
     song_lang = meta0.get("lyrics_language")          # 這首歌個別指定的語言（None＝依設定）
     want = song_lang if song_lang is not None else (cfg.get("lyrics_language") or "")
     # 2.1.1：載入模型、判斷語言、辨識都在顯示卡子程式裡跑（CTranslate2 的顯示卡記憶體才放得乾淨）
+    overlapping = getattr(G.CURRENT, "overlapping", None)   # fork（36、Codex r2-3）：重疊處理時 OOM 交給佇列
     r = G.call("whisper", np.ascontiguousarray(y16, dtype=np.float32), cfg, want, song_lang is not None,
-               progress=report)
+               raise_oom=bool(overlapping and overlapping()), progress=report)
     words = [SimpleNamespace(**w) for w in r["words"]]
     stats = r["stats"]
     lang, lang_note = r["lang"], r["lang_note"]
@@ -3676,6 +3682,7 @@ def live_status(cfg: dict | None = None) -> dict:
 # 直播中要先停住的背景工作（使用者沒有在等結果的）
 LIVE_BACKGROUND = {"upgrade", "fine", "compact", "max", "leadfix",
                    "unfinished"}   # fork（Codex r5-5）：2.3.5「重做全部歌曲」批次補做沒處理完的歌
+OVERLAP_GRACE = 60.0   # fork（36）：別首做完後這麼久內記憶體不夠，仍當成重疊處理造成的（子程式清理模型、回報錯誤要時間）
 
 
 class JobDeferred(JobCancelled):
@@ -3781,6 +3788,8 @@ class Jobs:
     def _can_start(self, st: dict, slots: int) -> bool:
         if not self.running:
             return True
+        if st.get("oom_retry"):
+            return False   # fork（Codex r2-2）：重疊處理記憶體不夠的重做要等別的工作（含上一首的旋律分析）都做完
         if not self.pipeline or st.get("kind") != "process" or st.get("label") not in PIPELINE_LABELS:
             return False   # 其他工作（錄音評分、匯出、壓縮）等前面的都做完才開始
         others = [self.state.get(j) or {} for j in self.running]
@@ -3916,8 +3925,13 @@ class Jobs:
         return n
 
     def _overlapping(self, jid: str) -> bool:
+        """和別首同時在跑，或別首剛做完不久（Codex r2-1：OOM 從子程式傳回來要先清理模型，這段時間另一首可能剛好做完）。
+        這首已經因為記憶體不夠重做過就不算（重做時照原本的方式退回標準模型）。"""
         with self.lock:
-            return len(self.running) > 1 and not (self.state.get(jid) or {}).get("oom_retry")
+            st = self.state.get(jid) or {}
+            if st.get("oom_retry"):
+                return False
+            return len(self.running) > 1 or time.time() - st.get("overlap_end", 0.0) < OVERLAP_GRACE
 
     def stems_busy(self, song_id: str) -> bool:
         """fork（D6、68）：這首歌有沒有會重寫分軌的工作在執行（匯入、分離、主唱補回；只重做旋律、歌詞的不算）。"""
@@ -4094,6 +4108,8 @@ class Jobs:
             with self.cv:
                 self.running.pop(jid, None)
                 (self.state.get(jid) or {}).pop("pause", None)
+                for other in self.running:   # fork（Codex r2-1）：還在跑的那幾首記下「剛剛還有別首一起跑」
+                    (self.state.get(other) or {})["overlap_end"] = time.time()
                 self.cv.notify_all()
 
 

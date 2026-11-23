@@ -360,3 +360,83 @@ def test_overlap_judgement_survives_other_song_finishing(song, monkeypatch, app_
     q._work(jid, fn)
     st = q.get(jid)
     assert st["status"] == "queued" and st.get("oom_retry")
+
+
+# ---------------------------------------------------------------- Codex 審查（2026-11-24）r2-1～r2-3
+
+
+def test_overlap_still_counts_right_after_other_song_finished(app_module, monkeypatch):
+    """r2-1：OOM 從子程式傳回來前另一首剛好做完：第一次判定時只剩一首，原本會當成一般的高品質失敗。
+    別首做完後 OVERLAP_GRACE 內仍算重疊；過了就不算。"""
+    import pipeline as P
+
+    q = P.Jobs(pipeline=True)
+    other = q.submit("process", "other00001", lambda r: None, label="youtube")
+    jid = q.submit("process", SID, lambda r: None, label="all")
+    with q.lock:
+        q.pending.clear()
+        for j in (other, jid):
+            q.state[j]["status"] = "running"
+            q.running[j] = "gpu"
+    q._work(other, lambda r: None)   # 另一首做完：finally 從 running 拿掉、記下 overlap_end
+    assert list(q.running) == [jid]
+    assert q._overlapping(jid) is True
+    t0 = P.time.time()
+    monkeypatch.setattr(P.time, "time", lambda: t0 + P.OVERLAP_GRACE + 1)
+    assert q._overlapping(jid) is False
+
+
+def test_oom_retry_waits_for_all_running_jobs(app_module):
+    """r2-2：記憶體不夠重做的工作，要等上一首的旋律分析（post）也做完才開始，才是真的一次一首。"""
+    import pipeline as P
+
+    q = P.Jobs(pipeline=True)
+    prev = q.submit("process", "other00001", lambda r: None, label="all")
+    with q.lock:
+        q.pending.clear()
+        q.state[prev]["status"] = "running"
+        q.running[prev] = "post"
+    retry = {"kind": "process", "label": "all", "song": SID, "oom_retry": True}
+    assert q._can_start(dict(retry, oom_retry=False), 2) is True   # 一般工作可以和旋律分析重疊
+    assert q._can_start(retry, 2) is False
+    q.running.clear()
+    assert q._can_start(retry, 2) is True
+
+
+def test_lyrics_passes_raise_oom_only_when_overlapping(song, monkeypatch, app_module):
+    """r2-3：歌詞辨識在子程式裡遇到 OOM 會自己改跑 CPU，佇列不知道要降並行；重疊處理時要求子程式直接丟出來。"""
+    import gpu_worker as G
+    import pipeline as P
+
+    seen = []
+
+    def fake_call(name, *args, progress=None, **kw):
+        seen.append(kw.get("raise_oom"))
+        raise RuntimeError("CUDA out of memory")
+
+    monkeypatch.setattr(G, "call", fake_call)
+    monkeypatch.setattr(P, "module_status", lambda: {"whisper": True})
+    monkeypatch.setattr(P, "analysis_vocal", lambda d: np.zeros(16000, np.float32))
+    for on in (True, False):
+        _overlapping(monkeypatch, on)
+        with pytest.raises(RuntimeError):
+            P.step_lyrics(song, dict(CFG), lambda *a: None)
+    assert seen == [True, False]
+
+
+def test_whisper_worker_raises_oom_when_asked(monkeypatch):
+    """r2-3：子程式的 t_whisper：raise_oom 為真時 OOM 直接丟出去，不改用 CPU 重跑。"""
+    import types
+
+    import gpu_worker as G
+
+    class Model:
+        model = types.SimpleNamespace(unload_model=lambda: None)
+
+        def transcribe(self, *a, **k):
+            raise RuntimeError("CUDA failed with error out of memory")
+
+    P = types.SimpleNamespace(_whisper_model=lambda cfg, raise_oom=False: Model(),
+                              pick_language=lambda *a: ("ja", ""), PITCH_SR=16000)
+    with pytest.raises(RuntimeError, match="out of memory"):
+        G.t_whisper(P, lambda *a: None, np.zeros(16000, np.float32), {}, "", False, raise_oom=True)
