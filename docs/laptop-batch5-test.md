@@ -115,5 +115,5 @@ gh run download <run 編號> --repo lydek/Leihu-singsing -n installer-test -D $e
 
 ## 這台筆電測不到的
 
-- **6 GB 門檻**：RTX 3060 筆電版回報約 6.44e9 位元組（6 GiB），比門檻 `6e9` 大，照常用高品質。這正好確認「6 GB 以上照常」；要測門檻本身，要把 `pipeline.py` 的 `HQ_MIN_VRAM` 暫時改成 `7e9`。
+- **6 GB 門檻**：RTX 3060 筆電版回報約 6.44e9 位元組（6 GiB），比門檻 `6e9` 大，照常用高品質。這正好確認「6 GB 以上照常」；要測門檻本身：關掉測試版，把**測試版安裝資料夾**裡的 `%LOCALAPPDATA%\LeihuLiantaiTest\pipeline.py` 的 `HQ_MIN_VRAM = 6e9` 暫時改成 `7e9`，再開測試版、匯入一首歌，進度不會出現「（高品質）」、歌曲的分離模型是標準模型；測完改回 `6e9`。改 repo 裡的 `pipeline.py` 沒有用：測試版跑的是安裝資料夾裡的程式，數值基準也是從指定的 commit 匯出程式。
 - **重疊處理時記憶體不夠**：顯示卡記憶體 10 GB 以上、設定開了「閒置時兩首同時分離」才會兩首同時分離（`parallel_ok`），這台不到 10 GB。
