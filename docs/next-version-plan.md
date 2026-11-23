@@ -49,6 +49,14 @@ fork 對上游後端檔案的修改（同步時 3.21 步驟 4 要確認沒被蓋
 | 36 的匯出影片 | `share.py` 的 `export_video` | 中途按停止或失敗時結束 ffmpeg、刪掉半截影片 | `test_export_video_cancel_stops_ffmpeg_and_removes_partial`（用真的 ffmpeg） |
 | O21、M3、38 的 PowerShell 路徑 | `installer.py` 的 `run`（新增 `RUN_TIMEOUT`）、`probe`、`powershell`、`stop_app` 和 8 處 probe 呼叫；`installer/leihu.nsi` 的 `StopApp`（登記在 `OWN_CHANGES`） | pip 等子程序整體逾時 2 小時，逾時連同子程序結束、回傳失敗；probe 的路徑改用 argv 傳、PowerShell 的路徑改用環境變數傳、用 `StartsWith` 比對（路徑含「'」「[ ]」時原本會語法錯誤或比對錯，也能被注入） | `tests/test_installer_robust.py`；`leihu.nsi` 沒有自動測試 |
 | 36 的輸入驗證 | `leihu/web/system.py` 的 `set_config`（新增 `_balance`）、`status`；`leihu/web/security.py` 的 `_local_only` | `balance_usd` 收到 `nan`、`inf`、不是數字時回 400「餘額格式不正確」（原本 NaN 寫進 config.json 後設定畫面打不開，不是數字回 500）；`/api/status?live=1` 帶 `Sec-Fetch-Site: cross-site`（外站網頁）時不算直播中（本機頁面和不帶這個標頭的本機程式照常算）；`LIANTAI_PORT=80` 時接受不帶埠號的本機 `Origin`（瀏覽器在 80 埠不送埠號） | `tests/test_errors.py` 的 `test_balance_*`、`test_status_live_ignores_cross_site`、`test_origin_check_without_port_when_port_80`（契約沒有差異） |
+| 6a：KEY 版本失效（69、70） | `pipeline.py` 新增 `VARIANT_STALE`、`variant_stale`、`invalidate_variants`；`fix_lead_gaps`、`step_separate` 改用；`variant_ready`、`step_variant`；`leihu/web/library.py` 的 `audio` | 主唱補回、重新分離後 KEY 版本都失效；資料夾刪不掉時（Windows 上正在被讀）留 `.stale` 記號，`variant_ready` 回 False、音訊路由回 404（畫面照原本的流程重新產生），`step_variant` 整份重做後清掉記號；刪不掉、記號也寫不進去時丟出錯誤，呼叫端在改分軌之前就停下；排隊中的 `mixdown` 執行時再檢查一次；換分軌之前、之後各失效一次，移調算到一半原調分軌被換掉時（用 `_stems_sig` 比對），結束時保留 `.stale`、不當成有效（第 2 批 D6 只擋了反方向） | `tests/test_stems.py` 的 `test_lead_fix_invalidates_key_versions`、`test_undeletable_key_version_is_marked_stale` |
+| 6a：兩軌一起換（70） | `pipeline.py` 新增 `_replace_stems`、`_swap_stems`；`fix_lead_gaps` 改用 | 主唱、合音都先寫好暫存檔才換；換之前複製原檔，換到一半失敗就換回原本的（用複製不用改名：程式在任何時間點被關掉，分軌檔都還在）；每一軌各自盡力換回，換不回的備份檔留著；刪舊 WAV 失敗只記錄。刪 `.bak` 失敗也只記錄。**限制**：兩次改名之間被強制關閉（或換回也失敗）仍可能一新一舊，沒有開機復原；先標記只會讓 KEY 版本、旋律重做，修不好一新一舊的分軌，要重新分離（換不回的原檔在 `.bak`）。分軌都能從 `mix` 重新分離，所以先接受 | `test_lead_fix_replaces_both_stems_or_neither`、`test_replace_stems_*` |
+| 6a：旋律過期（69、70） | `fix_lead_gaps`、`step_separate` 設 `pitch_stale`，`step_pitch` 清掉；`lead_fix_job`；`leihu/web/background.py` 的 `_lead_fix_scan`（新增 `_PITCH_RETRIED`） | 改分軌之前就先標記（主唱補回、分離開始前），中途失敗或被關掉也不會把舊的當成有效；`lead_fix_job` 遇到記號就重新分析旋律；背景檢查遇到記號排一次 `leadfix` 補做，同一次開程式只排一次（補做失敗後也不會繞去一般的主唱補回檢查再排；沒分離完的新歌不補） | `test_step_separate_marks_pitch_stale_and_invalidates`、`test_step_pitch_clears_pitch_stale`、`test_lead_fix_job_redoes_pitch_when_stale`、`test_background_retries_stale_pitch_once` |
+| 6a：`live_light`（69、70） | `step_separate` 回傳實際上是不是用輕量設定分離；`process_song`、`fine_job` 改用 | 補做高品質、精細處理時顯示卡又卡住、中途改用 CPU 標準模型做完，不再把 `live_light` 清掉，之後會再補做 | `test_upgrade_keeps_live_light_when_gpu_stalls`、`test_fine_job_keeps_live_light_when_gpu_stalls`、`test_step_separate_reports_light_fallback` |
+| 6a：節省空間不蓋掉新分軌（Codex 第二輪） | `pipeline.py` 的 `compact_song` | 同名 FLAC 已經存在時以 FLAC 為準，只刪多餘的舊 WAV。原本會把刪不掉而留下的舊 WAV 轉成 FLAC、蓋掉主唱補回後的新分軌 | `test_compact_keeps_newer_flac_over_leftover_wav` |
+| 6a：讀自己的分軌（70） | `read_audio` 新增 `fallback`；主唱、合音的讀取（`fix_lead_gaps`、`harmony_ratio`、`analysis_vocal`、`vocal_energy_phrases`、背景的主唱補回檢查）用 `fallback=False` | soundfile 讀不了時直接報錯，不退回 audioread（可能讀出殘缺的音訊又不報錯）。傳 `sf.SoundFile` 給 librosa，走的是同一段讀法，數值完全相同 | `test_read_audio_without_fallback_*` |
+
+第 6a 批 Codex CLI 審查（2026-11-23，`codex exec -s read-only`）提出 6 項：換分軌前先標記、換回失敗留備份、清理舊 WAV 失敗不中斷、`.stale` 寫不進去就停、排隊中的 `mixdown` 再檢查、`_PITCH_RETRIED` 不繞回一般檢查，都已修並補測試；「強制關閉時仍可能一新一舊」只做到先標記，沒有做交易紀錄與開機復原（見上表的限制）。第二輪確認 6 項修正正確，另提出 3 項 P2：已在跑的移調做完會清掉 `.stale`、`compact_song` 拿舊 WAV 蓋掉新 FLAC、刪 `.bak` 失敗回報成失敗，都已修並補測試；也同意沒有開機復原在這個專案可以接受（分軌能從 `mix` 重建），但說明要寫清楚先標記修不好一新一舊的分軌。
 
 第 3 批延後（2026-11-23 決定，等重構穩定再考慮）：
 
@@ -66,5 +74,19 @@ fork 對上游後端檔案的修改（同步時 3.21 步驟 4 要確認沒被蓋
   - 第 5 批已列：重疊處理時記憶體不夠交給佇列、旋律分析沉默上限依長度放寬。
   - 不適用：ml-worker 才有的（worker 自己設優先順序、stdout 關閉後再 kill、`gpu_probe_ml.json`；gpu_worker 有沒有「非歌詞工作前放掉 Whisper、CPU 重跑前放掉顯示卡模型」的記憶體問題沒有查）；全部來源找不到時訊息帶檔名（上游已有）；直播橫幅條件（上游原本就是）；`claude_coach` 沒帶錄音編號（目前已回 400）；`delete_song`（第 2 批已做）；`_Draw`／`_hex` 搬檔、`build.sh`、CI（舊分支的結構）。
   - 不做：`setlist_add` 先寫歌單再記次數。目前在歌單的鎖內記次數、例外都吞掉，不會漏記歌單，只差拿著歌單的鎖等 `_META_LOCK`。
+- 69（`340914c`）、70（`0fcc37f`）2026-11-23 逐行看過 diff，對照目前的程式（`claude/next-version-batch4` 的 `69f629a`），都還在：
+  - **分軌一致性**（第 6a 批已修）：
+    - 主唱補回（`fix_lead_gaps`）改了分軌卻沒清掉 KEY 版本，之後移調、匯出用的是修正前的分軌；`step_separate` 會清，但資料夾刪不掉（Windows 上正在被讀）時沒有記號，舊版本照樣被當成有效（70 的 `.stale` 記號與 `invalidate_variants`）。
+    - 主唱、合音兩軌分開存（`save_stem` 兩次），第二軌失敗時兩軌不一致（70 的 `_replace_stems`，失敗換回原本的）。
+    - 分軌改了、旋律還沒重新分析就按停止（主唱補回後、重新分離後），`pitch.json` 一直是舊的；沒有記號可以補做（69、70 的 `pitch_stale`）。
+    - 補做高品質時顯示卡又卡住、改用 CPU 標準模型做完，`process_song` 用開始前讀到的 `live_light` 判斷，把 `step_separate` 剛設的 `live_light` 清掉，之後不會再補做（69：`step_separate` 回傳實際的分離方式）。
+    - 伺服器讀自己的分軌時，soundfile 讀不了會退回 librosa，掩蓋壞檔（70 的 `read_audio(fallback=False)`）。
+  - **搬移歌曲庫**（3.20 判定不是使用者資料遺失：寫到舊位置的都能重新產生，舊位置也還在）：
+    - 背景工作（線上歌詞搜尋、補量響度、主唱補回檢查、YouTube 預先下載）和搬移開始前已經進來的寫入請求，在複製途中寫進舊位置；KEY 轉換等 600 秒後照樣開始搬（69 的 `library_writer` 計數、`vjobs.freeze`、等太久就放棄搬移）。
+    - 搬移還在排隊就被取消時，`storage_move` 先設的全部暫停不會恢復，而且已經寫進 config.json（69 的 `on_cancel`）。
+    - 搬移中開歌曲的 GET 會補寫 `acapella`、響度到舊位置；歌單記演唱次數也寫到舊位置（70 的 `library_writable`）。
+    - 排隊中的 KEY 轉換、錄音匯出在送出時就取好路徑，搬移後仍讀寫舊位置（70：開始時才用歌曲編號取路徑）。
+    - 接用現有歌曲庫只檢查主佇列，沒有看 KEY 佇列；搬移中仍會開始背景下載模型（70）。
+  - 不適用：`INFER.close()`（ml-worker 才有）、`exclusive`（目前用第 2 批的 `wait_for`）。
 - `import subprocess` 已補（2026-11-23），顯示卡忙碌判斷開始作用：上游從來沒有真的跑過這段，門檻是否合理、`nvidia-smi` 週期取樣的 CPU 使用率，都還沒在筆電（3.10）開實際的程式驗證。
 - 舊分支的測試（`test_jobs.py`、`test_values.py`）能不能直接搬，沒有確認。
