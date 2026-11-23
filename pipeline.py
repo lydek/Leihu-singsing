@@ -1671,7 +1671,10 @@ def _check_model_file(name: str) -> None:
     if bad:
         print(f"[separate] 模型檔 {name} 核對不正確，已刪除，下次會重新下載", flush=True)
         p.unlink(missing_ok=True)
-        for tr in (HQV_DL, HQ_DL):
+        # fork（Codex r5-1）：只重設這個模型自己的下載狀態。原本兩組都設成 idle：另一組還在下載時被當成沒在下載，
+        # 搬移歌曲庫的檢查就會放行，下載繼續寫舊位置
+        tr = {HQ_VOCAL: HQV_DL, HQ_KARAOKE: HQ_DL}.get(name)
+        if tr is not None and tr.get("state") != "downloading":
             tr.update(state="idle")
     # 設定檔（yaml）也一起看：下載到錯誤頁面時會是 HTML
     for cfgname, (csize, csha, _) in MODEL_FILES.items():
