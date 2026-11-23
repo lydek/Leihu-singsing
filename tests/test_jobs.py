@@ -91,6 +91,39 @@ def test_delete_cancels_queued_jobs(app_module, queues, song):
     assert [j["id"] for j in jobs.active() + vjobs.active()] == [other]
 
 
+def test_cancelled_song_jobs_leave_the_queue(app_module, queues, monkeypatch):
+    """Codex r4-1：cancel_song 只改狀態、留在 pending：一小時後 submit 清掉它的 state，
+    order()、active()、upcoming() 丟 KeyError（排在擋住的工作後面時，_next 碰不到它）。"""
+    import pipeline as P
+
+    jobs, _ = queues
+    _running(jobs, "process", "longsong01", "all")
+    jobs.submit("process", "waiting01", lambda report: None, label="all")
+    gone = jobs.submit("process", "deleted01", lambda report: None, label="all")
+    with jobs.lock:
+        jobs.cancel_song("deleted01")
+    assert gone not in [j for j, _ in jobs.pending]
+    t0 = P.time.time()
+    monkeypatch.setattr(P.time, "time", lambda: t0 + 3700)   # 超過一小時再排一個新工作
+    jobs.submit("process", "later01", lambda report: None, label="all")
+    assert gone not in jobs.state
+    assert list(jobs.order()) and jobs.active() and jobs.upcoming("all", 5) == ["waiting01", "later01"]
+
+
+def test_finished_state_still_in_queue_is_not_purged(app_module, queues, monkeypatch):
+    """清一小時前的工作紀錄時，還在 pending 的不清（防其他取消路徑留下同樣的情形）。"""
+    import pipeline as P
+
+    jobs, _ = queues
+    jid = jobs.submit("process", "stuck01", lambda report: None, label="all")
+    jobs.update(jid, status="cancelled")   # update 會補 finished，但沒有從 pending 拿掉
+    t0 = P.time.time()
+    monkeypatch.setattr(P.time, "time", lambda: t0 + 3700)
+    jobs.submit("process", "later02", lambda report: None, label="all")
+    assert jid in jobs.state
+    jobs.order()
+
+
 def test_delete_while_prefetching_is_refused(app_module, queues, song):
     """28 的 A2：預先下載不是佇列裡的工作，刪掉資料夾後下載會再寫出殘缺的歌。"""
     import pipeline as P
