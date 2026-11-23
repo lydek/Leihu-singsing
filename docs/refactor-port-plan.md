@@ -559,6 +559,13 @@ Codex 第 7 次審查後補的（同類問題和繞過路徑）：
 - 驗證：v2.3.4 的最上層定義都找得到；和上游不同的定義，同步前後只多了 `UI_PREFS`（放 `P.DATA`）。漏移檢查 0 項。契約加 3 個 `ui-prefs` 案例（路由 92 → 94），快照以 v2.3.4 重錄：144 個案例 143 個相同、1 個是已登記的 F1，原本的 141 個沒有變；`check_snapshot.py` 兩次都和快照相同、94 條路由都有案例。`uv run pytest` 97 passed。沒有改到分離、音高、歌詞、評分，數值沒有跑。
 - 沒有驗證：新圖示與工作列圖示要裝起來看（只在 Windows 的桌面視窗有作用）、安裝檔建置交給 CI。
 
+**v2.3.5 同步（2026-11-23）**：上游 5 個 commit 各一個同步 commit，版號 2.3.5.1。`refactor` 已經有下一版第 1～4、6 批（2.3.4.2），這是第一次在 fork 的行為修正之上同步。
+- 線上歌詞自動對時間（`voice_fit`）、跳過前奏略過標題行（`clean_lrc`，在 `leihu/lyrics_text.py`）、羅馬拼音點詞改讀音（只改前端）：`upstream_map.py` 都自動對應，程式和上游逐字相同。
+- 重做全部歌曲也補做沒處理完的歌：上游新增的 `submit_unfinished` 放 `leihu/web/common.py`（和 `queue_fine`、`queue_max` 一起，背景 `_resubmit`、`system.py` 的 `prioritize`、`library.py` 的 `upgrade_separation` 共用）。`upgrade_separation` 的 hunk 因工作目錄是 CRLF 套不上，照上游內容手動改。
+- 高品質人聲模型失敗改用標準模型、損壞的模型檔自動重新下載：`separate_uvr`、`vocal_model`、`karaoke_model`、`gpu_worker.t_separate` 自動套上。這個 commit 做了下一版第 5 批「第一段分離兩層退回」的大部分，第 5 批（PR #17，草稿）之後 rebase 到這裡、改用上游的寫法。
+- 版號：照 3.15 改成 2.3.5.1，`OWN_CHANGES` 的 `VERSION`、`help.html`、`index.html` 規則改成 2.3.5；`leihu.nsi` 保留測試版開關。
+- 驗證：v2.3.5 `app.py`、`pipeline.py` 的 477 個最上層定義都找得到；上游這次改的 14 個和上游相同，fork 也改過的只有 `VERSION`、`USER_AGENT`（版號）；上游沒改的定義同步前後都沒變（用暫時的比對腳本，註解不算）。漏移檢查（`--since=v2.3.4`）0 項。契約快照以 v2.3.5 重錄：144 個案例 119 個相同、25 個是已登記的 F1、D4、S15、D1、D1-後續，快照檔沒有變；`check_snapshot.py` 兩次都和快照相同、94 條路由都有案例。`uv run pytest` 247 passed。數值基準（CPU，測試計畫）`v2.3.5`、`43ddbb0` 各跑 1 次：異常都是「無」，`43ddbb0` 和 `v2.3.5` 逐檔核對 38／38 個檔案完全相同（這組素材的分離都沒有走到失敗退回）。
+
 ## 4. 要先決定的事
 - 舊分支要留著（唯讀）還是封存成 tag，`claude/original-refactor-behavior-comparison-d469de` 也一樣。在搬完之前不要刪。
 - 測試歌曲的清單和授權（3.8）。
