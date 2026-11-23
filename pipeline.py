@@ -4064,7 +4064,7 @@ LRCLIB = "https://lrclib.net/api/search"
 
 
 
-USER_AGENT = "LeihuLiantai/2.3.4.1 (+https://github.com/lydek/Leihu-singsing)"   # HTTP 標頭只能用英文字
+USER_AGENT = "LeihuLiantai/2.3.4.2 (+https://github.com/lydek/Leihu-singsing)"   # HTTP 標頭只能用英文字
 
 
 def _http_json(url: str, headers: dict | None = None, timeout: int = 8):
