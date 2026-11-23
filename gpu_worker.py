@@ -118,9 +118,50 @@ def _vram(tag: str) -> None:
         if torch.cuda.is_available():
             free, total = torch.cuda.mem_get_info()
             warn = "（不足：其他程式佔用太多，處理會非常慢）" if free < 1.5e9 else ""
-            print(f"[gpu] {tag}：顯示卡記憶體可用 {free / 1e9:.1f}／{total / 1e9:.1f} GB{warn}", flush=True)
+            print(f"[gpu] {tag}：{torch.cuda.get_device_name()} 記憶體可用 {free / 1e9:.1f}／{total / 1e9:.1f} GB{warn}", flush=True)
     except Exception:
         pass
+
+
+def _sep_diag(P, model: str) -> None:
+    """fork（移植自 9e53d67）：分離失敗時把找原因需要的資訊寫進 logs/app.log：用哪張顯示卡、各卡的
+    運算能力與記憶體、CUDA 環境變數、套件版本、模型檔大小。模型檔的檢查碼由 pipeline._check_model_file 核對，這裡不重算。"""
+    lines = [f"[gpu] 分離失敗診斷（{model}）"]
+    try:
+        import contextlib
+        from importlib.metadata import PackageNotFoundError, version
+
+        import torch
+        vers = [f"torch {torch.__version__}（CUDA {torch.version.cuda}）"]
+        for n in ("audio-separator", "onnxruntime-gpu", "onnxruntime"):
+            with contextlib.suppress(PackageNotFoundError):
+                vers.append(f"{n} {version(n)}")
+        lines.append("  " + "、".join(vers))
+        lines.append(f"  CUDA_DEVICE_ORDER={os.environ.get('CUDA_DEVICE_ORDER', '')} "
+                     f"CUDA_VISIBLE_DEVICES={os.environ.get('CUDA_VISIBLE_DEVICES', '')}")
+        if torch.cuda.is_available():
+            cur = torch.cuda.current_device()
+            for i in range(torch.cuda.device_count()):
+                free, total = torch.cuda.mem_get_info(i)
+                sm = "sm_{}{}".format(*torch.cuda.get_device_capability(i))
+                lines.append(f"  cuda:{i}{'（分離用這張）' if i == cur else ''} {torch.cuda.get_device_name(i)} "
+                             f"{sm} 可用 {free / 1e9:.1f}／{total / 1e9:.1f} GB")
+        else:
+            lines.append("  torch.cuda.is_available() = False")
+    except Exception as e:
+        lines.append(f"  讀不到顯示卡／版本資訊：{type(e).__name__}: {e}")
+    try:
+        mp = P.MODELS / "uvr" / model
+        size = (P.MODEL_FILES.get(model) or (None,))[0]
+        if not mp.exists():
+            lines.append(f"  模型檔不存在：{mp}")
+        else:
+            got = mp.stat().st_size
+            ok = "" if not size else ("（大小正確）" if got == size else f"（大小不符，應為 {size}）")
+            lines.append(f"  模型檔 {mp}：{got} bytes{ok}")
+    except Exception as e:
+        lines.append(f"  檢查模型檔失敗：{type(e).__name__}: {e}")
+    print("\n".join(lines), flush=True)
 
 
 def t_probe(P, progress):
@@ -169,6 +210,14 @@ def t_separate(P, progress, model: str, inp: str, out: str, overlap: int, autoca
         with P._sep_progress(label, progress, start, span):
             outs = sep.separate(inp)
         return [str(p) for p in P._outputs(outs, Path(out))]
+    except SystemExit as e:
+        # fork（9e53d67）：分離途中（不是載入模型）又被 sys.exit 時，真正的錯誤留在 __context__
+        cause = e.__context__ or e
+        _sep_diag(P, model)
+        raise RuntimeError(f"{type(cause).__name__}: {cause}") from cause
+    except Exception:
+        _sep_diag(P, model)   # fork（9e53d67）
+        raise
     finally:
         logging.getLogger("audio_separator").removeHandler(grab)
         # 確實刪掉模型與 ONNX session（ONNX Runtime 的顯示卡記憶體池要 session 被刪掉才會還）
