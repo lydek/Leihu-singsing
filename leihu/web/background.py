@@ -228,7 +228,7 @@ _QUEUE_READY = threading.Event()
 
 
 def _restorable(label: str) -> bool:
-    if label in ("all", "fine", "max", "upgrade"):
+    if label in ("all", "fine", "max", "upgrade", "unfinished"):   # unfinished：fork（Codex r5-5）
         return True
     parts = label.split(",") if label else []
     return bool(parts) and all(x in ("import", "separate", "pitch", "lyrics") for x in parts)
@@ -283,6 +283,9 @@ def _resubmit(sid: str, label: str) -> None:
             proc(report)
             prerender_key(sid)
         jobs.submit("process", sid, run, label="upgrade")
+        return
+    if label == "unfinished":   # fork（Codex r5-5）：重做全部歌曲排的補做，重開後照樣直播中暫停
+        submit_unfinished(sid, ["separate", "pitch"], label="unfinished")
         return
     if label == "all":
         steps = ["import", "separate", "pitch", "lyrics"]

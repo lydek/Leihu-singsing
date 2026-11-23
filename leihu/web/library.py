@@ -476,7 +476,7 @@ def upgrade_separation():
             continue   # 音檔還沒下載好（要先下載）
         if not stp.get("separate") or not stp.get("pitch") or s.get("separation") != "uvr":
             # 2.3.5：從來沒分離完（匯入到一半被中斷）、只分析到一半、或 AI 分離失敗改用聲像分離的：也一起補做
-            submit_unfinished(s["id"], ["separate", "pitch"])
+            submit_unfinished(s["id"], ["separate", "pitch"], label="unfinished")   # fork（Codex r5-5）：直播中暫停
             n += 1
             unfinished += 1
             continue

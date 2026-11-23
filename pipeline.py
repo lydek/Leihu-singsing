@@ -3603,7 +3603,8 @@ def live_status(cfg: dict | None = None) -> dict:
 
 
 # 直播中要先停住的背景工作（使用者沒有在等結果的）
-LIVE_BACKGROUND = {"upgrade", "fine", "compact", "max", "leadfix"}
+LIVE_BACKGROUND = {"upgrade", "fine", "compact", "max", "leadfix",
+                   "unfinished"}   # fork（Codex r5-5）：2.3.5「重做全部歌曲」批次補做沒處理完的歌
 
 
 class JobDeferred(JobCancelled):

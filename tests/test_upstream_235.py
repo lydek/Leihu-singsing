@@ -104,7 +104,12 @@ def library_songs(app_module, monkeypatch):
     monkeypatch.setattr(P, "vocal_model", lambda cfg: P.HQ_VOCAL)
     songs = [{"id": f"unfin0000{i}", "steps": {"import": True}, "created": i} for i in (1, 2)]
     monkeypatch.setattr(P, "list_songs", lambda: songs)
-    return common.jobs, [s["id"] for s in songs]
+    for s in songs:
+        (P.LIB / s["id"]).mkdir(parents=True, exist_ok=True)
+        (P.LIB / s["id"] / "meta.json").write_text(json.dumps(s), "utf-8")
+    yield common.jobs, [s["id"] for s in songs]
+    for s in songs:
+        shutil.rmtree(P.LIB / s["id"], ignore_errors=True)
 
 
 def test_redo_all_includes_recently_failed_song(library_songs):
@@ -119,3 +124,27 @@ def test_redo_all_includes_recently_failed_song(library_songs):
     r = app.app.test_client().post("/api/upgrade-separation")
     assert r.status_code == 200 and r.get_json()["unfinished"] == 1
     assert [jobs.state[j]["song"] for j, _ in jobs.pending] == [queued, failed]
+
+
+def test_redo_all_unfinished_pauses_while_live(library_songs, monkeypatch):
+    """r5-5：重做全部歌曲批次補做的工作（原本標籤 separate,pitch）不在 LIVE_BACKGROUND，直播中照樣開始；
+    改用 unfinished 標籤，直播中跳過、重開後也照樣是 unfinished。單首優先處理照舊直播中也做。"""
+    import pipeline as P
+    from leihu.web import background, common
+
+    jobs, (a, b) = library_songs
+    import app
+
+    app.app.test_client().post("/api/upgrade-separation")
+    labels = [jobs.state[j]["label"] for j, _ in jobs.pending]
+    assert labels == ["unfinished", "unfinished"]
+    assert "unfinished" in P.LIVE_BACKGROUND
+    jid, fn, only_held = jobs._next(hold=True, slots=1)
+    assert jid is None and only_held is True        # 直播中：兩個都跳過
+    assert background._restorable("unfinished")
+    jobs.pending.clear()
+    jobs.state.clear()   # 當成重開練唱台：佇列是空的，從 queue.json 排回去
+    background._resubmit(a, "unfinished")
+    assert [jobs.state[j]["label"] for j, _ in jobs.pending] == ["unfinished"]
+    common.submit_unfinished(b, ["separate", "pitch"])   # 單首優先處理：標籤照舊
+    assert jobs.state[jobs.pending[-1][0]]["label"] == "separate,pitch"
