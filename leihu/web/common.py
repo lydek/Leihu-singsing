@@ -90,9 +90,11 @@ def queue_fine(sid: str) -> str:
     return jobs.submit("process", sid, run, label="fine")
 
 
-def submit_unfinished(sid: str, steps: list[str]) -> str:
+def submit_unfinished(sid: str, steps: list[str], label: str | None = None) -> str:
     """2.3.5：補做沒處理完的歌（分離、旋律），做完如果還沒有歌詞，就上網找歌詞並套用最相符的版本。
-    以前重開練唱台時佇列不會保存，匯入到一半的歌會一直停在「旋律未完成」「無歌詞」。"""
+    以前重開練唱台時佇列不會保存，匯入到一半的歌會一直停在「旋律未完成」「無歌詞」。
+    label（fork，Codex r5-5）：「重做全部歌曲」批次排的用 "unfinished"（在 LIVE_BACKGROUND，直播中暫停）；
+    使用者按單首優先處理的照舊用步驟當標籤，直播中照樣做。"""
     proc = P.process_song(sid, steps)
 
     def run(report, sid=sid, proc=proc):
@@ -105,7 +107,7 @@ def submit_unfinished(sid: str, steps: list[str]) -> str:
             except Exception as e:
                 P.log_error("search_lyrics_later", e)
         prerender_key(sid)
-    return jobs.submit("process", sid, run, label=",".join(steps))
+    return jobs.submit("process", sid, run, label=label or ",".join(steps))
 
 
 def yt_submit(sid: str, url: str) -> str:
