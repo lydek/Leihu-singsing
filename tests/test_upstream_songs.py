@@ -72,3 +72,17 @@ def test_no_upstream_skips_without_writing(tmp_path, capsys):
     assert U.main([f"--upstream={tmp_path / 'missing'}"], plan_path=out) == 2
     assert not out.exists()
     assert "沒有找到已安裝的上游" in capsys.readouterr().out
+
+
+def test_relative_paths_become_absolute(tmp_path, monkeypatch):
+    """Codex r1-3：--upstream=相對路徑、config.json 的相對 library_dir：計畫一律寫絕對路徑，baseline.py 讀得到。"""
+    up = _install(tmp_path / "work" / "up")
+    (up / "library").rename(up / "songs")
+    (up / "config.json").write_text(json.dumps({"library_dir": "songs"}), "utf-8")
+    monkeypatch.chdir(tmp_path / "work")
+    out = tmp_path / "private" / "plans" / "upstream-library.json"
+    assert U.main(["--upstream=up", "--plan-only"], plan_path=out) == 0
+    loaded = PLAN.load(out, "numeric")
+    assert [s["path"] for s in loaded["songs"]] == [up / "songs" / "0a2aad6d6a" / "original.wav",
+                                                    up / "songs" / "12efd4016d" / "mix.flac"]
+    assert all(Path(s["path"]).is_absolute() for s in loaded["songs"])
