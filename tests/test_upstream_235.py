@@ -72,3 +72,19 @@ def test_standard_quality_requested_is_not_degraded(song, monkeypatch):
 
     _fake_separate(P, monkeypatch, "mdx", "std_kara.onnx", fail_note=False)
     assert P.step_separate(song, {"vocal_quality": "standard", "karaoke_quality": "standard"}, lambda *a: None) is False
+
+
+def test_bad_model_resets_only_its_own_download_state(app_module, monkeypatch, tmp_path):
+    """r5-1：主唱模型檢出壞掉時，人聲模型的下載還在跑：只重設主唱的狀態，人聲照樣是 downloading（搬移才會等它）。"""
+    import pipeline as P
+
+    monkeypatch.setattr(P, "MODELS", tmp_path)
+    (tmp_path / "uvr").mkdir()
+    (tmp_path / "uvr" / P.HQ_KARAOKE).write_bytes(b"broken")
+    monkeypatch.setattr(P, "_MODEL_CHECKED", set())
+    monkeypatch.setitem(P.HQV_DL, "state", "downloading")
+    monkeypatch.setitem(P.HQ_DL, "state", "ready")
+    P._check_model_file(P.HQ_KARAOKE)
+    assert not (tmp_path / "uvr" / P.HQ_KARAOKE).exists()
+    assert P.HQ_DL["state"] == "idle"
+    assert P.HQV_DL["state"] == "downloading"
