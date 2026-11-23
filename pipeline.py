@@ -3748,12 +3748,14 @@ class Jobs:
         回傳 (jid, fn, 只剩直播中暫停的工作)。"""
         if self.frozen:   # fork（69）：搬移歌曲庫中
             return None, None, False
+        held = False   # fork（Codex r4-8）：真的有工作因為直播被跳過，才回報「只剩直播中暫停的工作」
         for n, (jid, fn) in enumerate(self.pending):
             st = self.state.get(jid) or {}
             if st.get("status") == "cancelled":
                 self.pending.pop(n)
                 return jid, None, False
             if hold and st.get("label") in LIVE_BACKGROUND:
+                held = True
                 continue
             if self.paused and self._pausable(st):
                 continue
@@ -3765,7 +3767,7 @@ class Jobs:
             self.pending.pop(n)
             self._on_cancel.pop(jid, None)   # fork（69）：取出來就要開始了，之後的停止由工作自己收尾
             return jid, fn, False
-        return None, None, bool(self.pending) and not self.paused
+        return None, None, held and not self.paused
 
     def submit(self, kind: str, song_id: str, fn, label: str = "", on_cancel=None) -> str:
         """on_cancel（fork）：還沒開始就被使用者停止時呼叫（例如搬移歌曲庫排隊時先暫停了佇列，要恢復）。"""
@@ -3947,7 +3949,8 @@ class Jobs:
                         self.holding = reason
                         for j, _ in self.pending:
                             js = self.state.get(j)
-                            if js and js["status"] == "queued":
+                            # fork（Codex r4-8）：只改真的因為直播暫停的；等分軌、全部暫停的說明照留
+                            if js and js["status"] == "queued" and js.get("label") in LIVE_BACKGROUND:
                                 js["step"] = f"直播中暫停（{reason}），結束後自動繼續"
                     elif not held:
                         self.holding = ""
