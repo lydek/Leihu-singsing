@@ -2491,14 +2491,21 @@ def is_acapella(d: Path) -> bool:
 
 
 def step_separate(d: Path, cfg: dict, report) -> bool:
-    """fork（69）：回傳這次實際上是不是用輕量設定（CPU＋標準模型）分離的；顯示卡卡住時會中途改用。"""
+    """fork（69）：回傳這次實際上是不是沒用到要求的品質：用輕量設定（CPU＋標準模型）分離（顯示卡卡住時會中途改用），
+    或要求高品質、卻因為高品質模型失敗改用了標準模型（Codex r5-3）。呼叫端依這個決定 live_light 能不能清掉。"""
     notes = []
     method = "dsp"
     light = bool(cfg.get("_cpu"))
     # fork（70）：分離會寫分軌，先讓 KEY 版本失效（刪不掉時留記號）、標記旋律待重做（step_pitch 做完才清），
     # 中途失敗或被關掉也不會把舊的當成有效；中途停止時背景會補做旋律
     invalidate_variants(d)
-    update_meta(d, pitch_stale=True)
+    with _META_LOCK:
+        meta = read_meta(d)
+        meta["pitch_stale"] = True
+        # fork（Codex r2-4、r5-2）：上一次分離留下的說明在開始時清掉；做完時不再清，
+        # 這次分離途中寫的（2.3.5 的「高品質…分離模型無法使用」）才留得住、畫面看得到
+        meta["notes"] = [x for x in meta.get("notes", []) if "分離" not in x]
+        write_meta(d, meta)
     if module_status()["uvr"]:
         try:
             try:
@@ -2528,8 +2535,15 @@ def step_separate(d: Path, cfg: dict, report) -> bool:
         meta["steps"]["separate"] = True
         meta["separation"] = method
         meta["acapella"] = acap
-        meta["notes"] = [x for x in meta.get("notes", []) if "分離" not in x] + notes
+        meta["notes"] = meta.get("notes", []) + notes
         write_meta(d, meta)
+    if method == "uvr" and not light:
+        # fork（Codex r5-3）：要求高品質但實際用了標準模型（2.3.5 高品質失敗改標準），不算補做完成
+        def hq(key):
+            q = cfg.get(key, "auto")
+            return q == "high" or (q == "auto" and cuda_ok())
+        light = ((hq("vocal_quality") and meta.get("vocal_model") != "bs_roformer")
+                 or (hq("karaoke_quality") and meta.get("karaoke") != HQ_KARAOKE))
     return light
 
 
