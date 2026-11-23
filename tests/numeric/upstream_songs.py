@@ -69,7 +69,7 @@ def library(d: Path) -> Path:
         lib = json.loads((d / "config.json").read_text("utf-8")).get("library_dir")
     except (OSError, ValueError, AttributeError):
         lib = None
-    return Path(lib) if lib else d / "library"
+    return d / lib if lib else d / "library"   # 相對路徑以安裝資料夾為準（d / 絕對路徑 就是那個絕對路徑）
 
 
 def installs(paths: list[Path]) -> list[Path]:
@@ -118,7 +118,8 @@ def build_plan(libs: list[Path], runs: int, only: list[str] | None = None) -> tu
                 notes.append(f"{sid}（{audio}）和前面的歌同一個編號，略過")
             else:
                 hashes.add(h)
-                catalog[sid] = {"label": f"上游：{title}", "path": str(audio), "sha256": h}
+                # 計畫裡的相對路徑會被 plan.py 當成相對計畫檔所在的資料夾：一律寫絕對路徑
+                catalog[sid] = {"label": f"上游：{title}", "path": str(audio.resolve()), "sha256": h}
     if only is not None:
         notes += [f"上游歌曲庫裡沒有 {s}" for s in only if s not in catalog]
     return {"說明": "upstream_songs.py 產生：上游歌曲庫的歌（只讀）", "numeric": {"runs": runs, "songs": list(catalog)},
@@ -133,7 +134,7 @@ def main(argv: list[str] | None = None, plan_path: Path = PLAN_PATH) -> int:
     if "plan" in opt:
         print("--plan 由這支程式產生，不能另外指定")
         return 2
-    paths = [Path(p) for p in opt["upstream"].split(";") if p] if opt.get("upstream") else candidates()
+    paths = [Path(p).resolve() for p in opt["upstream"].split(";") if p] if opt.get("upstream") else candidates()
     found = installs(paths)
     if not found:
         print("沒有找到已安裝的上游雷虎練唱台（找過：" + "、".join(map(str, paths)) + "）：略過。"
