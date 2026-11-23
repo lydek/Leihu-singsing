@@ -12,6 +12,7 @@ import time  # noqa: F401  測試從 app.time 替換 sleep
 import webbrowser
 
 import pipeline as P
+from leihu import logstamp
 from leihu.web import create_app
 from leihu.web.background import (
     lead_fix_sweep,
@@ -35,6 +36,7 @@ app = create_app()
 
 
 def main():
+    logstamp.install()   # fork：app.log 每一行加時間
     P.LIB.mkdir(exist_ok=True)
     watch_parent()
     if not P.NO_BACKGROUND:

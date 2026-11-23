@@ -42,3 +42,41 @@ def test_sample_gpu_load_reads_nvidia_smi(monkeypatch):
     assert P.GPU_LOAD["total"] == 8192 * 2**20
     assert P.GPU_LOAD["util"] == 90
     assert P.GPU_LOAD["hot"] == 1  # 90% ≥ GPU_BUSY_UTIL，連續兩次才算忙
+
+
+def _drive(monkeypatch, samples):
+    """依序餵 nvidia-smi 的結果（已用 MB, 使用率），每次都重新取樣，回傳每次 gpu_busy_reason 的結果。"""
+    import gpu_worker as G
+    import pipeline as P
+
+    monkeypatch.setattr(G.POOL, "count", lambda: 0)
+    it = iter(samples)
+    monkeypatch.setattr(subprocess, "run",
+                        lambda args, **kw: SimpleNamespace(stdout="{}, 8192, {}\n".format(*next(it))))
+    for k, v in {"free": None, "total": None, "util": None, "hot": 0, "calm": 0, "busy": "",
+                 "stalled_until": 0.0}.items():
+        monkeypatch.setitem(P.GPU_LOAD, k, v)
+    got = []
+    for _ in samples:
+        P.GPU_LOAD["checked"] = 0.0   # 每次都當作超過 20 秒，重新取樣
+        got.append(bool(P.gpu_busy_reason()))
+    return got
+
+
+def test_gpu_busy_does_not_flap_around_threshold(monkeypatch):
+    """筆電 app.log：使用率在 85% 上下跳，判定忙碌後一次低於門檻就恢復，每 20 秒來回切換。
+    判定忙碌後要連續 GPU_CALM_SAMPLES 次都低於門檻才恢復。"""
+    import pipeline as P
+
+    utils = [90, 90, 50, 90, 50, 90, 90, 50, 50, 90, 50, 50, 50, 50]
+    got = _drive(monkeypatch, [(1000, u) for u in utils])
+    assert got == [False, True, True, True, True, True, True, True, True, True, True, True, False, False]
+    assert P.GPU_CALM_SAMPLES == 3
+
+
+def test_gpu_busy_low_memory_also_needs_calm_samples(monkeypatch):
+    """記憶體不足判定忙碌時同樣規則：記憶體回來、使用率也低，連續 3 次才恢復；還沒忙過就不會被擋。"""
+    # 8192-6000 MB ≈ 2.3 GB < 3.5 GB 判定忙碌；記憶體回來後中間又不足一次，要重新數
+    got = _drive(monkeypatch, [(1000, 10), (6000, 10), (1000, 10), (1000, 10), (6000, 10),
+                               (1000, 10), (1000, 10), (1000, 10), (1000, 10)])
+    assert got == [False, True, True, True, True, True, True, False, False]

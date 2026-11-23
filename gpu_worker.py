@@ -288,6 +288,8 @@ def serve(address, authkey_hex: str, parent_pid: int) -> None:
     conn.send(("hello", os.getpid()))
     threading.Thread(target=_watch_parent, args=(parent_pid,), daemon=True).start()
     sys.path.insert(0, str(ROOT))
+    from leihu import logstamp
+    logstamp.install()   # fork：子程式直接寫 app.log，不經過伺服器的 sys.stdout，要自己加時間
     import pipeline as P
     P.IN_WORKER = True
     if os.environ.get("LEIHU_CPU_WORKER"):
