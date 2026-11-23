@@ -30,6 +30,17 @@ SPAWN_TIMEOUT = 90.0  # 子程式這麼久還沒連上就放棄，改在主程�
 # 子程式多久沒有任何回報就當作卡住（結束它，改在主程式裡做）。分離每一小段都會回報進度；
 # 旋律分析中途沒有進度，用整體時間判斷
 STALL = {"separate": 120.0, "whisper": 900.0, "pitch": 600.0, "probe": 180.0}
+
+
+def _stall(name: str, args: tuple) -> float:
+    """fork（3.6）：旋律分析中途沒有進度，固定 600 秒時長歌在 CPU 上會被當成卡住；放寬成音訊長度的 3 倍。
+    args[0] 是 16 kHz 的單聲道音訊（pipeline.track_pitch 傳的 y16）。"""
+    s = STALL.get(name, 600.0)
+    if name == "pitch" and args and hasattr(args[0], "__len__"):
+        s = max(s, 3 * len(args[0]) / 16000)
+    return s
+
+
 CURRENT = threading.local()   # 目前這個執行緒的工作：check() 會在按停止／暫停時丟出例外
 MAX_WORKERS = 3       # 最多同時幾個子程式（兩首同時分離＋一首分析旋律）
 ROOT = Path(__file__).resolve().parent
@@ -593,7 +604,7 @@ class Pool:
         w = self._acquire()
         ok = False
         check = getattr(CURRENT, "check", None)
-        stall = STALL.get(name, 600.0)
+        stall = _stall(name, args)
         t0 = last = time.time()
         print(f"[gpu] {name} 交給處理程式 {w.pid}" + ("（直播中，低優先順序）" if low else ""), flush=True)
         try:

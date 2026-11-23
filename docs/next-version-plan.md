@@ -75,10 +75,26 @@ fork 對上游後端檔案的修改（同步時 3.21 步驟 4 要確認沒被蓋
 | 2.3.5 重做全部歌曲跳過剛失敗的歌（Codex r5-4） | `leihu/web/library.py` 的 `upgrade_separation` | 「已經在排或正在做」只算排隊中、執行中的工作。原本用 `jobs.active()`，也包含最近 10 分鐘做完、失敗的：剛分離失敗、修好環境後馬上按「重做全部歌曲」，正要補做的那首反而被跳過 | `test_redo_all_includes_recently_failed_song` |
 | 2.3.5 批次補做沒處理完的歌直播中暫停（Codex r5-5） | `pipeline.LIVE_BACKGROUND` 加 `unfinished`；`leihu/web/common.py` 的 `submit_unfinished`（加 `label`）；`library.py` 的 `upgrade_separation`；`background.py` 的 `_restorable`、`_resubmit`；`system.py` 的 `prioritize`（加 `_PRIORITIZE_LOCK`）、`_to_front`、`_reprioritize_unfinished`；`pipeline.Jobs.cancel` 加 `queued_only` | 「重做全部歌曲」批次補做的工作改用 `unfinished` 標籤，直播中和升級工作一樣暫停，重開後照樣是 `unfinished`。原本標籤是 `separate,pitch`，不在 `LIVE_BACKGROUND`：直播中按重做全部歌曲，沒處理完的歌立刻開始 CPU 分離與旋律分析。單首優先處理照舊直播中也做；這首已經有排隊中的 `unfinished` 工作時，優先處理取消它、改用步驟標籤重排（原本只移到最前面，直播中還是暫停，複審 P3-4；剛好開始了就不取消、不重排，回「這首正在處理中」；優先處理一次只處理一個請求，連按兩次不會排出兩份，Codex r6-2） | `test_redo_all_unfinished_pauses_while_live`、`test_prioritize_queued_unfinished_runs_while_live`、`test_reprioritize_leaves_started_job_alone`、`test_double_prioritize_makes_one_replacement`、`test_prioritize_started_between_check_and_cancel` |
 | 2.3.5 羅馬拼音的 nn（Codex r5-7） | `static/app.js` 的 `roma2hira`；漏移檢查 `OWN_CHANGES` 加兩條 | `nn` 後面接母音或 y 時只當成一個「ん」，第二個 n 屬於下一個音節（`onna` → おんな、`konnichiha` → こんにちは）；結尾或接子音的 `nn`、`n'` 照舊。原本一律吃掉兩個字元，點詞改讀音時會存成「おんあ」這種錯的讀音 | `tests/test_romaji.py`（用 node 執行從 app.js 取出的 `roma2hira`，沒有 node 就略過） |
+| 5：分離的混合精度退回與卡住（22） | `pipeline.py` 的 `separate_uvr` | 第一段的兩層退回（高品質失敗改標準模型、核對模型檔、`_HQ_FAIL`）2.3.5 上游已經做了（`6ee0964`），fork 只改上游沒有的：混合精度失敗改一般精度重分，**一般精度成功了**才標記之後不用混合精度（兩種都失敗不是精度的問題；兩段都改成這樣），這首的第二段也改用一般精度（上游第二段照用混合精度）。顯示卡沒有進度（`GpuStalled`）第二段也直接放行，交給 `step_separate` 改用 CPU、設 `live_light`（上游第一段已放行，第二段原本會在顯示卡上改用標準模型） | `tests/test_separation.py` 的 `test_first_stage_*`、`test_both_precisions_failing_does_not_mark_autocast_bad`、`test_second_stage_uses_full_precision_after_first_stage_retry`、`test_gpu_stall_is_left_to_step_separate` |
+| 5：停止、讓位不改跑聲像分離（22） | `step_separate` | `JobCancelled`（含 `JobDeferred`）直接放行。原本會先改跑聲像分離（載入 librosa、scipy、寫「AI 分離失敗」的提示），在第一個進度回報才又被停下 | `test_step_separate_does_not_fall_back_to_dsp_on_cancel` |
+| 5：auto 模式 6 GB 門檻（22） | `pipeline.py` 新增 `HQ_MIN_VRAM`、`hq_vram_ok`，`_uses_hq` 加上門檻（`vocal_model`、`karaoke_model`、`wants_hq`、`hq_models_ready`、`hq_disabled`、`separate_uvr` 共用）；`leihu/web/system.py` 的 `status` | auto 模式顯示卡記憶體不到 6 GB 直接用標準模型、不下載高品質模型；還不知道記憶體大小時照舊；選「高品質」照用。門檻是暫定值；6 GB 以下的卡不算要用高品質，所以高品質失敗的次數不會讓 `hq_disabled` 成立、補做也不會被當成沒用到要求的品質；`vocal_model`、`karaoke_model` 再加上 2.3.5 的 `_HQ_FAIL`（這次執行連續失敗 2 次先不用） | `test_auto_quality_checks_vram` |
+| 5：重疊處理時記憶體不夠（36） | `pipeline.py` 新增 `_overlap_oom`、`Jobs._overlapping`（`gpu_worker.CURRENT.overlapping`）；`separate_uvr` 兩段、`step_separate`、`process_song` 的歌詞辨識 | 和別首同時分離時記憶體不夠，不自己退回標準模型、聲像分離或寫「辨識沒有完成」，丟給佇列排回最前面、一次一首重做（`Jobs._work` 原本的重試）；重做那次照原本的方式退回。第一次判定就記在例外上（`overlap_oom`），往上丟的途中另一首剛好做完也照同一個判定 | `test_overlap_oom_*`、`test_step_separate_leaves_overlap_oom_to_the_queue`、`test_lyrics_overlap_oom_is_left_to_the_queue`、`test_jobs_tells_whether_running_alongside`、`test_overlap_judgement_survives_other_song_finishing` |
+| 5：長歌的旋律分析逾時（3.6） | `gpu_worker.py` 新增 `_stall`，`Pool.call` 改用 | 旋律分析沒有中間進度，原本固定 600 秒沒回應就當成卡住；改成 `max(600, 3 × 音訊秒數)`，長歌在 CPU 上不會被誤判 | `test_pitch_stall_grows_with_audio_length` |
 
 第 6a 批 Codex CLI 審查（2026-11-23，`codex exec -s read-only`）提出 6 項：換分軌前先標記、換回失敗留備份、清理舊 WAV 失敗不中斷、`.stale` 寫不進去就停、排隊中的 `mixdown` 再檢查、`_PITCH_RETRIED` 不繞回一般檢查，都已修並補測試；「強制關閉時仍可能一新一舊」只做到先標記，沒有做交易紀錄與開機復原（見上表的限制）。第二輪確認 6 項修正正確，另提出 3 項 P2：已在跑的移調做完會清掉 `.stale`、`compact_song` 拿舊 WAV 蓋掉新 FLAC、刪 `.bak` 失敗回報成失敗，都已修並補測試；也同意沒有開機復原在這個專案可以接受（分軌能從 `mix` 重建），但說明要寫清楚先標記修不好一新一舊的分軌。
 
 第 6b 批 Codex CLI 審查（2026-11-23）提出 6 項 P2、1 項 P3：測試把寫入者計數弄成 -1（沒留住 context manager）、接用時主佇列沒凍結、開歌曲與記演唱次數「檢查後才寫入」、歌詞 GET 與取消下載繞過隔離、啟動時的兩個背景清理沒登記、模型下載檢查與搬移之間的空窗，以及兩個測試沒有走真正的路徑，都已修並補測試。死鎖、Flask 生命週期的計數、取消回呼、延後取路徑這幾項它確認沒有問題。
+
+第 5 批 Codex CLI 審查（2026-11-23）提出 3 項 P2、1 項 P3：重疊處理的判定往上丟時會失效、第一段攔下 `GpuStalled`、一般失敗也永久標壞混合精度、第一段改用一般精度後第二段仍用混合精度，都已修並補測試。取消／讓位、鎖、6 GB 判斷、`_stall` 它確認沒有問題。
+
+第 5 批要在筆電（NVIDIA 顯示卡）上實測的（2026-11-23 程式已改，開發機只有單元測試）：
+
+1. 在開始前的 commit 重錄筆電顯示卡基準（3.10，`tests/numeric/baseline.py <參照> --label=<筆電名稱> --plan=tests/private/plans/refactor.json`），改完的 commit 再錄一次比較；顯示卡上逐位元不會相同，看差距表與相似度門檻。
+2. 6 GB 門檻：記下筆電顯示卡的記憶體大小。6 GB 以上時門檻不會作用，要確認高品質模型照常使用；要測門檻本身，需要不到 6 GB 的顯示卡，或暫時把 `HQ_MIN_VRAM` 調高。
+3. 第一段退回：開著其他吃顯示卡記憶體的程式（遊戲、VTube Studio）處理一首長歌，log 應出現「高品質人聲分離失敗，改用標準模型」或「顯示卡太忙」，歌曲不會變成聲像分離。
+4. 重疊處理：只有顯示卡記憶體 10 GB 以上、設定開了「閒置時兩首同時分離」才會發生（`parallel_ok`）；筆電不到 10 GB 時這項測不到，要在 10 GB 以上的顯示卡上測。
+5. 長歌旋律分析：開直播模式（只用 CPU）處理一首超過 4 分鐘的歌，不應出現「旋律分析 600 秒沒有回應」。
+6. 順便做第 1 批：顯示卡忙碌判斷的門檻是否合理、`nvidia-smi` 每 20 秒取樣的 CPU 使用率。
 
 第 3 批延後（2026-11-23 決定，等重構穩定再考慮）：
 

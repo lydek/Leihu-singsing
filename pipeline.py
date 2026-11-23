@@ -2022,16 +2022,25 @@ def hqv_status() -> dict:
     return dict(HQV_DL)
 
 
+HQ_MIN_VRAM = 6e9   # fork（22）：auto 模式下顯示卡記憶體不到這個就用標準模型（BS-Roformer 放不下）；暫定，未實測
+
+
+def hq_vram_ok() -> bool:
+    """顯示卡記憶體夠不夠用高品質模型。還不知道記憶體大小時照舊（不擋）；不會為了問而開顯示卡處理程式。"""
+    vram = (gpu_info(block=False) or {}).get("vram")
+    return not vram or vram >= HQ_MIN_VRAM
+
+
 def _uses_hq(cfg: dict, key: str) -> bool:
-    """fork（Codex r6-1）：這個設定會不會用高品質模型。vocal_model、karaoke_model、wants_hq、hq_models_ready、
+    """fork（22、Codex r6-1）：這個設定會不會用高品質模型。vocal_model、karaoke_model、wants_hq、hq_models_ready、
     hq_disabled、separate_uvr 共用，判斷一致。"""
     q = cfg.get(key, "auto")
-    return q == "high" or (q == "auto" and cuda_ok())
+    return q == "high" or (q == "auto" and cuda_ok() and hq_vram_ok())
 
 
 def vocal_model(cfg: dict) -> str:
     """要用的人聲／伴奏分離模型。高品質模型還沒下載好時，這首先用標準模型，模型在背景下載。"""
-    if _uses_hq(cfg, "vocal_quality") and _HQ_FAIL["vocal"] < 2:
+    if _uses_hq(cfg, "vocal_quality") and _HQ_FAIL["vocal"] < 2:   # fork（22）：6 GB 門檻；2.3.5：連續失敗 2 次先不用
         if hqv_ready():
             return HQ_VOCAL
         start_hqv_download()
@@ -2388,13 +2397,17 @@ def separate_uvr(d: Path, cfg: dict, report) -> bool:
         except Exception as e:
             if not (vhq and autocast) or "out of memory" in str(e).lower() or "GpuStalled" in type(e).__name__:
                 raise
-            _AUTOCAST["bad"] = True   # 混合精度在這張顯示卡上出問題：之後都改用一般精度
             log_error("autocast vocal separation", e)
             outs = _separate(vmodel, stem_path(d, "mix"), tmp, overlap, False, vlabel, report, 0.08, 0.26, cpu)
+            # fork（22）：一般精度重試成功才算混合精度的問題（兩種都失敗交給下面退回標準模型）；
+            # 之後（含這首的第二段）都改用一般精度
+            _AUTOCAST["bad"] = True
+            autocast = False
     except JobCancelled:
         raise
     except Exception as e:
-        if not vhq or type(e).__name__ == "GpuStalled":
+        # fork（36）：和別首重疊處理時記憶體不夠，交給佇列一次一首重做，不在這裡退回標準模型
+        if not vhq or type(e).__name__ == "GpuStalled" or _overlap_oom(e):
             raise
         # 2.3.5：高品質人聲模型載入或執行失敗（模型檔損壞、顯示卡不支援…）：改用標準模型，不要整首退回聲像分離。
         # 模型檔核對不過就刪掉，下次會重新下載
@@ -2433,16 +2446,18 @@ def separate_uvr(d: Path, cfg: dict, report) -> bool:
         except JobCancelled:
             raise
         except Exception as e:
-            if not (hq and autocast) or "out of memory" in str(e).lower():
+            if _stalled(e) or not (hq and autocast) or "out of memory" in str(e).lower():
                 raise
-            # 混合精度在這張顯示卡上出問題：之後都改用一般精度，這首重新分一次
-            _AUTOCAST["bad"] = True
             log_error("autocast separation", e)
             outs2 = run_kara(kara, label, False)
+            # 混合精度在這張顯示卡上出問題：之後都改用一般精度（fork：一般精度重試成功才算，兩種都失敗不是精度的問題）
+            _AUTOCAST["bad"] = True
     except JobCancelled:
         raise
     except Exception as e:
-        if not hq:
+        # fork：顯示卡卡住交給 step_separate 改用 CPU（原本會在顯示卡上改用標準模型、不設 live_light）；
+        # 36：重疊處理時記憶體不夠交給佇列重做
+        if not hq or _stalled(e) or _overlap_oom(e):
             raise
         # 高品質模型下載失敗或顯示卡記憶體不夠：改用標準模型，不要整首失敗
         print(f"[separate] 高品質主唱分離失敗，改用標準模型：{type(e).__name__}: {e}", flush=True)
@@ -2561,7 +2576,11 @@ def step_separate(d: Path, cfg: dict, report) -> bool:
             # fork（Codex r5-3）：這次途中高品質失敗改用標準模型、或高品質這次執行已停用，不算補做完成。
             # 看實際發生的事，不重算設定（重算會和 vocal_model 的判斷不一致）
             light = light or bool(missed)
+        except JobCancelled:
+            raise   # fork（22）：停止、讓位不是分離失敗，不改跑聲像分離
         except Exception as e:
+            if _overlap_oom(e):
+                raise   # fork（36）：交給佇列一次一首重做
             traceback.print_exc()
             notes.append(f"AI 分離失敗，改用聲像分離：{e}")
             separate_dsp(d, report)
@@ -3455,6 +3474,25 @@ def score_take(d: Path, take_id: str, report) -> None:
 
 # ---------------------------------------------------------------- 背景工作
 
+def _overlap_oom(e: Exception) -> bool:
+    """fork（36）：和別首重疊處理時顯示卡記憶體不夠。不要自己退回標準模型或聲像分離，交給佇列排回最前面、
+    一次一首重做（Jobs._work 的記憶體不夠重試）；原本兩首都變成標準品質，或一首變成聲像分離。"""
+    if getattr(e, "overlap_oom", False):   # 下面那層已經判定過：往上丟的途中另一首剛好做完，也照同一個判定
+        return True
+    import gpu_worker as G
+    overlapping = getattr(G.CURRENT, "overlapping", None)
+    if "out of memory" in str(e).lower() and overlapping and overlapping():
+        with contextlib.suppress(AttributeError):   # 少數內建例外不能加屬性：就只靠這一次的判斷
+            e.overlap_oom = True
+        return True
+    return False
+
+
+def _stalled(e: Exception) -> bool:
+    """顯示卡處理程式沒有進度（gpu_worker.GpuStalled）：交給 step_separate 改用 CPU＋標準模型。"""
+    return type(e).__name__ == "GpuStalled"
+
+
 class JobCancelled(Exception):
     """工作被新的要求取代（例如又換了 KEY），中途停止。"""
 
@@ -3877,6 +3915,10 @@ class Jobs:
                         n += 1
         return n
 
+    def _overlapping(self, jid: str) -> bool:
+        with self.lock:
+            return len(self.running) > 1 and not (self.state.get(jid) or {}).get("oom_retry")
+
     def stems_busy(self, song_id: str) -> bool:
         """fork（D6、68）：這首歌有沒有會重寫分軌的工作在執行（匯入、分離、主唱補回；只重做旋律、歌詞的不算）。"""
         with self.lock:
@@ -4006,6 +4048,8 @@ class Jobs:
                 raise JobDeferred("paused")
         import gpu_worker as G
         G.CURRENT.check = check
+        # fork（36）：和別首同時在跑、而且這首還沒因為記憶體不夠重做過（重做時照原本的方式退回標準模型）
+        G.CURRENT.overlapping = lambda: self._overlapping(jid)
         try:
             fn(report)
             self.update(jid, status="done", step="完成", progress=1.0)
@@ -4030,7 +4074,8 @@ class Jobs:
             self.update(jid, status="error", error=str(e))
         except Exception as e:
             traceback.print_exc()
-            if "out of memory" in str(e).lower() and not self.state[jid].get("oom_retry") and len(self.running) > 1:
+            if ("out of memory" in str(e).lower() and not self.state[jid].get("oom_retry")
+                    and (len(self.running) > 1 or getattr(e, "overlap_oom", False))):   # fork（36）：判定時是重疊處理
                 # 兩首同時處理時顯示卡記憶體不夠：接下來十分鐘只處理一首，這首排回最前面重做
                 self.oom_until = time.time() + 600
                 free_gpu()
@@ -4045,7 +4090,7 @@ class Jobs:
             else:
                 self.update(jid, status="error", error=f"{type(e).__name__}: {e}")
         finally:
-            G.CURRENT.check = None
+            G.CURRENT.check = G.CURRENT.overlapping = None
             with self.cv:
                 self.running.pop(jid, None)
                 (self.state.get(jid) or {}).pop("pause", None)
@@ -4118,6 +4163,8 @@ def process_song(song_id: str, steps: list[str], cfg_override: dict | None = Non
                     write_meta(d, meta)
                 raise
             except Exception as e:
+                if _overlap_oom(e):
+                    raise   # fork（36）：重疊處理時記憶體不夠，交給佇列一次一首重做，不算辨識失敗
                 traceback.print_exc()
                 with _META_LOCK:   # 讀出到寫回之間不讓別的執行緒改這首歌的資料
                     meta = read_meta(d)
