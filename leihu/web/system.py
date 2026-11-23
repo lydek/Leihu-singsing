@@ -32,9 +32,9 @@ def status():
     cfg = P.load_config()
     mods = P.module_status()
     q = cfg.get("karaoke_quality", "auto")
-    hq = P.hq_status() if (q == "high" or (q == "auto" and mods.get("cuda"))) else None
+    hq = P.hq_status() if (q == "high" or (q == "auto" and mods.get("cuda") and P.hq_vram_ok())) else None   # fork（22）
     vq = cfg.get("vocal_quality", "auto")
-    hqv = P.hqv_status() if (vq == "high" or (vq == "auto" and mods.get("cuda"))) else None
+    hqv = P.hqv_status() if (vq == "high" or (vq == "auto" and mods.get("cuda") and P.hq_vram_ok())) else None
     # fork：外站網頁可以用 <img> 一直打這個網址讓背景工作一直暫停，只認本機頁面
     # （瀏覽器會帶 Sec-Fetch-Site；本機的其他程式不帶，照常算）
     if request.args.get("live") == "1" and request.headers.get("Sec-Fetch-Site") != "cross-site":

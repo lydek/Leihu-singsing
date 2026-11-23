@@ -82,7 +82,7 @@
 | 12 | `3d0fd5f` | 步驟 2：值物件、`update_song`、背景工作佇列 | 不做 | 上游 2.3.2 已有 `meta.json` 的鎖、原子寫入、`update_meta` 和佇列；延後：會改變行為（`step2-plan.md` 的 API 變更 D1–D6、`step_import` 補鎖，3.19）；D2、D4、D6、`step_import` 補鎖下一版第 2 批已修，D1、D3 下一版第 3 批已修，D5 延後（`next-version-plan.md`） |
 | 13 | `c84046a` | 步驟 3：ml-worker、外部網址、伺服器記憶體 | 不做 | 沿用上游 `gpu_worker.py`，不做 ml-worker（3.6）；延後：效能調整（伺服器不載入 librosa／scipy／numba，3.19）；`LIANTAI_URL_BASE` 不做；`LIANTAI_NO_JOBS`、數值比對工具已做（3.19） |
 | 21 | `7247929` | 步驟 4：拆出 config、dsp、media、lyrics、llm、render | 重做 | 改用：只拆上游 v1.6 以來沒改過的純運算（音高後處理、歌詞文字），原因：上游常改 `pipeline.py`，整個拆開同步成本太高（3.19） |
-| 22 | `34b292d` | BS-Roformer 補強 | 延後 | HF 網址上游 2.2.0 已修；主唱與合音分離失敗退回、讓位（`JobDeferred` 是 `JobCancelled` 的子類別）不標壞混合精度，上游都已有；延後：會改變行為（第一段分離的兩層退回、auto 模式 6 GB 門檻）（3.20） |
+| 22 | `34b292d` | BS-Roformer 補強 | 延後 | HF 網址上游 2.2.0 已修；主唱與合音分離失敗退回、讓位（`JobDeferred` 是 `JobCancelled` 的子類別）不標壞混合精度，上游都已有；延後：會改變行為（第一段分離的兩層退回、auto 模式 6 GB 門檻）（3.20）；下一版第 5 批已修（`next-version-plan.md`，筆電實測未做） |
 | 45 | `07c4be0` | 拆 `read_sheet`、`sheet.render` | 不做 | 步驟 4 改成只拆穩定區塊（3.19），`read_sheet` 在 v1.6 之後改過，不在其中 |
 
 ### F. 寫在 `leihu/` 上的審查修正
