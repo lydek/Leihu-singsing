@@ -192,13 +192,26 @@ def job_cancel(jid):
         raise P.UserError("這個工作已經結束了")
     j = q.get(jid) or {}
     if j.get("label") == "youtube":   # 還在排隊的 YouTube 下載被取消：歌名標成「已取消下載」，之後可以重新下載
-        try:
-            d = P.song_dir(j["song"])
-            if not P.read_meta(d).get("steps", {}).get("import"):
-                P.set_dl_state(d, "cancelled")
-        except Exception:
-            pass
+        with P.library_write_slot() as w:
+            if w:
+                _mark_dl_cancelled(j["song"])
+        if not w:   # fork（70）：搬移中，搬完再寫到新的位置（不讓這個請求等幾分鐘；不寫的話重開會自動重新下載）
+            threading.Thread(target=_mark_dl_cancelled_after_move, args=(j["song"],), daemon=True).start()
     return jsonify(ok=True)
+
+
+def _mark_dl_cancelled(sid: str) -> None:
+    try:
+        d = P.song_dir(sid)
+        if not P.read_meta(d).get("steps", {}).get("import"):
+            P.set_dl_state(d, "cancelled")
+    except Exception:
+        pass
+
+
+def _mark_dl_cancelled_after_move(sid: str) -> None:
+    with P.library_writer():
+        _mark_dl_cancelled(sid)
 
 
 @bp.post("/api/songs/<sid>/prioritize")

@@ -21,7 +21,8 @@ def prefetcher() -> None:
             if P.YT_PAUSE["on"]:
                 continue
             for sid in jobs.upcoming("youtube", 2):
-                P.prefetch_youtube(sid)
+                with P.library_writer():   # fork（69）：搬移中等搬完（下載會寫進歌曲資料夾）
+                    P.prefetch_youtube(sid)
         except Exception as e:
             P.log_error("prefetcher", e)
 
@@ -81,22 +82,24 @@ def remove_duet_leftovers() -> None:
     except OSError:
         return
     for d in dirs:
-        found = False
-        for f in [*d.glob("male.*"), *d.glob("female.*"), *d.glob("parts.json"), *d.glob("v*/male.*"), *d.glob("v*/female.*")]:
-            try:
-                f.unlink() if f.is_file() else shutil.rmtree(f, ignore_errors=True)
-                found = True
-            except OSError:
-                pass
-        if found and (d / "meta.json").exists():
-            try:
-                with P._META_LOCK:
-                    m = P.read_meta(d)
-                    if "parts_stems" in m:
-                        m.pop("parts_stems", None)
-                        P.write_meta(d, m)
-            except Exception as e:
-                P.log_error("remove_duet_leftovers", e)
+        with P.library_writer():   # fork（69）：搬移中等搬完，再用新的位置
+            d = P.LIB / d.name
+            found = False
+            for f in [*d.glob("male.*"), *d.glob("female.*"), *d.glob("parts.json"), *d.glob("v*/male.*"), *d.glob("v*/female.*")]:
+                try:
+                    f.unlink() if f.is_file() else shutil.rmtree(f, ignore_errors=True)
+                    found = True
+                except OSError:
+                    pass
+            if found and (d / "meta.json").exists():
+                try:
+                    with P._META_LOCK:
+                        m = P.read_meta(d)
+                        if "parts_stems" in m:
+                            m.pop("parts_stems", None)
+                            P.write_meta(d, m)
+                except Exception as e:
+                    P.log_error("remove_duet_leftovers", e)
     try:
         flag.write_text("1", "utf-8")
     except OSError:
@@ -137,23 +140,31 @@ def _lead_fix_scan() -> None:
                 _PITCH_RETRIED.add(sid)
                 jobs.submit("process", sid, P.lead_fix_job(sid, after=prerender_key), label="leadfix")
                 continue
-            d = P.song_dir(sid)
-            try:
-                lead = P.read_audio(P.stem_path(d, "lead"), sr=P.PITCH_SR, mono=True, fallback=False)
-                back = P.read_audio(P.stem_path(d, "back"), sr=P.PITCH_SR, mono=True, fallback=False)
-                g, sec, stats = P._lead_gap_gain(lead, back, P.PITCH_SR, P._lyric_spans(d))
-            except Exception as e:
-                P.log_error("lead_fix_sweep", e)
-                continue
-            if g is None:
-                P._split_note(d, stats)
-                P.update_meta(d, lead_fix=P.LEAD_FIX_V, lead_fix_sec=0, lead_fix_lrc=P._lrc_stamp(d))
-            else:
+            sec = _lead_gap(sid)
+            if sec is not None:
                 print(f"[separate] {s.get('title') or sid}：主唱約 {sec:.0f} 秒被分到合音，排入背景修正", flush=True)
                 jobs.submit("process", sid, P.lead_fix_job(sid, after=prerender_key), label="leadfix")
             time.sleep(0.5)
     except Exception as e:
         P.log_error("lead_fix_sweep", e)
+
+
+def _lead_gap(sid: str) -> float | None:
+    """只讀檔判斷主唱有沒有被分到合音。沒有的直接記下已檢查、回傳 None；有的回傳要搬幾秒；讀不了回傳 None。"""
+    with P.library_writer():   # fork（69）：會寫 meta.json；搬移中等搬完再用新的位置
+        try:
+            d = P.song_dir(sid)
+            lead = P.read_audio(P.stem_path(d, "lead"), sr=P.PITCH_SR, mono=True, fallback=False)
+            back = P.read_audio(P.stem_path(d, "back"), sr=P.PITCH_SR, mono=True, fallback=False)
+            g, sec, stats = P._lead_gap_gain(lead, back, P.PITCH_SR, P._lyric_spans(d))
+            if g is None:
+                P._split_note(d, stats)
+                P.update_meta(d, lead_fix=P.LEAD_FIX_V, lead_fix_sec=0, lead_fix_lrc=P._lrc_stamp(d))
+                return None
+            return sec
+        except Exception as e:
+            P.log_error("lead_fix_sweep", e)
+            return None
 
 
 def live_light_upgrade() -> None:
@@ -197,13 +208,15 @@ def loudness_backfill() -> None:
     for d in dirs:
         while any(j["status"] == "running" for j in jobs.active() + vjobs.active()):
             time.sleep(30)
-        try:
-            meta = P.read_meta(d)
-            if meta.get("steps", {}).get("separate") and not meta.get("combo_lufs"):
-                P.measure_stem_loudness(d)
-                time.sleep(1)
-        except Exception as e:
-            P.log_error("loudness_backfill", e)
+        with P.library_writer():   # fork（69）：搬移中等搬完，再用新的位置
+            try:
+                d = P.LIB / d.name
+                meta = P.read_meta(d)
+                if meta.get("steps", {}).get("separate") and not meta.get("combo_lufs"):
+                    P.measure_stem_loudness(d)
+            except Exception as e:
+                P.log_error("loudness_backfill", e)
+        time.sleep(1)
 
 
 # ---------------------------------------------------------------- 佇列跨重開保存（2.3.3）

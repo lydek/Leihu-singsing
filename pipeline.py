@@ -13,6 +13,7 @@
 """
 from __future__ import annotations
 
+import contextlib
 import json
 import os
 import queue
@@ -1924,7 +1925,10 @@ def _start_download(files: dict, tracker: dict, ready) -> None:
     with _hq_lock:
         if tracker["state"] == "downloading" or ready():
             return
-        tracker.update(state="downloading", error="")
+        with _LIB_CV:   # fork（70）：搬移中不開始（下載完的檔案會留在舊位置）；和 set_moving 同一把鎖，搬移開始後一定看得到這次的「下載中」
+            if STORAGE["moving"]:
+                return
+            tracker.update(state="downloading", error="")
 
     def run():
         try:
@@ -3556,6 +3560,8 @@ class Jobs:
         # fork（D6）：wait_for(狀態) 為真的工作先跳過、做後面的。會拿另一條佇列的鎖：
         # 兩條佇列要同時拿鎖時，一律先拿有 wait_for 的這條，不會互等
         self.wait_for = wait_for
+        self.frozen = False   # fork（69）：搬移歌曲庫中不開始新的工作（不寫進設定，和全部暫停不同）
+        self._on_cancel: dict = {}   # fork（69）：排隊中被取消時要呼叫的收尾
         if live_safe:
             try:
                 self.paused = bool(load_config().get("queue_paused"))
@@ -3613,6 +3619,8 @@ class Jobs:
     def _next(self, hold: bool, slots: int):
         """挑下一個要做的工作。直播中跳過背景工作，先做使用者在等的（例如直播中匯入的歌）。
         回傳 (jid, fn, 只剩直播中暫停的工作)。"""
+        if self.frozen:   # fork（69）：搬移歌曲庫中
+            return None, None, False
         for n, (jid, fn) in enumerate(self.pending):
             st = self.state.get(jid) or {}
             if st.get("status") == "cancelled":
@@ -3628,12 +3636,16 @@ class Jobs:
             if not self._can_start(st, slots):
                 return None, None, False   # 依順序等前面的，不插隊
             self.pending.pop(n)
+            self._on_cancel.pop(jid, None)   # fork（69）：取出來就要開始了，之後的停止由工作自己收尾
             return jid, fn, False
         return None, None, bool(self.pending) and not self.paused
 
-    def submit(self, kind: str, song_id: str, fn, label: str = "") -> str:
+    def submit(self, kind: str, song_id: str, fn, label: str = "", on_cancel=None) -> str:
+        """on_cancel（fork）：還沒開始就被使用者停止時呼叫（例如搬移歌曲庫排隊時先暫停了佇列，要恢復）。"""
         jid = uuid.uuid4().hex[:10]
         with self.cv:
+            if on_cancel:
+                self._on_cancel[jid] = on_cancel
             old = time.time() - 3600   # 結束超過一小時的工作紀錄不用再留（大量匯入時會累積上千筆）
             for k in [k for k, j in self.state.items() if j.get("finished", old + 1) < old]:
                 del self.state[k]
@@ -3747,14 +3759,27 @@ class Jobs:
             j = self.state.get(jid)
             if not j:
                 return False
+            cb = None
             if j["status"] == "queued":
                 j.update(status="cancelled", step="已取消")
-                return True
-            if j["status"] == "running":
+                cb = self._on_cancel.pop(jid, None)
+            elif j["status"] == "running":
                 j["cancel"] = True
                 j["step"] = "停止中…"
-                return True
-        return False
+            else:
+                return False
+        if cb:   # 鎖外呼叫：收尾可能要再操作佇列（例如恢復暫停狀態）
+            try:
+                cb()
+            except Exception as e:
+                log_error("on_cancel", e)
+        return True
+
+    def freeze(self, on: bool) -> None:
+        """fork（69）：搬移歌曲庫時不開始新的工作（已經在跑的照常做完）。"""
+        with self.cv:
+            self.frozen = on
+            self.cv.notify_all()
 
     def position(self, jid: str) -> int:
         """前面還有幾個工作。"""
@@ -4013,13 +4038,15 @@ def search_lyrics_later(d: Path, cfg: dict, apply_first: bool = False) -> None:
         _LYRICS_POOL = ThreadPoolExecutor(max_workers=1, thread_name_prefix="lyrics-search")
 
     def run():
-        try:
-            if d.exists():
-                find_and_store_candidates(d, cfg, apply_first=apply_first)
-        except Exception as e:
-            traceback.print_exc()   # 沒有網路或網站不通時，維持辨識結果
-            if apply_first and d.exists():
-                _lyrics_note(d, f"線上歌詞搜尋失敗（{e}）。可以在練唱畫面按「搜尋線上歌詞」再試一次，或用「重新處理 → 只重新辨識歌詞」自動辨識。")
+        with library_writer():   # fork（69）：搬移中等搬完，再用新的位置
+            dd = LIB / d.name
+            try:
+                if dd.exists():
+                    find_and_store_candidates(dd, cfg, apply_first=apply_first)
+            except Exception as e:
+                traceback.print_exc()   # 沒有網路或網站不通時，維持辨識結果
+                if apply_first and dd.exists():
+                    _lyrics_note(dd, f"線上歌詞搜尋失敗（{e}）。可以在練唱畫面按「搜尋線上歌詞」再試一次，或用「重新處理 → 只重新辨識歌詞」自動辨識。")
     _LYRICS_POOL.submit(run)
 
 
@@ -4273,17 +4300,19 @@ def clear_false_recheck() -> int:
     """2.1.0 的判斷太嚴，把很多歌詞沒問題的歌也標成「建議重新匯入歌詞」：依新的標準重新判斷一次。"""
     n = 0
     for d in LIB.iterdir() if LIB.exists() else []:
-        mp = d / "meta.json"
-        if not mp.exists():
-            continue
-        try:
-            m = read_meta(d)
-        except Exception:
-            continue
-        rc = m.get("lyrics_recheck")
-        if isinstance(rc, dict) and not recheck_bad(rc.get("fit"), rc.get("before")):
-            update_meta(d, lyrics_recheck=None)
-            n += 1
+        with library_writer():   # fork（69）：搬移中等搬完，再用新的位置
+            d = LIB / d.name
+            mp = d / "meta.json"
+            if not mp.exists():
+                continue
+            try:
+                m = read_meta(d)
+            except Exception:
+                continue
+            rc = m.get("lyrics_recheck")
+            if isinstance(rc, dict) and not recheck_bad(rc.get("fit"), rc.get("before")):
+                update_meta(d, lyrics_recheck=None)
+                n += 1
     return n
 
 
@@ -4633,6 +4662,56 @@ def save_categories(cats: list[str]) -> None:
 
 # ---------------------------------------------------------------- 歌曲庫／模型搬移（2.3.0）
 STORAGE = {"moving": False}   # 搬移中：擋住會寫進歌曲庫的操作
+
+# fork（69）：寫進歌曲庫的人（HTTP 寫入請求、背景歌詞搜尋、預先下載、補量響度、主唱補回檢查）先登記。
+# 搬移開始後不再有新的寫入者，搬移等目前的寫完才複製；不然複製途中寫進舊位置的東西，搬完就不見了
+_LIB_CV = threading.Condition()
+_LIB_WRITERS = [0]
+
+
+@contextlib.contextmanager
+def library_writer(wait: bool = True):
+    """寫進歌曲庫前用 with 包起來。搬移中：wait=True 等搬完（之後要用 LIB 重新取路徑），wait=False 丟 UserError。"""
+    with _LIB_CV:
+        while STORAGE["moving"]:
+            if not wait:
+                raise UserError("正在搬移歌曲庫，搬完才能操作歌曲（大約幾分鐘，進度在處理清單）")
+            _LIB_CV.wait(1)
+        _LIB_WRITERS[0] += 1
+    try:
+        yield
+    finally:
+        with _LIB_CV:
+            _LIB_WRITERS[0] -= 1
+            _LIB_CV.notify_all()
+
+
+@contextlib.contextmanager
+def library_write_slot():
+    """順手補寫用（開歌曲時補量響度、記演唱次數）：搬移中回傳 False（這次只讀，下次再補），
+    否則登記成寫入者、回傳 True。檢查和登記在同一把鎖內，不會看到「沒在搬移」之後搬移才開始。"""
+    cm = library_writer(wait=False)
+    try:
+        cm.__enter__()
+    except UserError:
+        yield False
+        return
+    try:
+        yield True
+    finally:
+        cm.__exit__(None, None, None)
+
+
+def set_moving(on: bool) -> None:
+    with _LIB_CV:
+        STORAGE["moving"] = on
+        _LIB_CV.notify_all()
+
+
+def wait_library_idle(timeout: float) -> bool:
+    """等目前的寫入者都寫完；timeout 秒內沒等到回傳 False。"""
+    with _LIB_CV:
+        return _LIB_CV.wait_for(lambda: _LIB_WRITERS[0] == 0, timeout)
 
 
 def dir_size(p: Path) -> tuple[int, int]:

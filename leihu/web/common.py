@@ -60,7 +60,7 @@ def prerender_key(sid: str) -> str | None:
         return None
     label = f"{key}:1.0"
     return vjobs.find("variant", sid, label) or vjobs.submit(
-        "variant", sid, lambda report: P.step_variant(d, key, 1.0, report), label=label)
+        "variant", sid, lambda report: P.step_variant(P.song_dir(sid), key, 1.0, report), label=label)  # 開始時才取路徑（搬移歌曲庫）
 
 
 def after_process(sid: str) -> None:

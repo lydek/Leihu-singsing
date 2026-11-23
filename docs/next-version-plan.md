@@ -4,7 +4,7 @@
 
 ## 1. 先決定的事
 
-- **版號**：3.15 的第 4 段是 fork 序號（同步時照 3.21 設成「上游版本＋.1」）。這一版會改變行為，要單獨發 2.3.4.2，還是等下一次同步上游時一起發。
+- **版號**：3.15 的第 4 段是 fork 序號（同步時照 3.21 設成「上游版本＋.1」）。**2026-11-23 決定：第 6b 批完成後單獨發 2.3.4.2**，不等下一次同步上游。
 - **改上游擁有的檔案會讓同步變難**：`pipeline.py`、`gpu_worker.py`、`score_sheet.py`（M6）、`share.py`（S19）、`static/app.js`、`installer.py` 等，每多一處 fork 的修改，同步上游時就多一處要手動合併（3.21）；`--leak` 不比對後端檔案的內容，只檢查上游新增的名稱找不找得到；後端的修改只靠 3.21 步驟 4 逐一比對。真的是上游 bug 的（例如缺 `import subprocess`、`_set_priority`、M6），可以考慮回報給上游，上游修了之後同步就會帶進來；回報要你決定，也要你送出。
 - **前端**：D2（刪除處理中的歌回 400）要改 `static/app.js` 才看得到錯誤。`app.js` 是照上游同步的檔案，改了要登記在漏移檢查的 `OWN_CHANGES`。
 - **ruff 的範圍**：目前全 repo 311 個違規（`leihu/` 62 個、`tests/` 35 個，其餘在上游的檔案；2026-11-23 補 `import subprocess` 後，`uvx ruff@0.17.5 check .`）。`leihu/` 是上游程式原封搬過去的（3.19），同步時 hunk 會套到這裡（3.21），清了一樣會和同步衝突；建議只在 `tests/` 啟用。
@@ -23,6 +23,7 @@
 | 5 分離的退回 | 22 的第一段分離兩層退回、auto 模式 6 GB 門檻；36 的重疊處理 OOM；長音訊旋律分析逾時依長度放寬（3.6） | 顯示卡記憶體不夠時改用較小的模型，不是失敗；長歌在 CPU 上不會逾時 | 高。6 GB 門檻沒有實測，要在筆電量 | 用測試強制觸發顯示卡記憶體不足、CUDA 失敗（基準不會觸發，3.10）；筆電顯示卡基準（3.10）；數值基準；長歌 CPU 實測 |
 | 6 搬移與分軌一致性 | 69、70（搬移時的寫入者計數與隔離、主唱補回清 KEY 版本、KEY 版本失效、旋律過期、兩軌一起換、補做標記、`live_light`、`read_audio(fallback=False)`） | 搬移歌曲庫時背景工作不會寫到舊位置；換分軌後舊的 KEY 版本和旋律會重做 | 高。會改分軌，3.20 決定沒有數值參考輸出之前不合併 | 先用測試計畫在開始前的 commit 錄數值基準（見表下說明）；每項各自的回歸測試 |
 | 7 效能調整（3.8 第二階段） | 6 的 R2（`/api/status` 不 import torch）、R3（`OPENBLAS_NUM_THREADS`）；伺服器不載入 librosa／scipy／numba（3.19）；38 的濾波分段；S31（`SetErrorMode`、`ffmpeg_path()` 從 import 搬到 `init_runtime()`）；`_local` 依第 1 節的決定（S31、`_local` 是行為改變，另外測 `gpu_worker` 子程式的分離、音高、歌詞路徑，3.2） | 伺服器記憶體變少、啟動變快；數值輸出可能有微小差異（濾波、執行緒數） | 中到高。librosa 的替代實作會和上游分歧 | CPU 效能基準（`tests/perf/baseline.py`）和相似度基準（3.8：寫明快了多少、輸出差多少，門檻不比上游自己跑多次的差異嚴）；數值基準逐檔比對，有差異要說明 |
+| 8 AMD 顯示卡實驗（2026-11-23 新增） | 先做標準分軌：現有 `UVR-MDX-NET-Inst_HQ_3.onnx`、`UVR_MDXNET_KARA_2.onnx` 改走 ONNX Runtime DirectML；之後再評估高品質分軌（BS-RoFormer／MelBand RoFormer）與 torchcrepe 走 PyTorch ROCm、歌詞辨識走 CTranslate2 ROCm 或 whisper.cpp Vulkan | RX 9070 XT 等 AMD 顯示卡的分離可以不用 CPU | 高。audio-separator 的 DirectML 是實驗性的（CI 用 NVIDIA 驗證），RoFormer 在 DirectML 下預設回 CPU；Radeon 都沒有實跑過 | 同一首歌固定權重、overlap、精度，用數值基準比對 CPU 與 DirectML 的三軌輸出（逐位元不會相同，用相似度門檻），記錄耗時、顯示卡記憶體與實際用的推論後端；特別聽副歌主唱有沒有被分到合音。先做成實驗開關，不改預設 |
 
 建議順序：1 → 2 → 3 → 4，之後依需要做 5、6、7。第 1 批小，可以先驗證「改上游檔案」對同步流程的影響；第 6 批要等數值基準。第 5、6、7 批開始前，先用測試計畫在開始前的 commit 錄 CPU 數值、效能基準（第 1–4 批都還沒做時就是 2.3.4.1；已經做了的話，先用 `--against=v2.3.4.1` 確認數值輸出沒變）。第 7 批另外錄相似度基準（3.8，評分在 v2.3.3 改過，v2.3.2 的不能沿用）。筆電顯示卡基準是 v2.3.2 錄的，第 5 批要在開始前的 commit 重錄。
 
@@ -55,8 +56,15 @@ fork 對上游後端檔案的修改（同步時 3.21 步驟 4 要確認沒被蓋
 | 6a：`live_light`（69、70） | `step_separate` 回傳實際上是不是用輕量設定分離；`process_song`、`fine_job` 改用 | 補做高品質、精細處理時顯示卡又卡住、中途改用 CPU 標準模型做完，不再把 `live_light` 清掉，之後會再補做 | `test_upgrade_keeps_live_light_when_gpu_stalls`、`test_fine_job_keeps_live_light_when_gpu_stalls`、`test_step_separate_reports_light_fallback` |
 | 6a：節省空間不蓋掉新分軌（Codex 第二輪） | `pipeline.py` 的 `compact_song` | 同名 FLAC 已經存在時以 FLAC 為準，只刪多餘的舊 WAV。原本會把刪不掉而留下的舊 WAV 轉成 FLAC、蓋掉主唱補回後的新分軌 | `test_compact_keeps_newer_flac_over_leftover_wav` |
 | 6a：讀自己的分軌（70） | `read_audio` 新增 `fallback`；主唱、合音的讀取（`fix_lead_gaps`、`harmony_ratio`、`analysis_vocal`、`vocal_energy_phrases`、背景的主唱補回檢查）用 `fallback=False` | soundfile 讀不了時直接報錯，不退回 audioread（可能讀出殘缺的音訊又不報錯）。傳 `sf.SoundFile` 給 librosa，走的是同一段讀法，數值完全相同 | `test_read_audio_without_fallback_*` |
+| 6b：寫入者計數（69） | `pipeline.py` 新增 `library_writer`、`set_moving`、`wait_library_idle`；`leihu/web/security.py`（`MOVE_BLOCK` 的寫入請求算寫入者，`teardown_app_request` 離開）；背景的預先下載、補量響度、主唱補回檢查（拆出 `_lead_gap`）、`search_lyrics_later`；`leihu/web/storage.py` 新增 `_library_frozen` | 搬移、接用歌曲庫前擋住新的寫入、凍結 KEY 佇列（`Jobs.freeze`），等正在寫的做完才複製；等超過 600 秒（接用 30 秒）就放棄、歌曲庫不動（原本 KEY 轉換等 600 秒後照樣開始搬）。背景工作在搬移中等搬完，之後用新的位置。啟動時的 `remove_duet_leftovers`、`clear_false_recheck` 也逐首登記 | `tests/test_storage_move.py` 的 `test_writer_*`、`test_http_write_request_*`、`test_frozen_*`、`test_background_lyrics_search_waits_for_move` |
+| 6b：取消排隊中的搬移（69） | `pipeline.Jobs` 的 `submit(on_cancel=)`、`cancel`；`storage_move` | 搬移還沒開始就被停止時，恢復原本的全部暫停狀態（原本一直停在全部暫停，而且已經寫進 config.json）；工作開始後就不呼叫 | `test_cancel_queued_move_restores_pause`、`test_on_cancel_not_called_after_start` |
+| 6b：搬移中只讀（70） | `pipeline.library_write_slot`；`leihu/web/library.py` 的 `song`（GET）、`leihu/web/live.py` 的 `setlist_add`、`leihu/web/lyrics.py` 的歌詞與候選 GET、`leihu/web/system.py` 的 `job_cancel` | 搬移中開歌曲不補寫 `last_opened`、清唱判斷、響度；歌詞 GET 不存回修正、候選 GET 不補做；歌單照記，但演唱次數不寫到舊位置。檢查和登記寫入者在同一把鎖內（不會看到「沒在搬移」之後搬移才開始）。搬移中取消排隊的 YouTube 下載，搬完再標成已取消 | `test_song_get_is_read_only_while_moving`、`test_setlist_count_skipped_while_moving`、`test_lyrics_get_is_read_only_while_moving`、`test_cancel_youtube_while_moving_marks_after_move`、`test_write_slot` |
+| 6b：開始時才取路徑（70） | `leihu/web/common.py` 的 `prerender_key`、`library.py` 的 `variant`、`mixdown`、`takes.py` 的評分、重新評分、`_need_variant`、匯出 | 排隊中的 KEY 轉換、評分、匯出在開始時才用歌曲編號取路徑，搬移後不再讀寫舊位置 | `test_queued_variant_resolves_path_when_it_starts` |
+| 6b：接用與背景下載（70） | `storage_adopt`（新增 `ADOPT_WAIT`）；`pipeline._start_download`；`storage_move` | 接用現有歌曲庫期間主佇列、KEY 佇列都凍結，也等背景寫入（原本只看主佇列，而且沒上鎖）；搬移中不開始背景下載模型（和 `set_moving` 同一把鎖），真正開始搬模型時再檢查一次下載狀態 | `test_adopt_waits_for_running_variant`、`test_adopt_freezes_main_queue`、`test_no_background_model_download_while_moving`、`test_move_rechecks_model_download_when_it_starts` |
 
 第 6a 批 Codex CLI 審查（2026-11-23，`codex exec -s read-only`）提出 6 項：換分軌前先標記、換回失敗留備份、清理舊 WAV 失敗不中斷、`.stale` 寫不進去就停、排隊中的 `mixdown` 再檢查、`_PITCH_RETRIED` 不繞回一般檢查，都已修並補測試；「強制關閉時仍可能一新一舊」只做到先標記，沒有做交易紀錄與開機復原（見上表的限制）。第二輪確認 6 項修正正確，另提出 3 項 P2：已在跑的移調做完會清掉 `.stale`、`compact_song` 拿舊 WAV 蓋掉新 FLAC、刪 `.bak` 失敗回報成失敗，都已修並補測試；也同意沒有開機復原在這個專案可以接受（分軌能從 `mix` 重建），但說明要寫清楚先標記修不好一新一舊的分軌。
+
+第 6b 批 Codex CLI 審查（2026-11-23）提出 6 項 P2、1 項 P3：測試把寫入者計數弄成 -1（沒留住 context manager）、接用時主佇列沒凍結、開歌曲與記演唱次數「檢查後才寫入」、歌詞 GET 與取消下載繞過隔離、啟動時的兩個背景清理沒登記、模型下載檢查與搬移之間的空窗，以及兩個測試沒有走真正的路徑，都已修並補測試。死鎖、Flask 生命週期的計數、取消回呼、延後取路徑這幾項它確認沒有問題。
 
 第 3 批延後（2026-11-23 決定，等重構穩定再考慮）：
 
@@ -83,7 +91,7 @@ fork 對上游後端檔案的修改（同步時 3.21 步驟 4 要確認沒被蓋
     - 分軌改了、旋律還沒重新分析就按停止（主唱補回後、重新分離後），`pitch.json` 一直是舊的；沒有記號可以補做（69、70 的 `pitch_stale`）。
     - 補做高品質時顯示卡又卡住、改用 CPU 標準模型做完，`process_song` 用開始前讀到的 `live_light` 判斷，把 `step_separate` 剛設的 `live_light` 清掉，之後不會再補做（69：`step_separate` 回傳實際的分離方式）。
     - 伺服器讀自己的分軌時，soundfile 讀不了會退回 librosa，掩蓋壞檔（70 的 `read_audio(fallback=False)`）。
-  - **搬移歌曲庫**（3.20 判定不是使用者資料遺失：寫到舊位置的都能重新產生，舊位置也還在）：
+  - **搬移歌曲庫**（第 6b 批已修；3.20 判定不是使用者資料遺失：寫到舊位置的都能重新產生，舊位置也還在）：
     - 背景工作（線上歌詞搜尋、補量響度、主唱補回檢查、YouTube 預先下載）和搬移開始前已經進來的寫入請求，在複製途中寫進舊位置；KEY 轉換等 600 秒後照樣開始搬（69 的 `library_writer` 計數、`vjobs.freeze`、等太久就放棄搬移）。
     - 搬移還在排隊就被取消時，`storage_move` 先設的全部暫停不會恢復，而且已經寫進 config.json（69 的 `on_cancel`）。
     - 搬移中開歌曲的 GET 會補寫 `acapella`、響度到舊位置；歌單記演唱次數也寫到舊位置（70 的 `library_writable`）。
