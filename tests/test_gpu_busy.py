@@ -54,7 +54,7 @@ def _drive(monkeypatch, samples):
     monkeypatch.setattr(subprocess, "run",
                         lambda args, **kw: SimpleNamespace(stdout="{}, 8192, {}\n".format(*next(it))))
     for k, v in {"free": None, "total": None, "util": None, "hot": 0, "calm": 0, "busy": "",
-                 "stalled_until": 0.0}.items():
+                 "stalled_until": 0.0, "ok_at": 0.0, "err": ""}.items():
         monkeypatch.setitem(P.GPU_LOAD, k, v)
     got = []
     for _ in samples:
@@ -80,3 +80,51 @@ def test_gpu_busy_low_memory_also_needs_calm_samples(monkeypatch):
     got = _drive(monkeypatch, [(1000, 10), (6000, 10), (1000, 10), (1000, 10), (6000, 10),
                                (1000, 10), (1000, 10), (1000, 10), (1000, 10)])
     assert got == [False, True, True, True, True, True, True, False, False]
+
+
+def test_gpu_busy_expires_when_sampling_keeps_failing(monkeypatch, capsys):
+    """Codex r1-2／r4-5：判定忙碌、一次正常取樣後 nvidia-smi 一直失敗（逾時、壞掉）：湊不到 3 次正常取樣，
+    原本會一直沿用舊的「記憶體只剩…」、背景工作一直暫停。超過 GPU_STALE 沒有成功取樣就不再沿用；讀不到的原因記一次。"""
+    import gpu_worker as G
+    import pipeline as P
+
+    clock = [1000.0]
+    monkeypatch.setattr(P.time, "time", lambda: clock[0])
+    monkeypatch.setattr(G.POOL, "count", lambda: 0)
+    results = iter(["6000, 8192, 10\n", "1000, 8192, 10\n"])
+
+    def fake_run(args, **kw):
+        out = next(results, None)
+        if out is None:
+            raise subprocess.TimeoutExpired(args, 8)
+        return SimpleNamespace(stdout=out)
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+    for k, v in {"free": None, "total": None, "util": None, "hot": 0, "calm": 0, "busy": "",
+                 "stalled_until": 0.0, "ok_at": 0.0, "err": "", "checked": 0.0}.items():
+        monkeypatch.setitem(P.GPU_LOAD, k, v)
+    got = []
+    for _ in range(12):   # 每次 30 秒
+        got.append(bool(P.gpu_busy_reason()))
+        clock[0] += 30
+    assert got[:2] == [True, True]          # 記憶體不足 → 忙碌；一次正常取樣還不恢復
+    assert got[-1] is False                 # 之後一直讀不到：超過 GPU_STALE 就不再沿用
+    assert sum(got) <= 2 + P.GPU_STALE // 30 + 1
+    out = capsys.readouterr().out
+    assert out.count("讀不到顯示卡用量") == 1 and "TimeoutExpired" in out
+
+
+def test_own_worker_skip_is_not_a_sampling_failure(monkeypatch):
+    """練唱台自己的顯示卡處理程式開著時刻意不取樣：上一次的忙碌結果照用，不算過期。"""
+    import gpu_worker as G
+    import pipeline as P
+
+    clock = [1000.0]
+    monkeypatch.setattr(P.time, "time", lambda: clock[0])
+    monkeypatch.setattr(G.POOL, "count", lambda: 1)
+    for k, v in {"free": 1e9, "total": 8e9, "util": 10, "hot": 0, "calm": 0, "busy": "x",
+                 "stalled_until": 0.0, "ok_at": 1000.0, "err": "", "checked": 0.0}.items():
+        monkeypatch.setitem(P.GPU_LOAD, k, v)
+    for _ in range(10):
+        clock[0] += 30
+        assert P.gpu_busy_reason()

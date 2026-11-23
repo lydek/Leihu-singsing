@@ -3478,10 +3478,11 @@ def _running_apps(names: list[str]) -> list[str] | None:
 # 2.3.2：顯示卡被其他程式（直播軟體、VTube Studio、遊戲、錄影）佔滿時，也不要再把重工作丟給顯示卡：
 # 顯示卡記憶體不夠時 Windows 會把它搬到系統記憶體，分離慢幾十倍、整台電腦跟著卡。
 GPU_LOAD = {"checked": 0.0, "free": None, "total": None, "util": None, "hot": 0, "stalled_until": 0.0,
-            "calm": 0, "busy": ""}
+            "calm": 0, "busy": "", "ok_at": 0.0, "err": ""}
 GPU_MIN_FREE = 3.5e9    # 剩下的顯示卡記憶體少於這個就不用顯示卡分離
 GPU_BUSY_UTIL = 85      # 其他程式已經把顯示卡用到這麼滿（連續兩次）也不用
 GPU_CALM_SAMPLES = 3    # fork：判定忙碌後要連續這麼多次取樣（約 1 分鐘）都低於門檻才恢復，不會每 20 秒來回切換
+GPU_STALE = 120         # fork：這麼久沒有成功取樣，就不再沿用舊的忙碌結果（不然 nvidia-smi 壞掉後會一直暫停）
 
 
 def gpu_stalled_mark(seconds: float = 300) -> None:
@@ -3494,6 +3495,7 @@ def _sample_gpu_load() -> None:
     try:
         import gpu_worker as G
         if G.POOL.count():
+            GPU_LOAD["ok_at"] = time.time()   # fork：刻意不取樣，不算取樣失敗（上一次的結果照用）
             return
     except Exception:
         pass
@@ -3503,10 +3505,15 @@ def _sample_gpu_load() -> None:
                               "--format=csv,noheader,nounits"], capture_output=True, text=True,
                              timeout=8, creationflags=flags).stdout.strip().splitlines()
         used, total, util = (float(x) for x in out[0].split(","))
-    except Exception:
+    except Exception as e:
+        if not GPU_LOAD["err"]:   # fork：只在開始失敗時記一次（沒有 NVIDIA 顯示卡的電腦每 20 秒都會失敗）
+            print(f"[live] 讀不到顯示卡用量（nvidia-smi：{type(e).__name__}: {e}），不依顯示卡用量暫停", flush=True)
+        GPU_LOAD["err"] = f"{type(e).__name__}: {e}"
         return
+    if GPU_LOAD["err"]:
+        print("[live] 又讀得到顯示卡用量了", flush=True)
     free = (total - used) * 2**20
-    GPU_LOAD.update(free=free, total=total * 2**20, util=util,
+    GPU_LOAD.update(err="", ok_at=time.time(), free=free, total=total * 2**20, util=util,
                     hot=GPU_LOAD["hot"] + 1 if util >= GPU_BUSY_UTIL else 0,
                     calm=GPU_LOAD["calm"] + 1 if util < GPU_BUSY_UTIL and free >= GPU_MIN_FREE else 0)
 
@@ -3518,6 +3525,9 @@ def gpu_busy_reason() -> str:
     if now - GPU_LOAD["checked"] > 20:
         GPU_LOAD["checked"] = now
         _sample_gpu_load()
+    if GPU_LOAD["free"] is not None and now - GPU_LOAD["ok_at"] > GPU_STALE:
+        # fork：取樣一直失敗，舊的數字不能再用：忘掉它們（log 已經記了讀不到的原因）
+        GPU_LOAD.update(free=None, util=None, hot=0, calm=0, busy="")
     free = GPU_LOAD["free"]
     if free is not None and free < GPU_MIN_FREE:
         GPU_LOAD["busy"] = f"顯示卡記憶體只剩 {free / 1e9:.1f} GB（被其他程式佔用）"
