@@ -247,9 +247,11 @@ def t_pitch(P, progress, y16, cfg: dict, strict: bool):
     return P._track_pitch_local(y16, cfg, strict)
 
 
-def t_whisper(P, progress, y16, cfg: dict, want: str, per_song: bool) -> dict:
+def t_whisper(P, progress, y16, cfg: dict, want: str, per_song: bool, raise_oom: bool = False) -> dict:
+    """raise_oom（fork，Codex r2-3）：主程式正和別首重疊處理時為真：顯示卡記憶體不夠直接丟出去，交給佇列一次一首重做，
+    不在這裡改用 CPU 重跑（佇列才知道要降低同時處理的數量）。其他 CUDA 錯誤照舊改用 CPU。"""
     progress("載入語音辨識模型（第一次會下載）", 0.7)
-    model = P._whisper_model(cfg)
+    model = P._whisper_model(cfg, raise_oom=raise_oom)
     try:
         progress("判斷歌詞語言", 0.74)
         lang, lang_note = P.pick_language(model, y16, want, per_song)
@@ -261,7 +263,9 @@ def t_whisper(P, progress, y16, cfg: dict, want: str, per_song: bool) -> dict:
                 vad_parameters={"min_silence_duration_ms": 500},
                 word_timestamps=True, condition_on_previous_text=False, beam_size=5)
             words = P._collect_words(segs, len(y16) / P.PITCH_SR, progress, stats)
-        except RuntimeError:
+        except RuntimeError as e:
+            if raise_oom and "out of memory" in str(e).lower():
+                raise
             # 例如有顯示卡但缺 CUDA 函式庫：改用 CPU 重跑
             traceback.print_exc()
             from faster_whisper import WhisperModel
