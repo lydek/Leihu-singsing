@@ -314,16 +314,28 @@ def delete_song(sid):
     dl = P._dl_lock(sid)
     if not dl.acquire(blocking=False):   # fork（28 A2）：預先下載中刪掉，下載完會再寫出殘缺的歌
         raise P.UserError("這首歌正在下載，請稍後再刪除")
+    trash = P.LIB / ".trash"   # 沒有 meta.json，list_songs 不會把它當成歌
     try:
         with vjobs.lock, jobs.lock:   # 順序和 vjobs 挑工作時查 jobs 一樣（Jobs.wait_for）
             # fork（D2）：執行中的工作接著會寫出殘缺的 meta.json；拒絕時排隊中的工作照舊（28 A5）
             if jobs.song_running(sid) or vjobs.song_running(sid):
                 raise P.UserError("這首歌正在處理，請先停止工作再刪除")
+            # fork（Codex r4-2、r4-3）：還拿著佇列的鎖時先把資料夾移走（同一個磁碟，很快）：放開鎖之後新的工作
+            # 找不到這首歌，不會在刪到一半的資料夾裡開始；移不走（檔案被其他程式開著）就整個不刪，排隊的工作照舊
+            trash.mkdir(exist_ok=True)
+            gone = trash / f"{sid}-{os.urandom(3).hex()}"
+            try:
+                os.replace(d, gone)
+            except OSError as e:
+                raise P.UserError(f"刪不掉這首歌（檔案可能被其他程式開著）：{e}") from e
             jobs.cancel_song(sid)    # fork（D4）：排隊中的改成已取消，不再顯示
             vjobs.cancel_song(sid)
-        shutil.rmtree(d)
     finally:
         dl.release()
+    for p in trash.iterdir():   # 這次的，加上之前刪不乾淨留下的
+        shutil.rmtree(p, ignore_errors=True)
+        if p.exists():   # 歌已經從歌曲庫移走了，只是檔案還沒刪乾淨：記在 app.log
+            print(f"[library] 刪除歌曲留下的資料夾刪不掉，下次刪除歌曲時再試：{p}", flush=True)
     return jsonify(ok=True)
 
 

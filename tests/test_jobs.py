@@ -215,3 +215,49 @@ def test_step_import_keeps_steps_written_meanwhile(tmp_path, monkeypatch, app_mo
     P.step_import(d, lambda *a: None)
     other.join(5)
     assert real_read(d)["steps"] == {"import": True, "separate": True}
+
+
+def test_delete_moves_folder_while_holding_queue_locks(app_module, queues, song, monkeypatch):
+    """Codex r4-2：確認沒有執行中的工作後就放開佇列鎖、再 rmtree：空窗裡新的工作可以開始讀寫刪到一半的歌。
+    改成拿著鎖時先把資料夾移走（新的工作找不到這首歌），rmtree 在鎖外做。"""
+    from leihu.web import library
+
+    jobs, vjobs = queues
+    d = song("delrace001")
+    seen = {}
+    real_replace, real_rmtree = library.os.replace, library.shutil.rmtree
+
+    def replace(a, b):
+        seen["replace_locked"] = jobs.lock.locked() and vjobs.lock.locked()
+        return real_replace(a, b)
+
+    def rmtree(p, **kw):
+        seen["rmtree_locked"] = jobs.lock.locked()
+        return real_rmtree(p, **kw)
+
+    monkeypatch.setattr(library.os, "replace", replace)
+    monkeypatch.setattr(library.shutil, "rmtree", rmtree)
+    r = app_module.app.test_client().delete("/api/songs/delrace001")
+    assert r.status_code == 200 and not d.exists()
+    assert seen == {"replace_locked": True, "rmtree_locked": False}
+    import pipeline as P
+    assert not any((P.LIB / ".trash").iterdir())
+
+
+def test_delete_failure_keeps_queued_jobs(app_module, queues, song, monkeypatch):
+    """Codex r4-3：刪除失敗（檔案被其他程式開著）時，排隊的工作原本已經全部取消、不會恢復。"""
+    from leihu.web import library
+
+    jobs, vjobs = queues
+    d = song("delfail001")
+    a = jobs.submit("process", "delfail001", lambda report: None, label="all")
+    b = vjobs.submit("variant", "delfail001", lambda report: None, label="2:1.0")
+
+    def locked(src, dst):
+        raise PermissionError(32, "另一個程式正在使用此檔案")
+
+    monkeypatch.setattr(library.os, "replace", locked)
+    r = app_module.app.test_client().delete("/api/songs/delfail001")
+    assert r.status_code == 400 and "刪不掉" in r.get_json()["error"]
+    assert d.exists()
+    assert jobs.get(a)["status"] == "queued" and vjobs.get(b)["status"] == "queued"
