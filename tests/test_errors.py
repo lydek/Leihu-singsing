@@ -81,7 +81,7 @@ def test_s15_user_error_keeps_message(client):
 # ---------------------------------------------------------------- D1：PATCH 歌曲的 KEY
 
 
-@pytest.mark.parametrize("key", ["abc", 9, 1.5, True, "7"])
+@pytest.mark.parametrize("key", ["abc", 9, 1.5, True, "7", False, [], {}])   # False、[]、{}：Codex r4-4
 def test_d1_invalid_key_is_rejected(client, song, key):
     """不合法的 KEY 原本悄悄存成 0、回 200，使用者設的 KEY 就不見了。"""
     import pipeline as P
