@@ -90,6 +90,24 @@ def queue_fine(sid: str) -> str:
     return jobs.submit("process", sid, run, label="fine")
 
 
+def submit_unfinished(sid: str, steps: list[str]) -> str:
+    """2.3.5：補做沒處理完的歌（分離、旋律），做完如果還沒有歌詞，就上網找歌詞並套用最相符的版本。
+    以前重開練唱台時佇列不會保存，匯入到一半的歌會一直停在「旋律未完成」「無歌詞」。"""
+    proc = P.process_song(sid, steps)
+
+    def run(report, sid=sid, proc=proc):
+        proc(report)
+        d = P.song_dir(sid)
+        meta = P.read_meta(d)
+        if not (d / "lyrics.lrc").exists() and not meta.get("lyrics_source") and not meta.get("lyrics_pending"):
+            try:
+                P.search_lyrics_later(d, P.load_config(), apply_first=True)
+            except Exception as e:
+                P.log_error("search_lyrics_later", e)
+        prerender_key(sid)
+    return jobs.submit("process", sid, run, label=",".join(steps))
+
+
 def yt_submit(sid: str, url: str) -> str:
     return jobs.submit("process", sid, P.youtube_job(sid, url, after=after_process), label="youtube")
 

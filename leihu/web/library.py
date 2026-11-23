@@ -25,6 +25,7 @@ from .common import (
     prerender_key,
     queue_fine,
     queue_max,
+    submit_unfinished,
     vjobs,
     yt_submit,
 )
@@ -463,12 +464,22 @@ def upgrade_separation():
     with _SETLIST_LOCK:
         sl = {i.get("id") for i in _setlist_read()["items"]}
     songs = sorted(P.list_songs(), key=lambda m: (-P.usage_score(m, sl), -(m.get("created") or 0)))   # 常唱的先做
+    unfinished = 0
+    busy = {j.get("song") for j in jobs.active() if j.get("kind") == "process"}
     for s in songs:
         stp = s.get("steps") or {}
-        if not stp.get("separate") or (s.get("vocal_model") == "bs_roformer" and stp.get("pitch")) or s.get("separation") != "uvr":
+        if s["id"] in busy:
+            continue   # 已經在排或正在做
+        if not stp.get("import"):
+            continue   # 音檔還沒下載好（要先下載）
+        if not stp.get("separate") or not stp.get("pitch") or s.get("separation") != "uvr":
+            # 2.3.5：從來沒分離完（匯入到一半被中斷）、只分析到一半、或 AI 分離失敗改用聲像分離的：也一起補做
+            submit_unfinished(s["id"], ["separate", "pitch"])
+            n += 1
+            unfinished += 1
             continue
-        if jobs.find("process", s["id"], "upgrade") or jobs.find("process", s["id"], "max"):
+        if s.get("vocal_model") == "bs_roformer":
             continue
         jobs.submit("process", s["id"], P.process_song(s["id"], ["separate", "pitch"]), label="upgrade")
         n += 1
-    return jsonify(queued=n)
+    return jsonify(queued=n, unfinished=unfinished)
