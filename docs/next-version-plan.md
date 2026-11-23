@@ -8,7 +8,13 @@
 - **改上游擁有的檔案會讓同步變難**：`pipeline.py`、`gpu_worker.py`、`score_sheet.py`（M6）、`share.py`（S19）、`static/app.js`、`installer.py` 等，每多一處 fork 的修改，同步上游時就多一處要手動合併（3.21）；`--leak` 不比對後端檔案的內容，只檢查上游新增的名稱找不找得到；後端的修改只靠 3.21 步驟 4 逐一比對。真的是上游 bug 的（例如缺 `import subprocess`、`_set_priority`、M6），可以考慮回報給上游，上游修了之後同步就會帶進來；回報要你決定，也要你送出。
 - **前端**：D2（刪除處理中的歌回 400）要改 `static/app.js` 才看得到錯誤。`app.js` 是照上游同步的檔案，改了要登記在漏移檢查的 `OWN_CHANGES`。
 - **ruff 的範圍**：目前全 repo 311 個違規（`leihu/` 62 個、`tests/` 35 個，其餘在上游的檔案；2026-11-23 補 `import subprocess` 後，`uvx ruff@0.17.5 check .`）。`leihu/` 是上游程式原封搬過去的（3.19），同步時 hunk 會套到這裡（3.21），清了一樣會和同步衝突；建議只在 `tests/` 啟用。
-- **`_local` 備援**（第 4 節）：拿掉才能遵守「伺服器不載入 torch」，但顯示卡子程式壞了就不能處理歌曲。
+- **`_local` 備援**（第 4 節）：拿掉才能遵守「伺服器不載入 torch」，但顯示卡子程式壞了就不能處理歌曲。**2026-11-24 決定：第 7 批改用 CPU 處理程式**。`gpu_worker.call` 遇到 `WorkerFailed`（顯示卡處理程式開不起來）時，不再用 `_local` 在伺服器裡做，改交給已經有的 `CPU_POOL`（另一個只用 CPU 的處理程式）；接下來 10 分鐘照舊不開顯示卡處理程式（`_BROKEN`），直接交給 `CPU_POOL`。`CPU_POOL` 也開不起來（例如 Python 環境本身壞了）時，這首直接失敗並顯示原因。伺服器就永遠不會載入 torch。代價：子程式壞了的時候處理變慢（CPU 加原本的模型）；分離要不要比照 `GpuStalled` 改用標準模型，做的時候再看 CPU 的時間決定。要測的路徑：顯示卡處理程式開不起來時，分離、音高、歌詞都交給 `CPU_POOL` 做完；兩種處理程式都開不起來時，回報錯誤、伺服器沒有載入 torch（`sys.modules`）。
+  - **錯誤一定要讓使用者看得到、log 一定要記**（2026-11-24 決定）。目前 `WorkerFailed` 改用 `_local` 只印在 app.log，畫面上看不出來（`_BROKEN` 沒有任何路由讀）。第 7 批要做到：
+    - log（每一項都要有，app.log 已有時間）：顯示卡處理程式開不起來的原因（`WorkerFailed` 的訊息與 traceback）；每個工作交給 `CPU_POOL` 時記工作名稱和原因；10 分鐘不開顯示卡處理程式的期間開始、結束各一行；`CPU_POOL` 也失敗時記完整 traceback 和原因。
+    - 畫面上的歌曲：改用 CPU 處理的歌，在歌曲清單的說明（`meta["notes"]`，和 2.3.5 `_hq_fail_note` 相同的做法，同一種說明只留最新一則）寫「顯示卡處理程式無法啟動，這首改用 CPU 處理：原因」；兩種都失敗時，歌曲的錯誤訊息是真正的原因，不是 `SystemExit: 1` 或「代碼 1」。
+    - 畫面上的狀態列：`/api/status` 加一個欄位（例如顯示卡處理程式停用到什麼時候、原因），10 分鐘期間狀態列顯示「顯示卡處理程式無法啟動，暫時改用 CPU」，滑鼠移上去看原因。
+    - 測試：替換 `Pool.call` 丟 `WorkerFailed`，確認 log 的各行、`meta["notes"]`、`/api/status` 的欄位；兩種都失敗時歌曲的錯誤訊息。
+  - 同一批順便核對 `gpu_worker` 其他錯誤路徑是否兩邊都有：`GpuStalled`（log 有；畫面靠 `gpu_stalled_mark` 讓狀態列顯示「顯示卡剛剛處理沒有進度」）、高品質模型失敗改用標準模型（2.3.5：log 有、歌曲說明有）、分離失敗（`_sep_diag` 寫 log；歌曲的錯誤訊息要確認不是只有例外類別）、子程式意外結束（「詳細原因在 logs/app.log」要確認 log 裡真的有原因）。缺的補上，列在 fork 修改表。
 
 ## 2. 分批
 
@@ -22,7 +28,7 @@
 | 4 下載與安裝 | S8（yt-dlp 取消與逾時）；O21（installer 整體逾時）；M3 與 38 的 PowerShell 路徑（路徑嵌進程式碼字串）；38 取消下載後的 `.partK`（39 修的 `TypeError` 一起：這個錯誤由 38 的修法造成，v2.3.4 沒有） | 取消下載會真的停；安裝卡住會逾時；路徑有特殊字元時安裝不會失敗 | 中。安裝流程不好自動測 | 測試版安裝檔（3.14）實際安裝；假的下載測試（O14 的做法） |
 | 5 分離的退回 | 22 的第一段分離兩層退回、auto 模式 6 GB 門檻；36 的重疊處理 OOM；長音訊旋律分析逾時依長度放寬（3.6） | 顯示卡記憶體不夠時改用較小的模型，不是失敗；長歌在 CPU 上不會逾時 | 高。6 GB 門檻沒有實測，要在筆電量 | 用測試強制觸發顯示卡記憶體不足、CUDA 失敗（基準不會觸發，3.10）；筆電顯示卡基準（3.10）；數值基準；長歌 CPU 實測 |
 | 6 搬移與分軌一致性 | 69、70（搬移時的寫入者計數與隔離、主唱補回清 KEY 版本、KEY 版本失效、旋律過期、兩軌一起換、補做標記、`live_light`、`read_audio(fallback=False)`） | 搬移歌曲庫時背景工作不會寫到舊位置；換分軌後舊的 KEY 版本和旋律會重做 | 高。會改分軌，3.20 決定沒有數值參考輸出之前不合併 | 先用測試計畫在開始前的 commit 錄數值基準（見表下說明）；每項各自的回歸測試 |
-| 7 效能調整（3.8 第二階段） | 6 的 R2（`/api/status` 不 import torch）、R3（`OPENBLAS_NUM_THREADS`）；伺服器不載入 librosa／scipy／numba（3.19）；38 的濾波分段；S31（`SetErrorMode`、`ffmpeg_path()` 從 import 搬到 `init_runtime()`）；`_local` 依第 1 節的決定（S31、`_local` 是行為改變，另外測 `gpu_worker` 子程式的分離、音高、歌詞路徑，3.2） | 伺服器記憶體變少、啟動變快；數值輸出可能有微小差異（濾波、執行緒數） | 中到高。librosa 的替代實作會和上游分歧 | CPU 效能基準（`tests/perf/baseline.py`）和相似度基準（3.8：寫明快了多少、輸出差多少，門檻不比上游自己跑多次的差異嚴）；數值基準逐檔比對，有差異要說明 |
+| 7 效能調整（3.8 第二階段） | 6 的 R2（`/api/status` 不 import torch）、R3（`OPENBLAS_NUM_THREADS`）；伺服器不載入 librosa／scipy／numba（3.19）；38 的濾波分段；S31（`SetErrorMode`、`ffmpeg_path()` 從 import 搬到 `init_runtime()`）；`_local` 改成交給 `CPU_POOL`（第 1 節，2026-11-24 決定）（S31、`_local` 是行為改變，另外測 `gpu_worker` 子程式的分離、音高、歌詞路徑，3.2） | 伺服器記憶體變少、啟動變快；數值輸出可能有微小差異（濾波、執行緒數） | 中到高。librosa 的替代實作會和上游分歧 | CPU 效能基準（`tests/perf/baseline.py`）和相似度基準（3.8：寫明快了多少、輸出差多少，門檻不比上游自己跑多次的差異嚴）；數值基準逐檔比對，有差異要說明 |
 | 8 AMD 顯示卡實驗（2026-11-23 新增） | 先做標準分軌：現有 `UVR-MDX-NET-Inst_HQ_3.onnx`、`UVR_MDXNET_KARA_2.onnx` 改走 ONNX Runtime DirectML；之後再評估高品質分軌（BS-RoFormer／MelBand RoFormer）與 torchcrepe 走 PyTorch ROCm、歌詞辨識走 CTranslate2 ROCm 或 whisper.cpp Vulkan | RX 9070 XT 等 AMD 顯示卡的分離可以不用 CPU | 高。audio-separator 的 DirectML 是實驗性的（CI 用 NVIDIA 驗證），RoFormer 在 DirectML 下預設回 CPU；Radeon 都沒有實跑過 | 同一首歌固定權重、overlap、精度，用數值基準比對 CPU 與 DirectML 的三軌輸出（逐位元不會相同，用相似度門檻），記錄耗時、顯示卡記憶體與實際用的推論後端；特別聽副歌主唱有沒有被分到合音。先做成實驗開關，不改預設 |
 
 建議順序：1 → 2 → 3 → 4，之後依需要做 5、6、7。第 1 批小，可以先驗證「改上游檔案」對同步流程的影響；第 6 批要等數值基準。第 5、6、7 批開始前，先用測試計畫在開始前的 commit 錄 CPU 數值、效能基準（第 1–4 批都還沒做時就是 2.3.4.1；已經做了的話，先用 `--against=v2.3.4.1` 確認數值輸出沒變）。第 7 批另外錄相似度基準（3.8，評分在 v2.3.3 改過，v2.3.2 的不能沿用）。筆電顯示卡基準是 v2.3.2 錄的，第 5 批要在開始前的 commit 重錄。
