@@ -3477,9 +3477,11 @@ def _running_apps(names: list[str]) -> list[str] | None:
 
 # 2.3.2：顯示卡被其他程式（直播軟體、VTube Studio、遊戲、錄影）佔滿時，也不要再把重工作丟給顯示卡：
 # 顯示卡記憶體不夠時 Windows 會把它搬到系統記憶體，分離慢幾十倍、整台電腦跟著卡。
-GPU_LOAD = {"checked": 0.0, "free": None, "total": None, "util": None, "hot": 0, "stalled_until": 0.0}
+GPU_LOAD = {"checked": 0.0, "free": None, "total": None, "util": None, "hot": 0, "stalled_until": 0.0,
+            "calm": 0, "busy": ""}
 GPU_MIN_FREE = 3.5e9    # 剩下的顯示卡記憶體少於這個就不用顯示卡分離
 GPU_BUSY_UTIL = 85      # 其他程式已經把顯示卡用到這麼滿（連續兩次）也不用
+GPU_CALM_SAMPLES = 3    # fork：判定忙碌後要連續這麼多次取樣（約 1 分鐘）都低於門檻才恢復，不會每 20 秒來回切換
 
 
 def gpu_stalled_mark(seconds: float = 300) -> None:
@@ -3503,8 +3505,10 @@ def _sample_gpu_load() -> None:
         used, total, util = (float(x) for x in out[0].split(","))
     except Exception:
         return
-    GPU_LOAD.update(free=(total - used) * 2**20, total=total * 2**20, util=util,
-                    hot=GPU_LOAD["hot"] + 1 if util >= GPU_BUSY_UTIL else 0)
+    free = (total - used) * 2**20
+    GPU_LOAD.update(free=free, total=total * 2**20, util=util,
+                    hot=GPU_LOAD["hot"] + 1 if util >= GPU_BUSY_UTIL else 0,
+                    calm=GPU_LOAD["calm"] + 1 if util < GPU_BUSY_UTIL and free >= GPU_MIN_FREE else 0)
 
 
 def gpu_busy_reason() -> str:
@@ -3516,10 +3520,12 @@ def gpu_busy_reason() -> str:
         _sample_gpu_load()
     free = GPU_LOAD["free"]
     if free is not None and free < GPU_MIN_FREE:
-        return f"顯示卡記憶體只剩 {free / 1e9:.1f} GB（被其他程式佔用）"
-    if GPU_LOAD["hot"] >= 2:
-        return f"顯示卡已被其他程式用到 {GPU_LOAD['util']:.0f}%"
-    return ""
+        GPU_LOAD["busy"] = f"顯示卡記憶體只剩 {free / 1e9:.1f} GB（被其他程式佔用）"
+    elif GPU_LOAD["hot"] >= 2:
+        GPU_LOAD["busy"] = f"顯示卡已被其他程式用到 {GPU_LOAD['util']:.0f}%"
+    elif GPU_LOAD["calm"] >= GPU_CALM_SAMPLES:
+        GPU_LOAD["busy"] = ""
+    return GPU_LOAD["busy"]
 
 
 _LIVE_LAST = {"reason": None}

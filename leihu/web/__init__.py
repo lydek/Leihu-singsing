@@ -11,7 +11,8 @@ import pipeline as P
 class _QuietPolls(logging.Filter):
     """畫面每 1～5 秒會來問一次狀態，這些成功的例行請求不寫進 logs/app.log（不然一個月就幾十 MB，
     也蓋掉真正有用的訊息）。失敗的照樣記。"""
-    QUIET = ('"GET /api/status', '"GET /api/overlay', '"GET /api/hotkeys/', '"GET /static/')
+    QUIET = ('"GET /api/status', '"GET /api/overlay', '"GET /api/hotkeys/', '"GET /static/',
+             '"POST /api/overlay')   # fork：畫面每 2～5 秒把播放狀態送給直播歌詞，筆電的 app.log 大半是這行
 
     def filter(self, record: logging.LogRecord) -> bool:
         msg = record.getMessage()
