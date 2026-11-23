@@ -465,7 +465,9 @@ def upgrade_separation():
         sl = {i.get("id") for i in _setlist_read()["items"]}
     songs = sorted(P.list_songs(), key=lambda m: (-P.usage_score(m, sl), -(m.get("created") or 0)))   # 常唱的先做
     unfinished = 0
-    busy = {j.get("song") for j in jobs.active() if j.get("kind") == "process"}
+    # fork（Codex r5-4）：只算排隊中、執行中的；active() 也包含最近 10 分鐘做完、失敗的，剛失敗的歌原本會被跳過
+    busy = {j.get("song") for j in jobs.active()
+            if j.get("kind") == "process" and j.get("status") in ("queued", "running")}
     for s in songs:
         stp = s.get("steps") or {}
         if s["id"] in busy:
