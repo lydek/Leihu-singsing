@@ -1052,8 +1052,25 @@ def step_youtube(d: Path, url: str, report) -> None:
         timer.daemon = True
         timer.start()
         title, other = "", []
+        # fork（Codex r5-6）：讀輸出放在另一個執行緒，這裡每秒檢查一次停止／暫停（report 會丟例外）。
+        # 原本只在收到 PROG 時呼叫 report：yt-dlp 卡在取得資料、或 ffmpeg 轉檔沒有輸出時按停止沒反應，要等逾時
+        lines: queue.Queue = queue.Queue()
+
+        def pump():
+            for ln in p.stdout:
+                lines.put(ln)
+            lines.put(None)
+        threading.Thread(target=pump, daemon=True, name="yt-dlp-out").start()
+        last = ("取得影片資訊", 0.01)   # 和開始前的進度訊息相同，沒有輸出時照樣顯示這句
         try:
-            for line in p.stdout:
+            while True:
+                try:
+                    line = lines.get(timeout=1.0)
+                except queue.Empty:
+                    report(*last)
+                    continue
+                if line is None:
+                    break
                 line = line.strip()
                 if line.startswith("TITLE "):
                     title = line[6:]
@@ -1067,7 +1084,8 @@ def step_youtube(d: Path, url: str, report) -> None:
                     m = re.search(r"([\d.]+)%", line)
                     if m:
                         frac = float(m.group(1)) / 100
-                        report(f"從 YouTube 下載音訊 {frac * 100:.0f}%", 0.01 + 0.05 * frac)
+                        last = (f"從 YouTube 下載音訊 {frac * 100:.0f}%", 0.01 + 0.05 * frac)
+                        report(*last)
                 elif line:
                     other.append(line)   # 錯誤訊息（原本的 stderr）和其他輸出，判斷失敗原因用
             p.wait()

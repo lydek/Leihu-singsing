@@ -101,6 +101,25 @@ def test_s8_timeout_stops_ytdlp(fake_ytdlp, monkeypatch):
     assert not _beating(fake_ytdlp.parent / "beat")
 
 
+def test_s8_cancel_while_ytdlp_is_silent(fake_ytdlp, monkeypatch):
+    """Codex r5-6：yt-dlp 沒有輸出（卡在取得資料、ffmpeg 轉檔）時按停止，原本要等 PROG 才檢查，等到逾時才停。"""
+    import pipeline as P
+
+    monkeypatch.setenv("FAKE_YTDLP_MODE", "hang")
+    calls = []
+
+    def report(step, p):
+        calls.append(step)
+        if len(calls) >= 2:   # 第一次是開始前的「取得影片資訊」，之後是沒有輸出時每秒的檢查
+            raise P.JobCancelled()
+
+    t0 = time.time()
+    with pytest.raises(P.JobCancelled):
+        P.step_youtube(fake_ytdlp, "https://youtu.be/x", report)
+    assert time.time() - t0 < 15
+    assert not _beating(fake_ytdlp.parent / "beat")
+
+
 # ---------------------------------------------------------------- 分段下載
 
 
