@@ -123,15 +123,25 @@ def run_logged(cmd: list[str], log: Path, timeout: float) -> tuple[int | None, l
     return None, [head, *([note] if note else []), *keep, *(clean_stale() if stopped else [])], stopped
 
 
+# 被測程式的 app.log 每一行開頭有時間（leihu/logstamp.py，2.3.5.1 之後）；解析前去掉，舊版的 log 沒有也照樣讀
+STAMP = re.compile(r"^\d\d-\d\d \d\d:\d\d:\d\d ", re.M)
+
+
+def unstamp(log: str) -> str:
+    return STAMP.sub("", log)
+
+
 def log_alerts(log: str, label: str) -> list[str]:
     out = []
     for line in log.splitlines():
-        if re.match(r"\[(?:numeric|perf)\] 條件：", line):  # 工具自己印的執行條件（報告另列），不是被測程式的訊息
+        if re.match(r"\[(?:numeric|perf)\] 條件：", unstamp(line)):  # 工具自己印的執行條件（報告另列），不是被測程式的訊息
             continue
         for needle, what in LOG_ALERTS:
             if needle in line:
                 out.append(f"{label} log（{what}）：{line.strip()[:200]}")
                 break
+    # 子程式做了某一步卻沒有 [device] 紀錄：實際裝置不明，CPU／顯示卡的穩定性判定也會選錯（時間前綴曾讓整份讀不到）
+    out += [f"{label} {x[2:]}" for x in device_lines(log) if "未確認" in x]
     loaded = [("gpu_worker.py", m.group(1).strip()) for m in re.finditer(r"\[(?:numeric|perf)\] 子程式載入 (.+)", log)]
     loaded += [("pipeline.py", m.group(1).strip()) for m in re.finditer(r"\[source\] pipeline (.+)", log)]
     roots = re.findall(r"\[(?:numeric|perf)\] 沙盒 (.+)", log)
@@ -148,6 +158,7 @@ def log_alerts(log: str, label: str) -> list[str]:
 
 def device_lines(log: str) -> list[str]:
     """子程式回報的每一步實際裝置（child_hook.py）；有做的步驟卻沒有回報就寫「未確認」。"""
+    log = unstamp(log)
     seen = sorted({ln.strip()[len("[device] "):] for ln in log.splitlines() if ln.startswith("[device] ")})
     out = [f"- 實際裝置：{x}" for x in seen]
     for step in ("separate", "pitch", "whisper"):
@@ -246,7 +257,7 @@ def device_report(logs: dict[str, str]) -> list[str]:
 def final_devices(log: str) -> dict[str, str]:
     """child_hook 每個項目最後回報的實際裝置（「[device] <項目>：… 實際=<裝置>」，同一個項目後面的蓋掉前面的）。"""
     out: dict[str, str] = {}
-    for ln in log.splitlines():
+    for ln in unstamp(log).splitlines():
         m = re.match(r"\[device\] (.+?)：.* 實際=(\S+)\s*$", ln)
         if m:
             out[m.group(1)] = m.group(2)
@@ -260,6 +271,7 @@ def gpu_used(logs: dict[str, str]) -> bool:
 
 assert final_devices("[device] whisper 模型：device=cuda（要求 auto） 實際=cuda\n"
                      "[device] whisper 模型：device=cpu（要求 cpu） 實際=cpu\n") == {"whisper 模型": "cpu"}
+assert gpu_used({"1": "11-24 01:36:19 [device] separate onnx x：要求 cuda 實際=cuda\n"})   # 帶時間的 log 也讀得到
 
 
 def used(run_dir: Path, logs: dict[str, str]) -> list[str]:
