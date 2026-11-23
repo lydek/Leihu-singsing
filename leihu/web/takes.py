@@ -1,6 +1,7 @@
 """錄音：評分、匯出與分享、Claude 建議。"""
 from __future__ import annotations
 
+import contextlib
 import json
 import math
 import time
@@ -70,6 +71,18 @@ def _take_paths(sid, tid):
     return d, d / "takes" / f"{tid}.json", d / "takes" / f"{tid}.wav"
 
 
+@contextlib.contextmanager
+def _deleted_take_404(j, w):
+    """fork（9、Codex r4-6）：讀錄音、算人聲的途中錄音被刪掉（讀檔丟 FileNotFoundError）回 404，不是 500。
+    錄音還在、是別的檔案不見的照原本的錯誤處理。"""
+    try:
+        yield
+    except FileNotFoundError:
+        if j.exists() and w.exists():
+            raise
+        abort(404)
+
+
 @bp.get("/api/songs/<sid>/takes/<tid>")
 def get_take(sid, tid):
     _, j, _ = _take_paths(sid, tid)
@@ -116,25 +129,27 @@ def _need_variant(d, sid, tid):
 @bp.post("/api/songs/<sid>/takes/<tid>/mixprep")
 def take_mixprep(sid, tid):
     """即時試聽用：回傳處理好的人聲（和伴奏一樣長）、合音／伴奏的網址，以及自動平衡的建議音量。"""
-    d, _, _ = _take_paths(sid, tid)
+    d, j, w = _take_paths(sid, tid)
     need = _need_variant(d, sid, tid)
     if need:
         return jsonify(need_job=need)
     opts = _share_opts()
-    info = SH.load_take(d, tid)
-    key, speed = SH.variant_needed(d, info)
-    back = P.stem_path(P.variant_dir(d, key, speed), "back")
-    sr, n = sf_info(back)
-    tag = f"v2_{int(opts['polish'])}_{opts['reverb']}"   # v2：1.4.9 改了人聲處理，舊的暫存要重做
-    vp = d / "takes" / f"{tid}.vocal_{tag}.wav"
-    if not vp.exists():
-        for old in (d / "takes").glob(f"{tid}.vocal_*.wav"):
-            old.unlink(missing_ok=True)
-        if not P.write_take_audio(d / "takes", tid, vp, SH.vocal_track(d, tid, opts, sr, n), sr):
-            abort(404)   # fork（9）：處理期間錄音被刪掉了
+    with _deleted_take_404(j, w):
+        info = SH.load_take(d, tid)
+        key, speed = SH.variant_needed(d, info)
+        back = P.stem_path(P.variant_dir(d, key, speed), "back")
+        sr, n = sf_info(back)
+        tag = f"v2_{int(opts['polish'])}_{opts['reverb']}"   # v2：1.4.9 改了人聲處理，舊的暫存要重做
+        vp = d / "takes" / f"{tid}.vocal_{tag}.wav"
+        if not vp.exists():
+            for old in (d / "takes").glob(f"{tid}.vocal_*.wav"):
+                old.unlink(missing_ok=True)
+            if not P.write_take_audio(d / "takes", tid, vp, SH.vocal_track(d, tid, opts, sr, n), sr):
+                abort(404)   # fork（9）：處理期間錄音被刪掉了
+        mtime = int(vp.stat().st_mtime)
     q = f"key={key}&speed={speed}"
     start = (float(info.get("start", 0)) + float(info.get("offset", 0))) / speed
-    return jsonify(vocal=f"/api/songs/{sid}/takes/{tid}/vocal/{tag}?t={int(vp.stat().st_mtime)}",
+    return jsonify(vocal=f"/api/songs/{sid}/takes/{tid}/vocal/{tag}?t={mtime}",
                    back=f"/api/songs/{sid}/audio/back?{q}", inst=f"/api/songs/{sid}/audio/inst?{q}",
                    start=round(start, 3), key=key, speed=speed, master_db=SH.master_db(d, key, speed),
                    balance=SH.suggest_balance(d, tid, opts) if request.args.get("balance") else None)
@@ -173,7 +188,8 @@ def take_preview(sid, tid):
     need = _need_variant(d, sid, tid)
     if need:
         return jsonify(need_job=need)
-    y, sr, _ = SH.mix_take(d, tid, _share_opts())
+    with _deleted_take_404(j, w):
+        y, sr, _ = SH.mix_take(d, tid, _share_opts())
     if not P.write_take_audio(d / "takes", tid, d / "takes" / f"{tid}.preview.wav", y, sr):
         abort(404)   # fork（9）：處理期間錄音被刪掉了
     return jsonify(url=f"/api/songs/{sid}/takes/{tid}/preview.wav?t={int(time.time() * 1000)}")
