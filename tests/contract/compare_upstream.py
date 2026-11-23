@@ -42,6 +42,42 @@ OUT = ROOT / "tests" / "private" / "upstream"
 
 BASE = "v2.3.2"  # 第一階段的基準（refactor-port-plan.md 3.8）
 
+D4_CASES = ("status_end", "status_live", "status_override", "status_paused")
+D4_NOTE = "~ /body/jobs: 已核對：上游多 2 個刪掉的歌的 process 工作（all、youtube），其他工作相同，queued_total 少 2"
+
+
+def _align_d4(case: str, snap_c, res_c):
+    """D4（下一版第 2 批）：上游的 /api/status 還列著被刪掉的兩首歌的排隊工作。只有多出來的剛好是那 2 個
+    process 工作（all、youtube）、其他工作逐一相同、queued_total 剛好多 2 時，才把上游那兩個欄位換成這一邊的，
+    並回傳 D4_NOTE（記成預期差異）；不符合就原樣回傳，差異照常列為未預期（Codex r4-7）。"""
+    if case not in D4_CASES:
+        return res_c, None
+    try:
+        sj, rj = snap_c["body"]["jobs"], res_c["body"]["jobs"]
+        st, rt = snap_c["body"]["queued_total"], res_c["body"]["queued_total"]
+    except (KeyError, TypeError):
+        return res_c, None
+
+    def key(j):   # id、order、created 是遮蔽過的流水號或時間，兩邊的編號會因為少了工作而錯開
+        return json.dumps({k: v for k, v in j.items() if k not in ("id", "order", "created")}, sort_keys=True,
+                          ensure_ascii=False)
+
+    rest = list(rj)
+    for j in sj:
+        k = key(j)
+        hit = next((n for n, r in enumerate(rest) if key(r) == k), None)
+        if hit is None:
+            return res_c, None
+        rest.pop(hit)
+    ok = (len(rest) == 2 and all(r.get("kind") == "process" and r.get("status") == "queued" for r in rest)
+          and sorted(r.get("label") for r in rest) == ["all", "youtube"]
+          and [key(r) for r in rj if r not in rest] == [key(j) for j in sj] and rt - st == 2)
+    if not ok:
+        return res_c, None
+    body = dict(res_c["body"], jobs=sj, queued_total=st)
+    return dict(res_c, body=body), D4_NOTE
+
+
 # 預期差異：(名稱, 說明, 判斷函式(案例, 差異字串) -> bool)。差異字串的格式見 diff()：
 # "+ /路徑=值"（基準沒有、目前有）、"- /路徑=值"（基準有、目前沒有）、"~ /路徑: 基準 -> 目前"
 # 從空的開始：舊分支的 S15、D1、R2、D2/D4 是 2.0.0 重構版的差異，D1 還用案例名稱字首整個放行，留著會蓋掉真的差異。
@@ -56,10 +92,10 @@ RULES: list[tuple[str, str, object]] = [
     (
         "D4",
         "下一版第 2 批：刪掉的歌的排隊工作改成已取消，不再列在 /api/status（docs/next-version-plan.md）。"
-        "song_delete_uploaded、song_delete_youtube 刪掉的兩首歌的 all、youtube 工作從清單消失，queued_total 少 2；"
-        "清單整個換掉時差異字串只到 120 字，所以只放行這兩個欄位",
-        lambda c, d: c in ("status_end", "status_live", "status_override", "status_paused")
-        and d.startswith(("~ /body/jobs: ", "~ /body/queued_total: ")),
+        "song_delete_uploaded、song_delete_youtube 刪掉的兩首歌的 all、youtube 工作從清單消失，queued_total 少 2。"
+        "Codex r4-7：原本只看欄位名稱，別首的工作整批消失也會放行；改成 compare() 先核對（_align_d4：上游多出來的"
+        "剛好是 2 個 process 的 all／youtube、其他工作逐一相同、queued_total 剛好少 2），核對通過才記成這一條",
+        lambda c, d: c in D4_CASES and d == D4_NOTE,
     ),
     (
         "S15",
@@ -468,7 +504,10 @@ def compare(snap: dict, result: dict) -> tuple[list[str], dict, dict]:
             unexpected.setdefault(case, []).append("只有" + ("基準" if case in result else "目前這一邊") + "有這個案例")
             continue
         out: list[str] = []
-        diff(snap[case], result[case], "", out)
+        res_c, note = _align_d4(case, snap[case], result[case])
+        diff(snap[case], res_c, "", out)
+        if note:
+            out.append(note)
         if not out:
             same.append(case)
         for d in out:
