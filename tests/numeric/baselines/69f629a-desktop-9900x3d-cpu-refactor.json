@@ -1,0 +1,290 @@
+{
+ "version": "69f629a",
+ "label": "desktop-9900x3d-cpu",
+ "tool_commit": "69f629a+dirty",
+ "machine": {
+  "os": "Windows-10-10.0.26200-SP0",
+  "cpu": "AMD Ryzen 9 9900X3D 12-Core Processor",
+  "gpus": "AMD Radeon(TM) Graphics、AMD Radeon RX 9070 XT",
+  "ram_gb": "31",
+  "logical_cpus": 24,
+  "nvidia_smi": "沒有 nvidia-smi（FileNotFoundError）"
+ },
+ "environment": {
+  "python": "3.11.9",
+  "torch": "2.11.0+cpu",
+  "onnxruntime": "1.22.0",
+  "audio-separator": "0.47.0",
+  "faster-whisper": "1.2.1",
+  "ctranslate2": "4.8.2",
+  "torchcrepe": "0.0.24",
+  "onnx_providers": [
+   "AzureExecutionProvider",
+   "CPUExecutionProvider"
+  ],
+  "gpu_probe": {
+   "ok": false,
+   "note": "",
+   "cc": null,
+   "name": "",
+   "torch": "2.11.0+cpu"
+  }
+ },
+ "conditions": [
+  "測試計畫 refactor（refactor.json）：1 次；真實歌曲 4 首",
+  "只跑 1 次（測試計畫指定）：同一版的穩定性沒有判定",
+  "顯示卡子程式裡裝了 child_hook（記錄實際裝置）：ONNX session 的 run() 多包一層、每次呼叫後讀一次 get_providers()，在計時範圍內；參數與回傳值不變",
+  "OMP_NUM_THREADS、MKL_NUM_THREADS＝1（主程式與子程式）；處理時間不是效能基準",
+  "torchcrepe 隨機抖動關掉（主程式與子程式）",
+  "CTranslate2 亂數種子固定為 0（主程式與子程式；Whisper 溫度取樣重試時才會用到）",
+  "pipeline.search_lyrics_later：不搜尋線上歌詞（要連網，和推論無關）",
+  "pipeline._running_apps：直播軟體偵測固定回傳沒有",
+  "pipeline._sample_gpu_load：不跑 nvidia-smi（顯示卡被其他程式佔用時結果會不同）",
+  "pipeline.start_hq_download：不下載模型、不裝套件",
+  "pipeline.start_hqv_download：不下載模型、不裝套件",
+  "pipeline.start_kana_install：不下載模型、不裝套件",
+  "pipeline._upgrade_ytdlp：不下載模型、不裝套件",
+  "分離固定用標準模型（vocal_quality、karaoke_quality＝standard）；歌詞用語音辨識（auto_recognize_lyrics）"
+ ],
+ "plan": {
+  "name": "refactor",
+  "runs": 1,
+  "songs": []
+ },
+ "commit": "69f629af93a05827c1f8a4648b15148896bbfbba",
+ "inputs": {
+  "tts_voice": "Microsoft Hanhan Desktop",
+  "sha256": {
+   "sing.flac": "f2af450056ef18ef3f1141af50e5f1f6e61546b69b37787e1876711ced13b4b6",
+   "sing_take.wav": "4f07b3e103e4a3237eae2448502676a0382a36eeddb534c56a801d76a8d72068",
+   "speech.flac": "15fc4a27455fba5ee486488b5361351272d3ced04c08676828526019c7480cfb"
+  }
+ },
+ "songs": {},
+ "models": {
+  "uvr/download_checks.json": "d3622e1fa19c161d3cf704927711b453d593a3f1eb0f2e0838c3136907935151",
+  "uvr/mdx_model_data.json": "1aca8f9bcc57233bc714029663a9ec2345d9c7721f91e5e08f46392a879c6a9a",
+  "uvr/model_bs_roformer_ep_317_sdr_12.9755.ckpt": "5b84f37e8d444c8cb30c79d77f613a41c05868ff9c9ac6c7049c00aefae115aa",
+  "uvr/model_bs_roformer_ep_317_sdr_12.9755.yaml": "2bfdd16c656bd9519aba757cc4f8834b7ede675eb1e00ec4772d74ae1c41af7f",
+  "uvr/UVR-MDX-NET-Inst_HQ_3.onnx": "317554b07fe1ea5279a77f2b1520a41ea4b93432560c4ffd08792c30fddf9adc",
+  "uvr/UVR_MDXNET_KARA_2.onnx": "bf32e15105a09c0f7dddd2b67346146334d6f3ecb399ed7638eba2ab07cbf5f4",
+  "uvr/vr_model_data.json": "6a2021b9aa355c10f845b68c73944d47bd9e1fdf37b8a584b14ce8f88b09bb2f",
+  "whisper/CACHEDIR.TAG": "e8893e2dcb3f4545ef67a0a5b7b769113d38eef1aa61c7c7ba14659b02af955f",
+  "whisper/models--mobiuslabsgmbh--faster-whisper-large-v3-turbo/refs/main": "a51a4d3dbd7708ff138ea428d7018c9295bd8f05a2e35d5866df2548c5ada64b",
+  "whisper/models--mobiuslabsgmbh--faster-whisper-large-v3-turbo/snapshots/0a363e9161cbc7ed1431c9597a8ceaf0c4f78fcf/config.json": "b0253ea6c0d3bea6b1e19e91a02acfd3b53f4467362efcb5a3e6b16c9b3a9b7e",
+  "whisper/models--mobiuslabsgmbh--faster-whisper-large-v3-turbo/snapshots/0a363e9161cbc7ed1431c9597a8ceaf0c4f78fcf/model.bin": "e76620f83d5f5b69efd3d87e3dc180c1bd21df9fbebacfd4335e5e1efcc018da",
+  "whisper/models--mobiuslabsgmbh--faster-whisper-large-v3-turbo/snapshots/0a363e9161cbc7ed1431c9597a8ceaf0c4f78fcf/preprocessor_config.json": "7ccc62c6f2765af1f3b46c00c9b5894426835a05021c8b9c01eecb6dfb542711",
+  "whisper/models--mobiuslabsgmbh--faster-whisper-large-v3-turbo/snapshots/0a363e9161cbc7ed1431c9597a8ceaf0c4f78fcf/tokenizer.json": "297b13372ac43916285644fb9687add3cc62ee2a1adb60da3dc25cc94c1871fd",
+  "whisper/models--mobiuslabsgmbh--faster-whisper-large-v3-turbo/snapshots/0a363e9161cbc7ed1431c9597a8ceaf0c4f78fcf/vocabulary.json": "c69260f2ab26d659b7c398f9a2b2b48ed0df16c3b47d7326782fd9cba71690c1",
+  "whisper/models--mobiuslabsgmbh--faster-whisper-large-v3-turbo/trees/0a363e9161cbc7ed1431c9597a8ceaf0c4f78fcf.json": "7d08abef5876605d66d3fc4f95b3bb53a0a73aca8b03faa15c57a9282275e988"
+ },
+ "problems": [],
+ "on_gpu": false,
+ "exact": {},
+ "stability": [],
+ "against": {
+  "version": "v2.3.4.1",
+  "rows": [
+   {
+    "item": "songsing01/back.flac",
+    "value": "解碼後每個取樣逐位元相同",
+    "limit": "完全相同",
+    "ok": true,
+    "num": null
+   },
+   {
+    "item": "songsing01/export.wav",
+    "value": "解碼後每個取樣逐位元相同",
+    "limit": "完全相同",
+    "ok": true,
+    "num": null
+   },
+   {
+    "item": "songsing01/inst.flac",
+    "value": "解碼後每個取樣逐位元相同",
+    "limit": "完全相同",
+    "ok": true,
+    "num": null
+   },
+   {
+    "item": "songsing01/lead.flac",
+    "value": "解碼後每個取樣逐位元相同",
+    "limit": "完全相同",
+    "ok": true,
+    "num": null
+   },
+   {
+    "item": "songsing01/lyrics_auto.lrc",
+    "value": "位元組相同",
+    "limit": "完全相同",
+    "ok": true,
+    "num": null
+   },
+   {
+    "item": "songsing01/meta.json",
+    "value": "相同（combo_lufs_sig 只比欄位與格式）",
+    "limit": "完全相同",
+    "ok": true,
+    "num": null
+   },
+   {
+    "item": "songsing01/pitch.json",
+    "value": "相同",
+    "limit": "完全相同",
+    "ok": true,
+    "num": null
+   },
+   {
+    "item": "songsing01/take_take01.json",
+    "value": "相同",
+    "limit": "完全相同",
+    "ok": true,
+    "num": null
+   },
+   {
+    "item": "songspeech01/back.flac",
+    "value": "解碼後每個取樣逐位元相同",
+    "limit": "完全相同",
+    "ok": true,
+    "num": null
+   },
+   {
+    "item": "songspeech01/inst.flac",
+    "value": "解碼後每個取樣逐位元相同",
+    "limit": "完全相同",
+    "ok": true,
+    "num": null
+   },
+   {
+    "item": "songspeech01/lead.flac",
+    "value": "解碼後每個取樣逐位元相同",
+    "limit": "完全相同",
+    "ok": true,
+    "num": null
+   },
+   {
+    "item": "songspeech01/lyrics_auto.lrc",
+    "value": "位元組相同",
+    "limit": "完全相同",
+    "ok": true,
+    "num": null
+   },
+   {
+    "item": "songspeech01/meta.json",
+    "value": "相同（combo_lufs_sig 只比欄位與格式）",
+    "limit": "完全相同",
+    "ok": true,
+    "num": null
+   },
+   {
+    "item": "songspeech01/pitch.json",
+    "value": "相同",
+    "limit": "完全相同",
+    "ok": true,
+    "num": null
+   }
+  ]
+ },
+ "quality": {
+  "1": [
+   {
+    "item": "sing lead 和正確音軌的 SDR",
+    "value": "11.5 dB",
+    "limit": "",
+    "ok": null,
+    "num": null
+   },
+   {
+    "item": "sing inst 和正確音軌的 SDR",
+    "value": "8.1 dB",
+    "limit": "",
+    "ok": null,
+    "num": null
+   },
+   {
+    "item": "sing back（應該是空的）RMS",
+    "value": "-32.8 dBFS",
+    "limit": "",
+    "ok": null,
+    "num": null
+   },
+   {
+    "item": "sing 有聲影格找到的比例",
+    "value": "1.0000",
+    "limit": "",
+    "ok": null,
+    "num": null
+   },
+   {
+    "item": "sing 音和音之間判為有聲的比例（程式會把有聲段落往前後延伸最多 0.25 秒，空隙正好 0.25 秒）",
+    "value": "0.3815",
+    "limit": "",
+    "ok": null,
+    "num": null
+   },
+   {
+    "item": "sing 音高誤差中位數",
+    "value": "6.0 cents",
+    "limit": "",
+    "ok": null,
+    "num": null
+   },
+   {
+    "item": "sing 音符數（旋律 20 個音）",
+    "value": 25,
+    "limit": "",
+    "ok": null,
+    "num": null
+   },
+   {
+    "item": "評分狀態／準確率",
+    "value": "done／1.0",
+    "limit": "",
+    "ok": null,
+    "num": null
+   },
+   {
+    "item": "評分偵測到的偏差（答案 +30 cents）",
+    "value": "21.1 cents",
+    "limit": "",
+    "ok": null,
+    "num": null
+   },
+   {
+    "item": "評分偵測到的時間差 offset（錄音晚 0.2 秒；正負號依程式定義）",
+    "value": "-0.21 秒",
+    "limit": "",
+    "ok": null,
+    "num": null
+   },
+   {
+    "item": "speech 歌詞和原句的字元錯誤率",
+    "value": "0.000（辨識 53 字／原句 53 字）",
+    "limit": "",
+    "ok": null,
+    "num": null
+   },
+   {
+    "item": "songsing01 處理時間（不是效能基準；執行緒數見執行條件）",
+    "value": "process 61.8 秒、score 5.5 秒",
+    "limit": "",
+    "ok": null,
+    "num": null
+   },
+   {
+    "item": "songspeech01 處理時間（不是效能基準；執行緒數見執行條件）",
+    "value": "process 44.8 秒",
+    "limit": "",
+    "ok": null,
+    "num": null
+   }
+  ]
+ },
+ "wall_seconds": {
+  "1": 1141.0
+ },
+ "real_songs": {
+  "count": 4,
+  "full": "tests/private/baselines/"
+ }
+}
