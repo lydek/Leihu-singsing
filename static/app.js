@@ -2184,7 +2184,9 @@ function roma2hira(s) {
   while (i < s.length) {
     const c = s[i];
     if (c === "'") { i++; continue; }
-    if (c === "n" && (s[i + 1] === "n" || s[i + 1] === "'")) { out += "ん"; i += 2; continue; }
+    if (c === "n" && s[i + 1] === "'") { out += "ん"; i += 2; continue; }
+    // fork（Codex r5-7）：nn 後面接母音或 y 時，第二個 n 屬於下一個音節（onna → おんな、konnichiha → こんにちは）
+    if (c === "n" && s[i + 1] === "n") { out += "ん"; i += /[aiueoy]/.test(s[i + 2] || "") ? 1 : 2; continue; }
     if (c === "n" && (i + 1 >= s.length || !/[aiueoy]/.test(s[i + 1]))) { out += "ん"; i++; continue; }
     if (/[bcdfghjkmpqrstvwxyz]/.test(c) && s[i + 1] === c) { out += "っ"; i++; continue; }   // kk → っk
     if (c === "t" && s[i + 1] === "c" && s[i + 2] === "h") { out += "っ"; i++; continue; }   // tch → っch

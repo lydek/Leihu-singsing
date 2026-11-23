@@ -112,6 +112,9 @@ OWN_CHANGES: list[tuple[str, str]] = [
     ("installer/leihu.nsi", r"\+\s*nsExec::Exec .*StartsWith\(\$\$env:LEIHU_STOP_DIR.*"),
     # 下一版第 2 批 D2：刪除處理中、下載中的歌回 400，顯示錯誤（next-version-plan.md）
     ("static/app.js", r"[-+]\s*(try \{ )?await api\(`/api/songs/\$\{s\.id\}`, \{ method: \"DELETE\" \}\);.*"),
+    # Codex r5-7：羅馬拼音 nn 後面接母音時第二個 n 屬於下一個音節（2.3.5 的 roma2hira，next-version-plan.md）
+    ("static/app.js", r"[-+]\s*if \(c === \"n\" && .*\{ out \+= \"ん\"; i \+= .*"),
+    ("static/app.js", r"\+\s*// fork（Codex r5-7）：nn .*"),
 ]
 
 # 伺服器 log 裡代表「這次執行條件和平常不同」的訊息：一律列進報告，不然結果會被誤解
