@@ -118,3 +118,43 @@ def test_batch_delete_removes_all_take_files(app_module, take):
     r = app_module.app.test_client().post(f"/api/songs/{SID}/takes/delete", json={"ids": [TID]})
     assert r.get_json() == {"deleted": 1}
     assert _leftovers(take) == []
+
+
+@pytest.mark.parametrize("route", ["preview", "mixprep"])
+def test_take_deleted_while_reading_returns_404(app_module, take, monkeypatch, tmp_path, route):
+    """Codex r4-6：錄音在讀取階段（mix_take／vocal_track 讀 JSON、WAV 時）被刪掉，原本 FileNotFoundError 由 S15 回 500。"""
+    import soundfile as sf
+
+    import pipeline as P
+    import share as SH
+    from leihu.web import takes
+
+    back = tmp_path / "back.wav"
+    sf.write(str(back), np.zeros((100, 2), dtype=np.float32), 44100)
+
+    def reads_deleted(*a, **k):
+        _delete(app_module)
+        raise FileNotFoundError(2, "No such file", f"{TID}.wav")
+
+    monkeypatch.setattr(takes, "_need_variant", lambda d, sid, tid: None)
+    monkeypatch.setattr(SH, "mix_take", reads_deleted)
+    monkeypatch.setattr(SH, "load_take", lambda d, tid: {})
+    monkeypatch.setattr(SH, "variant_needed", lambda d, info: (0, 1.0))
+    monkeypatch.setattr(P, "stem_path", lambda vd, name: back)
+    monkeypatch.setattr(SH, "vocal_track", reads_deleted)
+    r = app_module.app.test_client().post(f"/api/songs/{SID}/takes/{TID}/{route}", json={})
+    assert r.status_code == 404
+
+
+def test_other_missing_file_is_still_an_error(app_module, take, monkeypatch):
+    """錄音還在、是別的檔案不見（例如伴奏）：照原本的錯誤處理（500 + log），不能說成錄音不見了。"""
+    import share as SH
+    from leihu.web import takes
+
+    def missing_stem(*a, **k):
+        raise FileNotFoundError(2, "No such file", "back.flac")
+
+    monkeypatch.setattr(takes, "_need_variant", lambda d, sid, tid: None)
+    monkeypatch.setattr(SH, "mix_take", missing_stem)
+    r = app_module.app.test_client().post(f"/api/songs/{SID}/takes/{TID}/preview", json={})
+    assert r.status_code == 500
