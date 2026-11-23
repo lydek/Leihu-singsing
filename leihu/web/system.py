@@ -14,7 +14,7 @@ from flask import Blueprint, abort, current_app, jsonify, request, send_from_dir
 import claude_api as C
 import pipeline as P
 
-from .common import RELEASES_URL, VERSION, _jobs_for_ui, _locked, jobs, vjobs, yt_submit
+from .common import RELEASES_URL, VERSION, _jobs_for_ui, _locked, jobs, submit_unfinished, vjobs, yt_submit
 from .update import UPDATE
 
 bp = Blueprint("system", __name__)
@@ -239,7 +239,7 @@ def prioritize(sid):
         steps = [s for s in ("separate", "pitch") if not st.get(s)]
         if not st.get("separate"):
             steps = ["separate", "pitch"]
-        jid = jobs.submit("process", sid, P.process_song(sid, steps), label=",".join(steps))
+        jid = submit_unfinished(sid, steps)
         what = "process"
     elif meta.get("separation") == "uvr" and meta.get("vocal_model") != "bs_roformer" \
             and P.hqv_ready() and P.vocal_model(P.load_config()) == P.HQ_VOCAL:

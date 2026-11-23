@@ -9,7 +9,7 @@ import time
 
 import pipeline as P
 
-from .common import after_process, jobs, prerender_key, queue_fine, queue_max, vjobs, yt_submit
+from .common import after_process, jobs, prerender_key, queue_fine, queue_max, submit_unfinished, vjobs, yt_submit
 from .live import _SETLIST_LOCK, _setlist_read
 
 
@@ -296,7 +296,11 @@ def _resubmit(sid: str, label: str) -> None:
                 P.log_error("after_process", e)
         jobs.submit("process", sid, run, label="all")
         return
-    jobs.submit("process", sid, P.process_song(sid, label.split(",")), label=label)
+    parts = label.split(",")
+    if "import" not in parts and "lyrics" not in parts:
+        submit_unfinished(sid, parts)   # 補做分離／旋律，做完沒歌詞的順便找線上歌詞
+    else:
+        jobs.submit("process", sid, P.process_song(sid, parts), label=label)
 
 
 def restore_queue() -> None:
