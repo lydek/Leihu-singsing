@@ -3738,7 +3738,8 @@ class Jobs:
             if on_cancel:
                 self._on_cancel[jid] = on_cancel
             old = time.time() - 3600   # 結束超過一小時的工作紀錄不用再留（大量匯入時會累積上千筆）
-            for k in [k for k, j in self.state.items() if j.get("finished", old + 1) < old]:
+            queued = {j for j, _ in self.pending}   # fork（Codex r4-1）：還在佇列裡的不能清
+            for k in [k for k, j in self.state.items() if j.get("finished", old + 1) < old and k not in queued]:
                 del self.state[k]
             self.state[jid] = {"id": jid, "kind": kind, "song": song_id, "label": label,
                                "status": "queued", "step": "排隊中", "progress": 0.0,
@@ -3843,6 +3844,10 @@ class Jobs:
         for j in self.state.values():
             if j["song"] == song_id and j["status"] == "queued":
                 j.update(status="cancelled", step="已取消", finished=time.time())
+        # Codex r4-1：同時從佇列拿掉。留在 pending 的話，一小時後 submit 清掉它的 state，
+        # order()、move()、upcoming() 用 self.state[j] 就會丟 KeyError
+        self.pending = [(jid, fn) for jid, fn in self.pending
+                        if not (self.state[jid]["song"] == song_id and self.state[jid]["status"] == "cancelled")]
 
     def cancel(self, jid: str) -> bool:
         """使用者按「停止」：排隊中的直接取消；執行中的在下一個檢查點停下。"""
