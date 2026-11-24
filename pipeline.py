@@ -3589,6 +3589,9 @@ _LIVE_LAST = {"reason": None}
 
 
 def _live_log(st: dict) -> dict:
+    # fork（複審 P3-5、Codex r6-3）：每一種狀態都帶，偵測到直播軟體時少了這欄，畫面會當成恢復、之後重複提示
+    if GPU_LOAD["err"] and cuda_ok():   # 沒有可用顯示卡的電腦本來就讀不到，不提示
+        st["gpu_err"] = GPU_LOAD["err"]
     r = st.get("reason") or ""
     key = ("gpu" if st.get("gpu") else r)   # 顯示卡用量的數字每次都不一樣，只在狀態改變時記
     if key != _LIVE_LAST["reason"]:
@@ -3627,10 +3630,9 @@ def live_status(cfg: dict | None = None) -> dict:
         if now - LIVE_HOLD["live_seen"] < 20:
             return _live_log({"hold": True, "reason": "直播模式開著", "apps": []})
     busy = gpu_busy_reason()
-    st = {"hold": True, "reason": busy, "apps": [], "gpu": True} if busy else {"hold": False, "reason": "", "apps": []}
-    if GPU_LOAD["err"] and cuda_ok():   # fork（複審 P3-5）：畫面也提示讀不到顯示卡用量（沒有可用顯示卡的電腦不提示）
-        st["gpu_err"] = GPU_LOAD["err"]
-    return _live_log(st)
+    if busy:
+        return _live_log({"hold": True, "reason": busy, "apps": [], "gpu": True})
+    return _live_log({"hold": False, "reason": "", "apps": []})
 
 
 # 直播中要先停住的背景工作（使用者沒有在等結果的）
