@@ -491,3 +491,16 @@ def test_app_static_folder_uses_current_app(tmp_path):
     r, out = merge(tmp_path, {"app.py": old}, {"app.py": new}, {"app.py": "", "leihu/web/x.py": fork})
     assert r["stats"]["fast"] == 1 and r["stats"]["conflict"] == 0
     assert "current_app.static_folder" in out("leihu/web/x.py") and " app.static_folder" not in out("leihu/web/x.py")
+
+
+def test_conflicted_file_still_checked_for_missing_import(tmp_path, monkeypatch):
+    """第 2 輪 5：同一個檔案裡 a 有衝突、b 乾淨合併並用到放進 common.py 的新函式：原本因為 SyntaxError 整個檔案略過。"""
+    monkeypatch.setattr(D, "PLACE", {"helper": "leihu/web/common.py"})
+    old = '@app.get("/a")\ndef a():\n    return 1\n\n\n@app.get("/b")\ndef b():\n    x = 1\n    return x\n'
+    new = ('def helper():\n    return 1\n\n\n'
+           + old.replace("return 1", "return 2").replace("return x", "return helper()"))
+    fork = old.replace("@app.", "@bp.").replace("return 1", "return 10")
+    r, _ = merge(tmp_path, {"app.py": old}, {"app.py": new},
+                 {"app.py": "", "leihu/web/common.py": "X = 1\n", "leihu/web/x.py": fork})
+    assert r["stats"]["conflict"] == 1
+    assert any("leihu/web/x.py 用到 helper" in x for x in r["report"] if x.startswith("手動"))

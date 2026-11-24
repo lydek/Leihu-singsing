@@ -609,11 +609,22 @@ class Merge:
                 if not re.search(rf"(?<![.\w]){re.escape(name)}\b", text):   # P.名稱 這種用法不用 import
                     continue
                 try:
-                    if name in defs(text) or any(bound_name(k) == name for k in import_keys(text)):
-                        continue
-                except SyntaxError:   # 有衝突標記：衝突已經列在報告裡
+                    has = self._has_name(text, name)
+                except SyntaxError:
+                    self.note("手動", f"{f} 用到 {name}（放在 {target}），檔案解析不了，自己確認要不要 import", "manual")
                     continue
-                self.note("手動", f"{f} 用到 {name}（放在 {target}），要加 import", "manual")
+                if not has:
+                    self.note("手動", f"{f} 用到 {name}（放在 {target}），要加 import", "manual")
+
+    @staticmethod
+    def _has_name(text: str, name: str) -> bool:
+        """這個檔案自己定義或 import 了 name 嗎。有衝突標記時取 fork 那一側再解析（第 2 輪審查 5：原本整個檔案略過，
+        同一個檔案裡別的定義用到新名稱、缺 import 就漏報）。"""
+        try:
+            ast.parse(text)
+        except SyntaxError:
+            text = ours_side(text)
+        return name in defs(text) or any(bound_name(k) == name for k in import_keys(text))
 
     def compare(self, expect: Source, out_dir: Path) -> list[str]:
         """依「來源檔案＋名稱」和預期的結果比較（不管放在哪個檔案）：內容不同、或位置不同。
@@ -631,6 +642,11 @@ class Merge:
         return diffs
 
 
+def ours_side(text: str) -> str:
+    """衝突的地方只留 fork 那一側（merge3 固定用 merge 樣式的衝突標記）。"""
+    return re.sub(r"<<<<<<< fork\n(.*?)=======\n.*?>>>>>>> 新上游\n?", r"\1", text, flags=re.S)
+
+
 def _index_of(read, files_of, origin: str) -> dict[str, list[tuple[str, str]]]:
     """這一組檔案的定義：名稱 → [(檔案, 原始碼)]（--expect 用）。"""
     idx: dict[str, list[tuple[str, str]]] = {}
@@ -640,8 +656,7 @@ def _index_of(read, files_of, origin: str) -> dict[str, list[tuple[str, str]]]:
             if t is None:
                 continue
             # 有衝突的地方先取 fork 那一側才能解析；衝突本身已經列在報告裡
-            t = re.sub(r"<<<<<<< fork\n(.*?)=======\n.*?>>>>>>> 新上游\n?", r"\1", t.replace("\r\n", "\n"), flags=re.S)
-            for nm, ds in defs(t).items():
+            for nm, ds in defs(ours_side(t.replace("\r\n", "\n"))).items():
                 idx.setdefault(nm, []).extend((f, x.src) for x in ds)
     return idx
 
