@@ -214,6 +214,24 @@ def _mark_dl_cancelled_after_move(sid: str) -> None:
         _mark_dl_cancelled(sid)
 
 
+def _to_front(sid: str, j: dict) -> tuple[str, str] | None:
+    """排隊中的工作移到最前面，回傳 (工作, what)；已經不在排隊就回 None。"""
+    if j.get("label") == "unfinished":
+        jid = _reprioritize_unfinished(sid, j["id"])
+        return (jid, "process") if jid else None
+    return (j["id"], "moved") if jobs.to_front(j["id"]) else None
+
+
+def _reprioritize_unfinished(sid: str, old: str) -> str | None:
+    """fork（複審 P3-4）：「重做全部歌曲」排的在 LIVE_BACKGROUND，只移到最前面直播中還是會暫停；
+    取消後改用單首優先處理的步驟標籤重排到最前面（unfinished 一律是分離＋旋律）。已經不在排隊就回 None。"""
+    if not jobs.cancel(old, queued_only=True):   # 剛好開始了就不動
+        return None
+    jid = submit_unfinished(sid, ["separate", "pitch"])
+    jobs.to_front(jid)
+    return jid
+
+
 @bp.post("/api/songs/<sid>/prioritize")
 def prioritize(sid):
     """2.1.1「優先處理」：這首歌排到處理佇列最前面。
@@ -224,18 +242,9 @@ def prioritize(sid):
     if any(j["status"] == "running" for j in mine):
         raise P.UserError("這首正在處理中")
     for j in mine:
-        if j["status"] != "queued":
-            continue
-        if j.get("label") == "unfinished":
-            # fork（複審 P3-4）：「重做全部歌曲」排的在 LIVE_BACKGROUND，只移到最前面直播中還是會暫停；
-            # 改用單首優先處理的步驟標籤重排（unfinished 一律是分離＋旋律）
-            if jobs.cancel(j["id"]):
-                jid = submit_unfinished(sid, ["separate", "pitch"])
-                jobs.to_front(jid)
-                return jsonify(job=jid, what="process")
-            continue
-        if jobs.to_front(j["id"]):
-            return jsonify(job=j["id"], what="moved")
+        moved = _to_front(sid, j) if j["status"] == "queued" else None
+        if moved:
+            return jsonify(job=moved[0], what=moved[1])
     st = meta.get("steps") or {}
     if not st.get("import"):
         url = meta.get("source_url")

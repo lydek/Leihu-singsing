@@ -268,7 +268,7 @@ def test_redo_all_unfinished_pauses_while_live(library_songs, monkeypatch):
 def test_prioritize_queued_unfinished_runs_while_live(library_songs):
     """複審 P3-4：直播中對已經被「重做全部歌曲」排進去的歌按「優先處理」，原本只移到最前面、標籤仍是
     unfinished，直播中照樣跳過。改成取消後用步驟標籤重排。"""
-    jobs, (a, b) = library_songs
+    jobs, (_, b) = library_songs
     import app
 
     client = app.app.test_client()
@@ -281,3 +281,14 @@ def test_prioritize_queued_unfinished_runs_while_live(library_songs):
     assert jobs.state[new]["label"] == "separate,pitch"
     jid, _, _ = jobs._next(hold=True, slots=1)
     assert jid == new   # 直播中照樣開始
+
+
+def test_reprioritize_leaves_started_job_alone(library_songs):
+    """複審 P3-4：取消 unfinished 工作時它剛好開始了，不能把執行中的工作停掉、也不重排。"""
+    from leihu.web import system
+
+    jobs, (_, b) = library_songs
+    jid = jobs.submit("process", b, lambda r: None, label="unfinished")
+    jobs.state[jid]["status"] = "running"
+    assert system._reprioritize_unfinished(b, jid) is None
+    assert jobs.state[jid]["status"] == "running" and not jobs.state[jid].get("cancel")
