@@ -113,7 +113,7 @@ PR #26 合併後，`tests/tools/defmerge.py` 以定義為單位三方合併，fo
 | 1 | `Jobs` 和直播中暫停背景處理（`JobCancelled`、`JobDeferred`、`live_status`、`LIVE_BACKGROUND` 等，約 700 行）→ `leihu/core/jobs.py`。**2026-11-24 完成**，見表下說明 | 方式一 |
 | 2 | 分離（78 個定義、約 900 行）→ `leihu/core/separation.py`。**2026-11-24 完成**，見表下說明 | 方式一 |
 | 3 | `process_song` 等處理流程、YouTube 與批次匯入 → `leihu/core/process.py`、`leihu/core/youtube.py`。**2026-11-24 完成**：YouTube 相關不連續，分成 `leihu/core/youtube.py`（下載）和 `leihu/core/batch_import.py`（ffmpeg、網址、批次匯入），見表下說明 | 方式一 |
-| 4 | 線上歌詞搜尋、依主唱聲音對時間 → `leihu/core/lyrics_search.py`、`leihu/core/voice_align.py` | 方式一 |
+| 4 | 線上歌詞搜尋、依主唱聲音對時間 → `leihu/core/lyrics_search.py`、`leihu/core/voice_align.py`。**2026-11-25 完成**：`LRCLIB`、`USER_AGENT`、`_http_json`、`log_error` 留在 `pipeline.py`，見表下說明 | 方式一 |
 | 之後 | 曲名／歌手／預設 KEY、音量標準化等穩定區塊：先看相依和有沒有讀重新指派的變數，適合的才用方式二 | 個別評估 |
 
 **步驟 0 的結果（2026-11-24）**：
@@ -154,6 +154,16 @@ PR #26 合併後，`tests/tools/defmerge.py` 以定義為單位三方合併，fo
 - CPU 數值基準（`609b7bf`，1 次，1164.3 秒）：異常「無」，和步驟 2 的 `0b3b9c6` 逐檔 38／38 相同。
 - 啟動時間（和 `7306856` 交錯各 15 次）：`import pipeline, share` 0.202 → 0.201 秒，`import app` 0.374 → 0.370 秒，範圍重疊。
 - 模擬同步：五次搬移都套到 `263833a`、`43ddbb0` 後同步 2.3.5，結果和步驟 2 相同（沒有衝突、沒有不同的定義、`pipeline.py` 和手動同步完全相同）。2.3.5 沒有改到這一步搬的三段。
+
+**步驟 4 的結果（2026-11-25）**：
+- 兩段，各用 `split_moves.py` 搬：
+  - `lyrics_search.py`：`search_lrclib` 到 `find_and_store_candidates`（LRCLIB、網易雲、酷狗搜尋、候選排名、歌詞和歌聲吻合度、重新分離後的歌詞檢查）。
+  - `voice_align.py`：`vocal_energy_phrases` 到 `apply_candidate`（依主唱聲音對時間、`voice_fit`、匯入與套用歌詞）。
+- 「線上歌詞搜尋」區塊開頭的 `LRCLIB`、`USER_AGENT`、`_http_json`、`log_error` 留在 `pipeline.py`：`USER_AGENT` 是發版時手動改的版號（第 1 節寫的是 `pipeline.USER_AGENT`），`log_error`、`_http_json` 到處都用。`pipeline.py` 剩 2268 行（拆檔前 5133 行），`leihu/core/` 共 7 個方式一的檔案。
+- `split_check.py af746dd`：330 個定義都在、逐字相同，整份還原也相同。pytest 460 項全過（`tests/test_fork_update.py` 替換 `P._http_json` 照常有效）；ruff 311。契約：`check_snapshot.py` 兩次都是 144 個案例和快照相同。
+- CPU 數值基準（`af5a3b8`，1 次，1091.5 秒）：異常「無」，和步驟 3 的 `609b7bf` 逐檔 38／38 相同。
+- 啟動時間（和 `af746dd` 交錯各 15 次）：`import pipeline, share` 0.217 → 0.220 秒，`import app` 0.401 → 0.401 秒，範圍重疊。
+- 模擬同步：七次搬移都套到 `263833a`、`43ddbb0` 後同步 2.3.5：2.3.5 改的 `voice_fit` 直接換進 `voice_align.py`（和手動同步逐字相同），`USER_AGENT` 照版號規則換；統計和沒拆檔時相同，沒有衝突、沒有不同的定義，`pipeline.py` 和手動同步完全相同。
 
 每一步搬完，`pipeline.py` 留下設定、檔案、共用的小函式，以及依序載入各檔案的那幾行。
 
