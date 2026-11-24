@@ -1665,6 +1665,11 @@ STD_VOCAL = "UVR-MDX-NET-Inst_HQ_3.onnx"
 _HQ_FAIL = {"vocal": 0, "kara": 0}   # 這次執行中高品質模型失敗幾次；連續失敗 2 次就先不用（重開練唱台再試）
 
 
+def hq_disabled() -> bool:
+    """fork（Codex r5-3）：高品質模型這次執行已經停用（連續失敗 2 次），補做高品質也只會用標準模型。"""
+    return max(_HQ_FAIL.values()) >= 2
+
+
 def _hq_fail_note(d: Path, what: str, e: Exception) -> None:
     msg = f"高品質{what}分離模型無法使用，這首改用標準模型：{str(e)[:160]}"
     with _META_LOCK:
@@ -2351,7 +2356,8 @@ def _separate(model: str, inp: Path, tmp: Path, overlap: int, autocast: bool,
     return [Path(p) for p in outs]
 
 
-def separate_uvr(d: Path, cfg: dict, report) -> None:
+def separate_uvr(d: Path, cfg: dict, report) -> bool:
+    """回傳這次是不是沒用到高品質：途中高品質失敗改用標準模型，或高品質這次執行已經停用（fork，Codex r5-3）。"""
     tmp = d / "_sep"
     shutil.rmtree(tmp, ignore_errors=True)
     tmp.mkdir()
@@ -2363,6 +2369,7 @@ def separate_uvr(d: Path, cfg: dict, report) -> None:
     report("準備人聲分離模型", 0.07)
     vmodel = vocal_model(cfg)
     vhq = vmodel == HQ_VOCAL
+    missed = not vhq and _HQ_FAIL["vocal"] >= 2
     ensure_model(vmodel, _dl_report(report, "人聲分離模型", 0.07))
     vlabel = "分離人聲與伴奏" + ("（直播中：CPU 輕量處理，下播後自動補做高品質）" if cpu else "") + ("（高品質）" if vhq else "（高品質模型下載中，這首先用標準模型）" if HQV_DL["state"] == "downloading" else "")
     report(vlabel, 0.08)
@@ -2389,7 +2396,7 @@ def separate_uvr(d: Path, cfg: dict, report) -> None:
         _check_model_file(vmodel)
         _HQ_FAIL["vocal"] += 1
         _hq_fail_note(d, "人聲", e)
-        vmodel, vhq = cfg.get("separation_model") or STD_VOCAL, False
+        vmodel, vhq, missed = cfg.get("separation_model") or STD_VOCAL, False, True
         vlabel = "分離人聲與伴奏（高品質模型失敗，這首先用標準模型）"
         report(vlabel, 0.08)
         ensure_model(vmodel, _dl_report(report, "人聲分離模型", 0.07))
@@ -2403,6 +2410,7 @@ def separate_uvr(d: Path, cfg: dict, report) -> None:
 
     kara = karaoke_model(cfg)
     hq = kara == HQ_KARAOKE
+    missed = missed or (not hq and _HQ_FAIL["kara"] >= 2)
     waiting = not hq and HQ_DL["state"] == "downloading"
     label = "把人聲分成主唱與合音" + ("（高品質）" if hq else "（高品質模型下載中，這首先用標準模型）" if waiting else "")
     if not hq:
@@ -2435,7 +2443,7 @@ def separate_uvr(d: Path, cfg: dict, report) -> None:
             _check_model_file(HQ_KARAOKE)
             _HQ_FAIL["kara"] += 1
             _hq_fail_note(d, "主唱", e)
-        kara = cfg["karaoke_model"]
+        kara, missed = cfg["karaoke_model"], True
         report("把人聲分成主唱與合音（標準）", 0.35)
         ensure_model(kara, _dl_report(report, "主唱分離模型", 0.35))
         outs2 = run_kara(kara, "把人聲分成主唱與合音（標準）", autocast)
@@ -2462,6 +2470,7 @@ def separate_uvr(d: Path, cfg: dict, report) -> None:
                     fine_suggest=bool(used_hq and overlap < 4 and h is not None and h >= FINE_HARMONY))
     except Exception as e:
         log_error("harmony ratio", e)
+    return missed
 
 
 def separate_dsp(d: Path, report) -> None:
@@ -2530,7 +2539,7 @@ def step_separate(d: Path, cfg: dict, report) -> bool:
     if module_status()["uvr"]:
         try:
             try:
-                separate_uvr(d, cfg, report)
+                missed = separate_uvr(d, cfg, report)
             except Exception as e:
                 if type(e).__name__ != "GpuStalled" or cfg.get("_cpu"):
                     raise
@@ -2540,8 +2549,11 @@ def step_separate(d: Path, cfg: dict, report) -> bool:
                 light = True
                 update_meta(d, live_light=True)
                 report("顯示卡太忙：改用 CPU 輕量處理（之後自動補做高品質）", 0.08)
-                separate_uvr(d, cfg, report)
+                missed = separate_uvr(d, cfg, report)
             method = "uvr"
+            # fork（Codex r5-3）：這次途中高品質失敗改用標準模型、或高品質這次執行已停用，不算補做完成。
+            # 看實際發生的事，不重算設定（重算會和 vocal_model 的判斷不一致）
+            light = light or bool(missed)
         except Exception as e:
             traceback.print_exc()
             notes.append(f"AI 分離失敗，改用聲像分離：{e}")
@@ -2558,13 +2570,6 @@ def step_separate(d: Path, cfg: dict, report) -> bool:
         meta["acapella"] = acap
         meta["notes"] = meta.get("notes", []) + notes
         write_meta(d, meta)
-    if method == "uvr" and not light:
-        # fork（Codex r5-3）：要求高品質但實際用了標準模型（2.3.5 高品質失敗改標準），不算補做完成
-        def hq(key):
-            q = cfg.get(key, "auto")
-            return q == "high" or (q == "auto" and cuda_ok())
-        light = ((hq("vocal_quality") and meta.get("vocal_model") != "bs_roformer")
-                 or (hq("karaoke_quality") and meta.get("karaoke") != HQ_KARAOKE))
     return light
 
 
