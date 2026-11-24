@@ -280,6 +280,30 @@ def test_waiting_for_stems_is_not_reported_as_live_hold(app_module):
         assert q2._next(hold=True, slots=1)[2] is True   # 直播中跳過背景工作：照舊回報
 
 
+class _StopRun(BaseException):
+    pass
+
+
+def test_run_rewrites_only_live_held_jobs(app_module, monkeypatch):
+    """Codex r4-8、複審 P3-7：走 _run（不是只呼叫 _next）：直播中背景工作被跳過、同時有工作在等分軌時，
+    只有背景工作改成「直播中暫停」，等分軌的說明照留。原本 _run 把所有排隊的工作都改寫。"""
+    import pipeline as P
+
+    q = P.Jobs(live_safe=True, wait_for=lambda st: st.get("song") == "busysong1")
+    wait = q.submit("variant", "busysong1", lambda r: None, label="2:1.0")
+    bg = q.submit("process", "bgsong001", lambda r: None, label="upgrade")
+    monkeypatch.setattr(P, "live_status", lambda cfg=None: {"hold": True, "reason": "偵測到 obs64"})
+
+    def stop(timeout=None):
+        raise _StopRun()
+
+    monkeypatch.setattr(q.cv, "wait", stop)
+    with pytest.raises(_StopRun):
+        q._run()
+    assert q.state[bg]["step"].startswith("直播中暫停（偵測到 obs64）")
+    assert q.state[wait]["step"] == "等這首歌的分軌處理完"
+
+
 def test_delete_twice_says_song_not_found(app_module, queues, song, monkeypatch):
     """複審 P3-2：同一首歌連按兩次刪除，第二個請求通過 song_dir 時資料夾還在、拿到鎖時已經被移走：
     原本 os.replace 丟 FileNotFoundError，回「刪不掉這首歌（檔案可能被其他程式開著）」。"""
