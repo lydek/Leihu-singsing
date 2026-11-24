@@ -263,3 +263,21 @@ def test_redo_all_unfinished_pauses_while_live(library_songs, monkeypatch):
     assert [jobs.state[j]["label"] for j, _ in jobs.pending] == ["unfinished"]
     common.submit_unfinished(b, ["separate", "pitch"])   # 單首優先處理：標籤照舊
     assert jobs.state[jobs.pending[-1][0]]["label"] == "separate,pitch"
+
+
+def test_prioritize_queued_unfinished_runs_while_live(library_songs):
+    """複審 P3-4：直播中對已經被「重做全部歌曲」排進去的歌按「優先處理」，原本只移到最前面、標籤仍是
+    unfinished，直播中照樣跳過。改成取消後用步驟標籤重排。"""
+    jobs, (a, b) = library_songs
+    import app
+
+    client = app.app.test_client()
+    client.post("/api/upgrade-separation")
+    old = next(j for j, _ in jobs.pending if jobs.state[j]["song"] == b)
+    r = client.post(f"/api/songs/{b}/prioritize")
+    assert r.status_code == 200 and r.get_json()["what"] == "process"
+    new = r.get_json()["job"]
+    assert jobs.state[old]["status"] == "cancelled"
+    assert jobs.state[new]["label"] == "separate,pitch"
+    jid, _, _ = jobs._next(hold=True, slots=1)
+    assert jid == new   # 直播中照樣開始
