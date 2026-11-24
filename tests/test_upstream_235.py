@@ -119,6 +119,20 @@ def test_failures_of_model_no_longer_wanted_do_not_count(song, monkeypatch):
     assert P.hq_disabled(CFG)   # 人聲還要高品質：照樣停用
 
 
+def test_small_vram_failures_do_not_disable_or_degrade(song, monkeypatch):
+    """第 5 批的 6 GB 門檻合併後：auto 模式顯示卡不到 6 GB 本來就用標準模型，高品質失敗次數不算停用，
+    分離完也不算「沒用到要求的品質」（不然 live_light 清不掉、每次開程式重做）。"""
+    import pipeline as P
+
+    _fake_models(P, monkeypatch, hq_fail={"vocal": 2, "kara": 2})
+    monkeypatch.setattr(P, "gpu_info", lambda block=True: {"ok": True, "vram": 4e9})
+    used, sep = [], P._separate
+    monkeypatch.setattr(P, "_separate", lambda model, *a: used.append(model) or sep(model, *a))
+    assert not P.hq_disabled(CFG)
+    assert P.step_separate(song, dict(CFG), lambda *a: None) is False
+    assert used == ["std_vocal.onnx", "std_kara.onnx"]
+
+
 def test_standard_quality_requested_is_not_degraded(song, monkeypatch):
     """複審 P2-1：設定本來就要標準模型，不是「沒用到要求的品質」（原本的副本判斷靠設定重算）。"""
     import pipeline as P
