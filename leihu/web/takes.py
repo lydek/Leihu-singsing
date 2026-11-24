@@ -73,11 +73,11 @@ def _take_paths(sid, tid):
 
 @contextlib.contextmanager
 def _deleted_take_404(j, w):
-    """fork（9、Codex r4-6）：讀錄音、算人聲的途中錄音被刪掉（讀檔丟 FileNotFoundError）回 404，不是 500。
-    錄音還在、是別的檔案不見的照原本的錯誤處理。"""
+    """fork（9、Codex r4-6）：讀錄音、算人聲的途中錄音被刪掉回 404，不是 500。讀 JSON 丟 FileNotFoundError，
+    soundfile 讀 WAV 丟 LibsndfileError（RuntimeError，複審 P2-2）。錄音還在、是別的錯誤照原本的錯誤處理。"""
     try:
         yield
-    except FileNotFoundError:
+    except (OSError, RuntimeError):
         if j.exists() and w.exists():
             raise
         abort(404)
@@ -130,11 +130,11 @@ def _need_variant(d, sid, tid):
 def take_mixprep(sid, tid):
     """即時試聽用：回傳處理好的人聲（和伴奏一樣長）、合音／伴奏的網址，以及自動平衡的建議音量。"""
     d, j, w = _take_paths(sid, tid)
-    need = _need_variant(d, sid, tid)
-    if need:
-        return jsonify(need_job=need)
     opts = _share_opts()
     with _deleted_take_404(j, w):
+        need = _need_variant(d, sid, tid)
+        if need:
+            return jsonify(need_job=need)
         info = SH.load_take(d, tid)
         key, speed = SH.variant_needed(d, info)
         back = P.stem_path(P.variant_dir(d, key, speed), "back")
@@ -147,12 +147,13 @@ def take_mixprep(sid, tid):
             if not P.write_take_audio(d / "takes", tid, vp, SH.vocal_track(d, tid, opts, sr, n), sr):
                 abort(404)   # fork（9）：處理期間錄音被刪掉了
         mtime = int(vp.stat().st_mtime)
+        balance = SH.suggest_balance(d, tid, opts) if request.args.get("balance") else None
     q = f"key={key}&speed={speed}"
     start = (float(info.get("start", 0)) + float(info.get("offset", 0))) / speed
     return jsonify(vocal=f"/api/songs/{sid}/takes/{tid}/vocal/{tag}?t={mtime}",
                    back=f"/api/songs/{sid}/audio/back?{q}", inst=f"/api/songs/{sid}/audio/inst?{q}",
                    start=round(start, 3), key=key, speed=speed, master_db=SH.master_db(d, key, speed),
-                   balance=SH.suggest_balance(d, tid, opts) if request.args.get("balance") else None)
+                   balance=balance)
 
 
 def sf_info(path):
@@ -185,10 +186,10 @@ def delete_takes(sid):
 @bp.post("/api/songs/<sid>/takes/<tid>/preview")
 def take_preview(sid, tid):
     d, j, w = _take_paths(sid, tid)
-    need = _need_variant(d, sid, tid)
-    if need:
-        return jsonify(need_job=need)
     with _deleted_take_404(j, w):
+        need = _need_variant(d, sid, tid)
+        if need:
+            return jsonify(need_job=need)
         y, sr, _ = SH.mix_take(d, tid, _share_opts())
     if not P.write_take_audio(d / "takes", tid, d / "takes" / f"{tid}.preview.wav", y, sr):
         abort(404)   # fork（9）：處理期間錄音被刪掉了
@@ -206,13 +207,14 @@ def take_preview_file(sid, tid):
 
 @bp.post("/api/songs/<sid>/takes/<tid>/export")
 def take_export(sid, tid):
-    d, _, _ = _take_paths(sid, tid)
+    d, j, w = _take_paths(sid, tid)
     opts = _share_opts()
-    if opts["formats"] != ["png"]:   # 只匯出成績卡不需要伴奏
-        need = _need_variant(d, sid, tid)
-        if need:
-            return jsonify(need_job=need)
-    SH.load_take(d, tid)
+    with _deleted_take_404(j, w):   # 複審 P2-2：錄音剛被刪掉回 404
+        if opts["formats"] != ["png"]:   # 只匯出成績卡不需要伴奏
+            need = _need_variant(d, sid, tid)
+            if need:
+                return jsonify(need_job=need)
+        SH.load_take(d, tid)
     title = P.read_meta(d).get("title", "我的演唱")
     base = P.downloads_dir() / P.APP_NAME / f"{_safe_name(title)[:50]}_我的演唱_{tid[:13]}"
     # 2.3.3：同一次錄音匯出過，這次的檔名加上編號、不覆蓋上次的。
