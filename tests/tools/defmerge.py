@@ -510,8 +510,11 @@ class Merge:
         if target not in self.texts or (users and target not in users):
             return False, why or ["要放進用到的檔案"]
         text = self.texts[target]
-        if k in import_keys(text):
+        have = import_keys(text)
+        if k in have:
             return False, why
+        if name in defs(text) or any(bound_name(x) == name for x in have):   # 第 2 輪審查 7：加了會蓋掉 fork 的
+            return False, [*why, f"{target} 已經有同名的 {name}（import 或定義）"]
         at = last_import_end(text)
         if used_before(text, name, at) or self.merged_uses_before(target, name, at):
             return False, [*why, f"{target} 在 import 的位置之前就用到 {name}"]
