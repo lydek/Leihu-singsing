@@ -18,7 +18,7 @@ def prefetcher() -> None:
     while True:
         time.sleep(3)
         try:
-            if P.YT_PAUSE["on"]:
+            if P.YT_PAUSE["on"] or jobs.paused:   # fork：全部暫停時 YouTube 下載也停，預先下載跟著停
                 continue
             for sid in jobs.upcoming("youtube", 2):
                 with P.library_writer():   # fork（69）：搬移中等搬完（下載會寫進歌曲資料夾）

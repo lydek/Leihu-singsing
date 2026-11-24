@@ -80,9 +80,10 @@ def record(model: str, usage, purpose: str, song: str) -> dict:
             return entry
         data["calls"].append(entry)
         data["calls"] = data["calls"][-2000:]
-        tmp = USAGE_PATH.with_name(USAGE_PATH.name + ".tmp")   # 已經在 _lock 裡，同一時間只有一個人寫
-        tmp.write_text(json.dumps(data, ensure_ascii=False, indent=1), "utf-8")
-        tmp.replace(USAGE_PATH)
+        try:   # fork：/api/status 每秒讀這個檔，Windows 上取代可能撞到；重試後仍失敗只記 log，回覆照常交給使用者
+            P.atomic_write_text(USAGE_PATH, json.dumps(data, ensure_ascii=False, indent=1))
+        except OSError as e:
+            P.log_error("usage.json 寫入失敗，這次的用量沒有記錄", e)
     return entry
 
 

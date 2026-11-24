@@ -15,7 +15,7 @@ import exporter as EX  # 2.3.0：匯出歌單、直播歌單回顧
 import hotkeys as HK  # 2.0：自訂全域快捷鍵
 import pipeline as P
 
-from .common import HOST, PORT, _locked
+from .common import HOST, PORT, _locked, _safe_name
 
 bp = Blueprint("live", __name__)
 
@@ -258,12 +258,14 @@ def export_songlist():
         raise P.UserError("沒有符合條件的歌可以匯出")
     title = str(b.get("title") or "點歌清單").strip()[:60] or "點歌清單"
     day = time.strftime("%Y%m%d")
+    # fork：標題當檔名前先清掉 \ / : 等字元（原本 / 會 500、../ 寫到下載資料夾外、: 在 NTFS 寫成替代資料流）
     if fmt == "xlsx":
-        p = EX.save_download(f"{title}_{day}.xlsx", EX.songlist_xlsx(rows, bool(b.get("show_key", True))))
+        p = EX.save_download(_safe_name(f"{title}_{day}.xlsx"), EX.songlist_xlsx(rows, bool(b.get("show_key", True))))
     elif fmt == "csv":
         p = EX.save_download(f"練唱台歌單_{day}.csv", EX.songlist_csv(rows))
     else:
-        p = EX.save_download(f"{title}_{day}.html", EX.songlist_html(rows, title, bool(b.get("show_key", True))))
+        p = EX.save_download(_safe_name(f"{title}_{day}.html"),
+                             EX.songlist_html(rows, title, bool(b.get("show_key", True))))
     _reveal(p)
     return jsonify(path=str(p), count=len(rows))
 

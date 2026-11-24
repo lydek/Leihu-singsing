@@ -92,11 +92,14 @@ def ui_prefs_get():
 
 
 @bp.post("/api/ui-prefs")
+@_locked   # fork：同時拖多個音量拉桿時，讀改寫不互相蓋掉
 def ui_prefs_set():
     b = request.get_json(force=True) or {}
     try:
         cur = json.loads(UI_PREFS.read_text("utf-8")) if UI_PREFS.exists() else {}
     except Exception:
+        cur = {}
+    if not isinstance(cur, dict):   # fork：內容是 [] 或 null 時 cur[k] = v 丟 TypeError，設定再也存不了
         cur = {}
     for k, v in b.items():
         if k in UI_PREF_KEYS:
@@ -302,6 +305,7 @@ EXTERNAL_URLS = ("https://www.twitch.tv/leihustore", "https://github.com/lydek/L
 
 
 @bp.post("/api/yt-unlock")
+@_locked   # fork：和 set_config 共用設定鎖，讀改寫 config.json 不互相蓋掉
 def yt_unlock():
     """開啟 YouTube 下載與歌單批次匯入（存在設定檔裡，之後更新版本也維持開啟）。"""
     cfg = P.load_config()
