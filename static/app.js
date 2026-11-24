@@ -1237,6 +1237,7 @@ function syncPauseBar(st) {
   $("#jobs-sum").textContent = proc.length ? `處理中 ${run} 首、排隊 ${proc.length - run} 首` : "";
 }
 let liveHoldWas = null;
+let gpuErrWas = false;
 function syncLiveHold(l) {
   const on = !!(l && l.hold);
   const held = on && !!l.holding;   // 真的有背景工作在等才顯示橫幅
@@ -1244,6 +1245,8 @@ function syncLiveHold(l) {
   if (held) $("#live-hold-why").textContent = (l.reason ? `原因：${l.reason}。` : "");
   if (on && liveHoldWas === false) toast(l.gpu ? `${l.reason}：背景工作暫停，新的分離改用 CPU` : `直播中（${l.reason}）：背景工作暫停，匯入改用 CPU 輕量處理`, 4000);
   liveHoldWas = on;
+  if (l && l.gpu_err && !gpuErrWas) toast("讀不到顯示卡用量，不會依顯示卡忙碌暫停背景工作", 6000);   // fork（複審 P3-5）
+  gpuErrWas = !!(l && l.gpu_err);
 }
 $("#live-hold-go").onclick = async () => {
   if (!confirm("接下來一小時，直播中也照常做分離、分析、辨識？直播畫面和 VTube Studio 可能會掉格。")) return;

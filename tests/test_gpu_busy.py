@@ -128,3 +128,21 @@ def test_own_worker_skip_is_not_a_sampling_failure(monkeypatch):
     for _ in range(10):
         clock[0] += 30
         assert P.gpu_busy_reason()
+
+
+def test_live_status_reports_unreadable_gpu_load(app_module, monkeypatch):
+    """複審 P3-5：讀不到顯示卡用量原本只記在 log，畫面看起來像正常。有可用顯示卡時 live_status 帶 gpu_err
+    （畫面提示一次）；沒有可用顯示卡的電腦（本來就讀不到）不提示。"""
+    import pipeline as P
+
+    monkeypatch.setitem(P.LIVE_HOLD, "override_until", 0.0)
+    monkeypatch.setattr(P, "gpu_busy_reason", lambda: "")
+    monkeypatch.setitem(P.GPU_LOAD, "err", "TimeoutExpired: nvidia-smi")
+    cfg = {"pause_while_streaming": False}
+    monkeypatch.setattr(P, "cuda_ok", lambda: True)
+    assert P.live_status(cfg)["gpu_err"] == "TimeoutExpired: nvidia-smi"
+    monkeypatch.setattr(P, "cuda_ok", lambda: False)
+    assert "gpu_err" not in P.live_status(cfg)
+    monkeypatch.setattr(P, "cuda_ok", lambda: True)
+    monkeypatch.setitem(P.GPU_LOAD, "err", "")
+    assert "gpu_err" not in P.live_status(cfg)
