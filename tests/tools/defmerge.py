@@ -270,14 +270,24 @@ def norm(s: str) -> str:
     return s.strip("\n")
 
 
+class MergeFailed(Exception):
+    """git merge-file 執行失敗（不是有衝突）：例如內容有 NUL 被當成二進位檔。"""
+
+
 def merge3(ours: str, base: str, theirs: str, exact: bool = False) -> tuple[str, int]:
-    """git merge-file 三方合併：回傳 (結果, 衝突數)。exact：整個檔案合併用，內容照原樣、不補也不去掉檔尾換行。"""
+    """git merge-file 三方合併：回傳 (結果, 衝突數)。exact：整個檔案合併用，內容照原樣、不補也不去掉檔尾換行。
+    執行失敗丟 MergeFailed（第 2 輪審查 3：結束代碼 255、輸出是空字串，原本會把定義或整個檔案寫成空白）。
+    衝突標記固定用 merge 樣式：使用者設了 diff3／zdiff3 會多出 ||||||| 區塊，--expect 取 fork 那一側時去不乾淨。"""
     with tempfile.TemporaryDirectory() as d:
         p = {k: Path(d) / k for k in ("ours", "base", "theirs")}
         for k, v in (("ours", ours), ("base", base), ("theirs", theirs)):
             p[k].write_bytes((v if exact else v + "\n").encode("utf-8"))
-        r = subprocess.run(["git", "merge-file", "-p", "-L", "fork", "-L", "舊上游", "-L", "新上游",
+        r = subprocess.run(["git", "-c", "merge.conflictStyle=merge", "merge-file", "-p",
+                            "-L", "fork", "-L", "舊上游", "-L", "新上游",
                             str(p["ours"]), str(p["base"]), str(p["theirs"])], capture_output=True)
+        if r.returncode < 0 or r.returncode > 127:   # 衝突數最多回報到 127
+            err = r.stderr.decode("utf-8", errors="replace").strip()
+            raise MergeFailed(f"git merge-file 失敗（代碼 {r.returncode}）：{err or '沒有訊息'}")
         out = r.stdout.decode("utf-8").replace("\r\n", "\n")
         return (out if exact else out.rstrip("\n")), r.returncode
 
@@ -420,23 +430,33 @@ class Merge:
             self.note("手動", f"{origin}:{name}：fork 有兩個以上同名定義，或和別的名稱寫在同一個指定裡", "manual")
             return
         f, d = hit
-        if name in VERSIONED and self.upver and self.oldver:
-            if VER_MARK not in unver(theirs, self.upver):
-                self.note("手動", f"{origin}:{name}：新上游的這個定義裡找不到版號 {self.upver}", "manual")
-                return
-            merged, c = self.vmerge(d.src, base, theirs)
-            if merged is None:
-                self.note("手動", f"{origin}:{name}：{c}", "manual")
-                return
-            kind, stat = ("版號", "version") if c == 0 else (f"衝突 {c} 處", "conflict")
-        elif norm(d.src) == norm(base):
-            merged, kind, stat = theirs, "直接換", "fast"
-        else:
-            merged, c = merge3(d.src, base, theirs)
-            kind, stat = ("合併", "merged") if c == 0 else (f"衝突 {c} 處", "conflict")
+        try:
+            r = self._merge_def(origin, name, d, base, theirs)
+        except MergeFailed as e:
+            self.note("手動", f"{origin}:{name}：{e}", "manual")
+            return
+        if r is None:
+            return
+        merged, kind, stat = r
         self.edits.setdefault(f, []).append((d.a, d.b, merged))
         self.dest[name], self.code[name], self.pos[name] = f, merged, d.a
         self.note(kind, f"{origin}:{name} → {f}", stat)
+
+    def _merge_def(self, origin: str, name: str, d: Def, base: str, theirs: str) -> tuple[str, str, str] | None:
+        """(合併結果, 報告的種類, 統計欄位)；要手動時已經記在報告裡，回傳 None。"""
+        if name in VERSIONED and self.upver and self.oldver:
+            if VER_MARK not in unver(theirs, self.upver):
+                self.note("手動", f"{origin}:{name}：新上游的這個定義裡找不到版號 {self.upver}", "manual")
+                return None
+            merged, c = self.vmerge(d.src, base, theirs)
+            if merged is None:
+                self.note("手動", f"{origin}:{name}：{c}", "manual")
+                return None
+            return (merged, "版號", "version") if c == 0 else (merged, f"衝突 {c} 處", "conflict")
+        if norm(d.src) == norm(base):
+            return theirs, "直接換", "fast"
+        merged, c = merge3(d.src, base, theirs)
+        return (merged, "合併", "merged") if c == 0 else (merged, f"衝突 {c} 處", "conflict")
 
     def removed(self, origin: str, name: str, olds: list[Def]) -> None:
         hit = self.where(name)
@@ -508,6 +528,12 @@ class Merge:
 
     # ---- 其他檔案：整個檔案三方合併
     def file(self, path: str) -> None:
+        try:
+            self._file(path)
+        except MergeFailed as e:
+            self.note("手動", f"{path}：{e}（這個檔案沒有寫出）", "manual")
+
+    def _file(self, path: str) -> None:
         try:
             o, n, f = self.old.read(path), self.new.read(path), self.fork.read(path)
         except UnicodeDecodeError:
