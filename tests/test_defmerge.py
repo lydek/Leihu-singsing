@@ -427,3 +427,12 @@ def test_used_before_counts_load_time_parts(code, want):
     """複審 P3-11：原本整個略過函式和類別；裝飾器、預設參數、類別內容其實在載入時就會執行。"""
     text = "import os\n" + code + "import sys\n"
     assert D.used_before(text, "re", D.last_import_end(text)) is want
+
+
+def test_merged_definition_using_import_at_load_is_manual(tmp_path):
+    """Codex r6-4：依賴只出現在合併後定義的預設值（merged_uses_before），定義在最後一個 import 前面：
+    新的 import 加在後面會 NameError，要列手動。原本的測試只走 used_before，守不住這一條。"""
+    old = "import os\ndef f(x=None):\n    return x\nimport sys\n"
+    new = "import os\nimport re\ndef f(x=re.compile('x')):\n    return x\nimport sys\n"
+    r, _ = merge(tmp_path, {"pipeline.py": old}, {"pipeline.py": new}, {"pipeline.py": old})
+    assert any("之前就用到 re" in x for x in r["report"] if x.startswith("手動"))
