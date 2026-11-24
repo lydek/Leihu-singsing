@@ -70,7 +70,7 @@ def _load_part(name: str) -> None:
     import __future__
 
     p = PARTS_DIR / f"{name}.py"
-    code = compile(p.read_bytes().decode("utf-8"), str(p), "exec",
+    code = compile(p.read_bytes(), str(p), "exec",   # 給 bytes：和 import 一樣處理 BOM、編碼宣告
                    flags=__future__.annotations.compiler_flag, dont_inherit=True)
     exec(code, globals())   # noqa: S102  內容是 repo 裡的程式，和寫在這裡相同
     _PARTS.append(name)

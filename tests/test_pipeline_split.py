@@ -56,6 +56,20 @@ def test_load_part_shares_pipeline_namespace(app_module, tmp_path, monkeypatch):
             P.__dict__.pop(n, None)
 
 
+def test_load_part_accepts_bom(app_module, tmp_path, monkeypatch):
+    """Agy 審查 2：有些 Windows 編輯器存檔會加 BOM；先 decode 成字串再 compile 會 SyntaxError，給 bytes 才和 import 一樣。"""
+    import pipeline as P
+
+    (tmp_path / "bom.py").write_bytes(b"\xef\xbb\xbf# BOM\nBOM_PROBE = 1\n")
+    monkeypatch.setattr(P, "PARTS_DIR", tmp_path)
+    monkeypatch.setattr(P, "_PARTS", [])
+    try:
+        P._load_part("bom")
+        assert P.BOM_PROBE == 1
+    finally:
+        P.__dict__.pop("BOM_PROBE", None)
+
+
 def test_part_header_is_a_comment():
     """分出去的檔案開頭如果是字串，exec 時會蓋掉 pipeline 的 __doc__，所以 split_moves 寫的是註解。"""
     g = {"__doc__": "pipeline"}
@@ -131,6 +145,16 @@ def test_move_cuts_contiguous_block():
 def test_move_rejects_bad_ranges(args, msg):
     with pytest.raises(M.MoveError, match=msg):
         M.move(SAMPLE, *args)
+
+
+def test_compare_catches_dropped_module_statement():
+    """Agy 審查 1：分出去的檔案掉了一段定義以外的敘述（載入時執行的 try），每個定義都還在，原本照樣回報相同。"""
+    new, part = M.move(SAMPLE, "x", "b", "c")
+    bad = part.replace("try:\n    a()\nexcept Exception:\n    pass\n\n\n", "")
+    assert bad != part
+    got = C.compare(SAMPLE, {"pipeline.py": new, "leihu/core/x.py": bad}, {"leihu/core/x.py"})
+    assert got == ["把 _load_part 換回原本的內容後，整份和搬移前不同（定義以外的敘述或順序變了）"]
+    assert C.reassemble(new, {"leihu/core/x.py": part}) == SAMPLE
 
 
 def test_compare_reports_changed_and_missing():
