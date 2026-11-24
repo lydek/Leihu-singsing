@@ -44,12 +44,20 @@ BASE = "v2.3.2"  # 第一階段的基準（refactor-port-plan.md 3.8）
 
 D4_CASES = ("status_end", "status_live", "status_override", "status_paused")
 D4_NOTE = "~ /body/jobs: 已核對：上游多 2 個刪掉的歌的 process 工作（all、youtube），其他工作相同，queued_total 少 2"
+D4_SONGS = {"all": "song_upload", "youtube": "youtube_add"}   # 多出來的工作標籤 → 建立被刪的那首歌的案例
 
 
-def _align_d4(case: str, snap_c, res_c):
+def _body_id(c) -> str | None:
+    body = c.get("body") if isinstance(c, dict) else None
+    return body.get("id") if isinstance(body, dict) else None
+
+
+def _align_d4(case: str, snap_c, res_c, deleted: dict | None = None):
     """D4（下一版第 2 批）：上游的 /api/status 還列著被刪掉的兩首歌的排隊工作。只有多出來的剛好是那 2 個
     process 工作（all、youtube）、其他工作逐一相同、queued_total 剛好多 2 時，才把上游那兩個欄位換成這一邊的，
-    並回傳 D4_NOTE（記成預期差異）；不符合就原樣回傳，差異照常列為未預期（Codex r4-7）。"""
+    並回傳 D4_NOTE（記成預期差異）；不符合就原樣回傳，差異照常列為未預期（Codex r4-7）。
+    deleted：標籤 → 被刪的那首歌遮蔽後的編號（基準的 song_upload、youtube_add 回應），多出來的工作要剛好是
+    那兩首歌的（複審 P3-6）。"""
     if case not in D4_CASES:
         return res_c, None
     try:
@@ -71,6 +79,7 @@ def _align_d4(case: str, snap_c, res_c):
         rest.pop(hit)
     ok = (len(rest) == 2 and all(r.get("kind") == "process" and r.get("status") == "queued" for r in rest)
           and sorted(r.get("label") for r in rest) == ["all", "youtube"]
+          and all(r.get("song") is not None and r.get("song") == (deleted or {}).get(r.get("label")) for r in rest)
           and [key(r) for r in rj if r not in rest] == [key(j) for j in sj] and rt - st == 2)
     if not ok:
         return res_c, None
@@ -501,12 +510,13 @@ def compare(snap: dict, result: dict) -> tuple[list[str], dict, dict]:
     """snap＝目前這一邊、result＝基準。回傳（完全相同的案例、預期差異、未預期差異）。案例集合不同也算未預期。"""
     same, expected, unexpected = [], {}, {}
     snap, result = (json.loads(json.dumps(x, ensure_ascii=False)) for x in (snap, result))  # 兩邊都用 JSON 的型別（tuple→list）
+    deleted = {label: _body_id(result.get(c)) for label, c in D4_SONGS.items()}
     for case in sorted(snap.keys() | result.keys()):
         if case not in snap or case not in result:
             unexpected.setdefault(case, []).append("只有" + ("基準" if case in result else "目前這一邊") + "有這個案例")
             continue
         out: list[str] = []
-        res_c, note = _align_d4(case, snap[case], result[case])
+        res_c, note = _align_d4(case, snap[case], result[case], deleted)
         diff(snap[case], res_c, "", out)
         if note:
             out.append(note)
