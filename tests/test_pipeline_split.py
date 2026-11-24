@@ -96,12 +96,24 @@ def test_unresolved_finds_missing_names_and_typos():
 
 
 def test_parts_resolve_all_names(app_module):
-    """每個分出去的檔案，每個作用域用到的全域名稱都在 pipeline 的命名空間或 builtins 裡（取代 ruff 的 F821）。"""
+    """pipeline.py 和每個分出去的檔案，每個作用域用到的全域名稱都在 pipeline 的命名空間或 builtins 裡
+    （取代 ruff 的 F821：拆檔後 pipeline.py 用到分出去的名稱，ruff 也看不到）。"""
     import pipeline as P
 
-    for name in P._PARTS:
-        p = P.PARTS_DIR / f"{name}.py"
-        assert C.unresolved(_text(p), str(p), set(vars(P))) == [], name
+    for p in [ROOT / "pipeline.py", *(P.PARTS_DIR / f"{n}.py" for n in P._PARTS)]:
+        assert C.unresolved(_text(p), str(p), set(vars(P))) == [], p.name
+
+
+def test_ruff_f821_excluded_only_for_shared_namespace(app_module):
+    """ruff 只對 pipeline.py 和方式一的檔案排除 F821（逐檔登記）；方式二的模組、其他檔案照樣檢查。"""
+    import tomllib
+
+    import pipeline as P
+
+    ignores = tomllib.loads((ROOT / "pyproject.toml").read_text("utf-8"))["tool"]["ruff"]["lint"]["per-file-ignores"]
+    f821 = {k for k, v in ignores.items() if "F821" in v}
+    want = {"pipeline.py", *(f"leihu/core/{n}.py" for n in P._PARTS)} if P._PARTS else set()
+    assert f821 == want
 
 
 def test_pipeline_names_complete(app_module):
@@ -172,13 +184,20 @@ def test_move_and_load_real_pipeline(tmp_path):
     shutil.copy2(ROOT / "pipeline.py", tmp_path / "pipeline.py")
     shutil.copytree(ROOT / "leihu", tmp_path / "leihu", ignore=shutil.ignore_patterns("__pycache__"))
     base = _text(ROOT / "pipeline.py")
+    base_files = {f"leihu/core/{n}.py": _text(ROOT / "leihu" / "core" / f"{n}.py") for n in C.part_names(base)}
     dest = M.run(tmp_path, "categories", "_cats_path", "save_categories")
     assert dest == tmp_path / "leihu" / "core" / "categories.py"
     files = C.tree_files(tmp_path)
-    assert C.compare(base, files, {"leihu/core/categories.py"}) == []
+    names = C.part_names(files["pipeline.py"])
+    assert "categories" in names
+    parts = {f"leihu/core/{n}.py" for n in names}
+    assert C.compare(base, files, parts, base_files) == []
+    if base_files:   # 之前的步驟分出去的檔案被改到，也要抓得到
+        f = next(iter(base_files))
+        assert C.compare(base, {**files, f: files[f] + "\nX_EXTRA = 1\n"}, parts, base_files) != []
     code = ("import pipeline as P, split_check as C\n"
             "from pathlib import Path\n"
-            "assert P._PARTS == ['categories'], P._PARTS\n"
+            f"assert P._PARTS == {names!r}, P._PARTS\n"
             "assert P._cats_path.__module__ == 'pipeline'\n"
             "P.LIB = Path('elsewhere')\n"
             "assert P._cats_path() == Path('elsewhere') / 'categories.json'\n"

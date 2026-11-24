@@ -58,3 +58,7 @@ ignore = [
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["S101"]   # pytest 用 assert
+# 拆檔方式一（docs/pipeline-split-plan.md）：pipeline.py 和 _load_part 載入的檔案共用命名空間，ruff 看不到彼此的名稱。
+# 這幾個檔案的未定義名稱改由 tests/test_pipeline_split.py 用 symtable 檢查（函式裡的筆誤也抓得到）。每搬一個檔案就登記一行
+"pipeline.py" = ["F821"]
+"leihu/core/jobs.py" = ["F821"]
