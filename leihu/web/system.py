@@ -224,7 +224,17 @@ def prioritize(sid):
     if any(j["status"] == "running" for j in mine):
         raise P.UserError("這首正在處理中")
     for j in mine:
-        if j["status"] == "queued" and jobs.to_front(j["id"]):
+        if j["status"] != "queued":
+            continue
+        if j.get("label") == "unfinished":
+            # fork（複審 P3-4）：「重做全部歌曲」排的在 LIVE_BACKGROUND，只移到最前面直播中還是會暫停；
+            # 改用單首優先處理的步驟標籤重排（unfinished 一律是分離＋旋律）
+            if jobs.cancel(j["id"]):
+                jid = submit_unfinished(sid, ["separate", "pitch"])
+                jobs.to_front(jid)
+                return jsonify(job=jid, what="process")
+            continue
+        if jobs.to_front(j["id"]):
             return jsonify(job=j["id"], what="moved")
     st = meta.get("steps") or {}
     if not st.get("import"):
