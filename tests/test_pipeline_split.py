@@ -111,16 +111,20 @@ def test_shared_namespace_imports_used_and_names_unique(app_module):
 
     texts = [_text(ROOT / "pipeline.py"), *(_text(P.PARTS_DIR / f"{n}.py") for n in P._PARTS)]
     assert C.unused_imports(texts[0], texts[1:]) == []
-    counts: dict[str, int] = {}
-    for t in texts:
-        for nm, ds in D.defs(t).items():
-            counts[nm] = counts.get(nm, 0) + len(ds)
-    assert [nm for nm, k in counts.items() if k > 1] == []
+    assert C.duplicate_names(texts) == []
 
 
 def test_unused_imports_finds_leftovers():
-    main = "import os\nimport re\nimport json  # noqa: F401  轉出\nfrom __future__ import annotations\n"
-    assert C.unused_imports(main, ["def f():\n    return os.sep\n"]) == ["re"]
+    main = "import os\nimport re\nimport sys\nimport json  # noqa: F401  轉出\nfrom __future__ import annotations\n"
+    part = "def f():\n    sys = 1\n    return os.sep\n"   # sys 只被寫入、沒被讀，不算用到（Agy 審查 2）
+    assert C.unused_imports(main, [part]) == ["re", "sys"]
+
+
+def test_duplicate_names_counts_imports():
+    """Agy 審查 1：重複 import、import 被分出去的檔案裡的定義蓋掉，原本的檢查只算定義、抓不到。"""
+    main = "from __future__ import annotations\nimport re\nimport re\nimport os\n\n\ndef a():\n    return 1\n"
+    assert C.duplicate_names([main, "def os():\n    return 2\n\n\ndef b():\n    return 3\n"]) == ["os", "re"]
+    assert C.duplicate_names(["import os\n", "def a():\n    return 1\n"]) == []
 
 
 def test_ruff_f821_excluded_only_for_shared_namespace(app_module):

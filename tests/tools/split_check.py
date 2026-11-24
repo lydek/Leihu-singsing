@@ -67,16 +67,31 @@ def unused_imports(pipeline_text: str, part_texts: list[str]) -> list[str]:
     """pipeline.py 模組層級 import 的名稱，pipeline.py 和方式一的檔案都沒用到的（取代 ruff 對 pipeline.py 的 F401：
     import 留在 pipeline.py、只有分出去的檔案用到時，ruff 會誤報）。轉出用的 import（寫了 noqa: F401）和 __future__ 不算。"""
     lines = pipeline_text.split("\n")
-    imported: dict[str, int] = {}
+    imported: set[str] = set()
     for n in ast.parse(pipeline_text).body:
         if not isinstance(n, (ast.Import, ast.ImportFrom)) or getattr(n, "module", None) == "__future__":
             continue
         if "noqa: F401" in "\n".join(lines[n.lineno - 1:n.end_lineno]):
             continue
-        for a in n.names:
-            imported[a.asname or a.name.split(".")[0]] = n.lineno
-    used = {x.id for t in [pipeline_text, *part_texts] for x in ast.walk(ast.parse(t)) if isinstance(x, ast.Name)}
-    return sorted(k for k in imported if k not in used)
+        imported |= {a.asname or a.name.split(".")[0] for a in n.names}
+    used = {x.id for t in [pipeline_text, *part_texts] for x in ast.walk(ast.parse(t))
+            if isinstance(x, ast.Name) and isinstance(x.ctx, ast.Load)}   # 只寫不讀的同名變數不算用到
+    return sorted(imported - used)
+
+
+def duplicate_names(texts: list[str]) -> list[str]:
+    """共用命名空間（pipeline.py 和方式一的檔案）裡，模組層級綁定兩次以上的名稱：定義（def、class、指定）和
+    import 都算（取代 ruff 對 pipeline.py 的 F811：重複 import、import 被定義蓋掉都抓得到）。__future__ 不算。"""
+    counts: dict[str, int] = {}
+    for t in texts:
+        for nm, ds in D.defs(t).items():
+            counts[nm] = counts.get(nm, 0) + len(ds)
+        for n in ast.parse(t).body:
+            if isinstance(n, (ast.Import, ast.ImportFrom)) and getattr(n, "module", None) != "__future__":
+                for a in n.names:
+                    nm = a.asname or a.name.split(".")[0]
+                    counts[nm] = counts.get(nm, 0) + 1
+    return sorted(nm for nm, k in counts.items() if k > 1)
 
 
 def compare(base: str, files: dict[str, str], parts: set[str], base_files: dict[str, str] | None = None) -> list[str]:
