@@ -176,7 +176,7 @@ def live_light_upgrade() -> None:
         try:
             cfg = P.load_config()
             # fork（Codex r5-3）：高品質這次執行已停用時不排，等下次開程式再試
-            if not P.live_status(cfg)["hold"] and P.hq_models_ready(cfg) and not P.hq_disabled():
+            if not P.live_status(cfg)["hold"] and P.hq_models_ready(cfg) and not P.hq_disabled(cfg):
                 for s in P.list_songs():
                     sid = s["id"]
                     if not s.get("live_light") or sid in tried:
@@ -186,7 +186,7 @@ def live_light_upgrade() -> None:
                     proc = P.process_song(sid, ["separate", "pitch"])
 
                     def run(report, sid=sid, proc=proc):
-                        if P.hq_disabled():   # 排隊期間高品質停用了：做了也只是標準模型，標記留著
+                        if P.hq_disabled(P.load_config()):   # 排隊期間高品質停用了：做了也只是標準模型，標記留著
                             return
                         proc(report)
                         try:

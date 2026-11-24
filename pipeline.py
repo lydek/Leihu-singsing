@@ -1665,9 +1665,11 @@ STD_VOCAL = "UVR-MDX-NET-Inst_HQ_3.onnx"
 _HQ_FAIL = {"vocal": 0, "kara": 0}   # 這次執行中高品質模型失敗幾次；連續失敗 2 次就先不用（重開練唱台再試）
 
 
-def hq_disabled() -> bool:
-    """fork（Codex r5-3）：高品質模型這次執行已經停用（連續失敗 2 次），補做高品質也只會用標準模型。"""
-    return max(_HQ_FAIL.values()) >= 2
+def hq_disabled(cfg: dict) -> bool:
+    """fork（Codex r5-3）：設定要用的高品質模型，有一個這次執行已經停用（連續失敗 2 次），補做高品質也只會用標準模型。
+    只看目前設定要用的（Codex r6-1：人聲失敗兩次後改成標準，主唱的高品質補做照做）。"""
+    return ((_uses_hq(cfg, "vocal_quality") and _HQ_FAIL["vocal"] >= 2)
+            or (_uses_hq(cfg, "karaoke_quality") and _HQ_FAIL["kara"] >= 2))
 
 
 def _hq_fail_note(d: Path, what: str, e: Exception) -> None:
@@ -2020,10 +2022,16 @@ def hqv_status() -> dict:
     return dict(HQV_DL)
 
 
+def _uses_hq(cfg: dict, key: str) -> bool:
+    """fork（Codex r6-1）：這個設定會不會用高品質模型。vocal_model、karaoke_model、wants_hq、hq_models_ready、
+    hq_disabled、separate_uvr 共用，判斷一致。"""
+    q = cfg.get(key, "auto")
+    return q == "high" or (q == "auto" and cuda_ok())
+
+
 def vocal_model(cfg: dict) -> str:
     """要用的人聲／伴奏分離模型。高品質模型還沒下載好時，這首先用標準模型，模型在背景下載。"""
-    q = cfg.get("vocal_quality", "auto")
-    if (q == "high" or (q == "auto" and cuda_ok())) and _HQ_FAIL["vocal"] < 2:
+    if _uses_hq(cfg, "vocal_quality") and _HQ_FAIL["vocal"] < 2:
         if hqv_ready():
             return HQ_VOCAL
         start_hqv_download()
@@ -2032,8 +2040,7 @@ def vocal_model(cfg: dict) -> str:
 
 def karaoke_model(cfg: dict) -> str:
     """要用的主唱／合音分離模型。高品質模型還沒下載好時，這首先用標準模型，模型在背景下載。"""
-    q = cfg.get("karaoke_quality", "auto")
-    if (q == "high" or (q == "auto" and cuda_ok())) and _HQ_FAIL["kara"] < 2:
+    if _uses_hq(cfg, "karaoke_quality") and _HQ_FAIL["kara"] < 2:
         if hq_ready():
             return HQ_KARAOKE
         start_hq_download()
@@ -2369,7 +2376,7 @@ def separate_uvr(d: Path, cfg: dict, report) -> bool:
     report("準備人聲分離模型", 0.07)
     vmodel = vocal_model(cfg)
     vhq = vmodel == HQ_VOCAL
-    missed = not vhq and _HQ_FAIL["vocal"] >= 2
+    missed = not vhq and _uses_hq(cfg, "vocal_quality") and _HQ_FAIL["vocal"] >= 2   # 要高品質、但這次執行已停用
     ensure_model(vmodel, _dl_report(report, "人聲分離模型", 0.07))
     vlabel = "分離人聲與伴奏" + ("（直播中：CPU 輕量處理，下播後自動補做高品質）" if cpu else "") + ("（高品質）" if vhq else "（高品質模型下載中，這首先用標準模型）" if HQV_DL["state"] == "downloading" else "")
     report(vlabel, 0.08)
@@ -2410,7 +2417,7 @@ def separate_uvr(d: Path, cfg: dict, report) -> bool:
 
     kara = karaoke_model(cfg)
     hq = kara == HQ_KARAOKE
-    missed = missed or (not hq and _HQ_FAIL["kara"] >= 2)
+    missed = missed or (not hq and _uses_hq(cfg, "karaoke_quality") and _HQ_FAIL["kara"] >= 2)
     waiting = not hq and HQ_DL["state"] == "downloading"
     label = "把人聲分成主唱與合音" + ("（高品質）" if hq else "（高品質模型下載中，這首先用標準模型）" if waiting else "")
     if not hq:
@@ -3637,18 +3644,13 @@ class JobDeferred(JobCancelled):
 
 def wants_hq(cfg: dict) -> bool:
     """這台電腦平常會不會用高品質（較慢、較吃顯示卡）的分離模型。"""
-    def hq(key):
-        q = cfg.get(key, "auto")
-        return q == "high" or (q == "auto" and cuda_ok())
-    return hq("vocal_quality") or hq("karaoke_quality")
+    return _uses_hq(cfg, "vocal_quality") or _uses_hq(cfg, "karaoke_quality")
 
 
 def hq_models_ready(cfg: dict) -> bool:
     """平常要用的高品質模型都下載好了（直播後補做才有意義）。"""
-    def hq(key):
-        q = cfg.get(key, "auto")
-        return q == "high" or (q == "auto" and cuda_ok())
-    return (not hq("vocal_quality") or hqv_ready()) and (not hq("karaoke_quality") or hq_ready())
+    return ((not _uses_hq(cfg, "vocal_quality") or hqv_ready())
+            and (not _uses_hq(cfg, "karaoke_quality") or hq_ready()))
 
 
 LIGHT_CFG = {"vocal_quality": "standard", "karaoke_quality": "standard", "auto_recognize_lyrics": False, "_cpu": True}
