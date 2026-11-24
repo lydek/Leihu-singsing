@@ -158,3 +158,45 @@ def test_other_missing_file_is_still_an_error(app_module, take, monkeypatch):
     monkeypatch.setattr(SH, "mix_take", missing_stem)
     r = app_module.app.test_client().post(f"/api/songs/{SID}/takes/{TID}/preview", json={})
     assert r.status_code == 500
+
+
+@pytest.mark.parametrize(("route", "nth", "before", "cached"), [
+    ("preview", 1, True, False),         # _need_variant 讀 JSON 時已經不在（原本在保護範圍外）
+    ("preview", 3, False, False),        # vocal_track 讀完 JSON、要讀 WAV 時被刪：soundfile 丟 LibsndfileError
+    ("mixprep", 3, False, False),        # 同上，試聽用人聲
+    ("mixprep?balance=1", 3, True, True),  # suggest_balance 讀錄音時已經不在（原本在保護範圍外）
+    ("export", 1, True, False),          # 匯出前檢查錄音時已經不在
+])
+def test_take_deleted_with_real_reads_returns_404(app_module, take, monkeypatch, tmp_path, route, nth, before, cached):
+    """複審 P2-2：真的讀檔（不是假的 FileNotFoundError），第 nth 次讀錄音 JSON 時（之前／之後）錄音被刪掉，回 404。"""
+    import soundfile as sf
+
+    import pipeline as P
+    import share as SH
+
+    td = take / "takes"
+    info = json.loads((td / f"{TID}.json").read_text("utf-8"))
+    (td / f"{TID}.json").write_text(json.dumps(dict(info, status="done")), "utf-8")
+    if cached:
+        (td / f"{TID}.vocal_v2_1_light.wav").write_bytes(b"x")
+    back = tmp_path / "back.wav"
+    sf.write(str(back), np.zeros((100, 2), dtype=np.float32), 44100)
+    real_load, calls = SH.load_take, []
+
+    def load_take(d, tid):
+        calls.append(tid)
+        if len(calls) == nth and before:
+            _delete(app_module)
+        got = real_load(d, tid)
+        if len(calls) == nth and not before:
+            _delete(app_module)
+        return got
+
+    monkeypatch.setattr(SH, "load_take", load_take)
+    monkeypatch.setattr(SH, "_stems", lambda d, info: (np.zeros((2, 100), np.float32), np.zeros((2, 100), np.float32),
+                                                       44100, 0, 1.0))
+    monkeypatch.setattr(P, "variant_ready", lambda d, key, speed: True)
+    monkeypatch.setattr(P, "stem_path", lambda vd, name: back)
+    r = app_module.app.test_client().post(f"/api/songs/{SID}/takes/{TID}/{route}", json={})
+    assert len(calls) >= nth
+    assert r.status_code == 404
