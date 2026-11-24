@@ -20,14 +20,15 @@ import os
 import secrets
 import subprocess
 import sys
+import tempfile
 import threading
 import time
 import traceback
 from pathlib import Path
 
 IDLE_EXIT = 30.0      # 子程式閒置幾秒後結束（把顯示卡記憶體全部還回去）
-SPAWN_TIMEOUT = 90.0  # 子程式這麼久還沒連上就放棄，改在主程式裡做
-# 子程式多久沒有任何回報就當作卡住（結束它，改在主程式裡做）。分離每一小段都會回報進度；
+SPAWN_TIMEOUT = 90.0  # 子程式這麼久還沒連上就放棄（顯示卡處理程式改交給 CPU 處理程式，fork 第 7 批）
+# 子程式多久沒有任何回報就當作卡住（結束它，GpuStalled 交給呼叫的人改用 CPU）。分離每一小段都會回報進度；
 # 旋律分析中途沒有進度，用整體時間判斷
 STALL = {"separate": 120.0, "whisper": 900.0, "pitch": 600.0, "probe": 180.0}
 
@@ -350,7 +351,8 @@ def serve(address, authkey_hex: str, parent_pid: int) -> None:
 # ================================================================ 主程式這一端
 
 class WorkerFailed(RuntimeError):
-    """子程式開不起來或卡住：改在主程式裡做（顯示卡記憶體會留到程式關閉，但工作不會卡住）。"""
+    """子程式開不起來或卡住。顯示卡處理程式開不起來時交給 CPU 處理程式（fork 第 7 批：原本改在主程式裡做，
+    伺服器會載入 torch、CUDA）。"""
 
 
 class GpuStalled(WorkerFailed):
@@ -364,11 +366,25 @@ class RemoteError(RuntimeError):
         self.kind, self.msg = kind, msg
 
 
+def _exit_reason(err: Path | None) -> str:
+    """子程式寫下的 traceback 的最後一行（真正的原因）；沒有（例如原生程式當掉）時請看 app.log。讀完刪掉暫存檔。"""
+    text = ""
+    if err:
+        try:
+            text = err.read_text("utf-8", errors="replace")
+            err.unlink(missing_ok=True)
+        except OSError:   # 沒有寫（正常結束、原生程式當掉）
+            pass
+    lines = [x.strip() for x in text.splitlines() if x.strip()]
+    return lines[-1][:300] if lines else "沒有留下原因，詳細情形在 logs/app.log"
+
+
 class _Worker:
     def __init__(self, proc, conn, pid):
         self.proc, self.conn, self.pid = proc, conn, pid
         self.busy = True
         self.last = time.time()
+        self.err: Path | None = None   # 子程式結束時寫 traceback 的暫存檔（_exit_reason）
 
     def alive(self) -> bool:
         return self.proc.poll() is None
@@ -452,6 +468,7 @@ def _win_kill(pid: int) -> None:
 class Pool:
     def __init__(self, cpu: bool = False):
         self.cpu = cpu   # True：只用 CPU 的處理程式（直播中用，完全不碰顯示卡）
+        self.label = "CPU 處理程式" if cpu else "顯示卡處理程式"   # fork（第 7 批）：log、錯誤訊息分得出是哪一種
         self.cv = threading.Condition()
         self.workers: list[_Worker] = []
         self.starting = 0
@@ -484,8 +501,18 @@ class Pool:
                 time.sleep(0.5)
 
     def _spawn(self) -> _Worker:
-        cmd = [sys.executable, "-c",
-               f"import gpu_worker; gpu_worker.serve({self.listener.address!r}, {self.authkey.hex()!r}, {os.getpid()})"]
+        # fork（第 7 批）：子程式開不起來（例如 import 失敗）時把 traceback 寫到暫存檔，錯誤訊息才有真正的原因，
+        # 不是只有「代碼 1」
+        err = Path(tempfile.gettempdir()) / f"leihu-spawn-{os.getpid()}-{secrets.token_hex(4)}.txt"
+        code = ("import traceback\n"
+                "try:\n"
+                "    import gpu_worker\n"
+                f"    gpu_worker.serve({self.listener.address!r}, {self.authkey.hex()!r}, {os.getpid()})\n"
+                "except BaseException as e:\n"
+                "    if not isinstance(e, SystemExit) or e.code not in (0, None):\n"
+                f"        open({str(err)!r}, 'w', encoding='utf-8').write(traceback.format_exc())\n"
+                "    raise\n")
+        cmd = [sys.executable, "-c", code]
         flags = 0x08000000 if sys.platform == "win32" else 0   # CREATE_NO_WINDOW
         env = dict(os.environ, PYTHONIOENCODING="utf-8", PYTHONUNBUFFERED="1")
         if self.cpu:   # 看不到顯示卡：PyTorch、ONNX 都改用 CPU；只用一半的核心，留給直播軟體
@@ -499,7 +526,7 @@ class Pool:
         except Exception:
             out = None
         t0 = time.time()
-        print("[gpu] 開啟顯示卡處理程式…", flush=True)
+        print(f"[gpu] 開啟{self.label}…", flush=True)
         if sys.platform == "win32":
             flags |= 0x00000004   # CREATE_SUSPENDED：先放進工作物件再開始跑，它開出的 Python 才會一起被管到
         proc = subprocess.Popen(cmd, cwd=str(ROOT), env=env, creationflags=flags,
@@ -524,17 +551,19 @@ class Pool:
                     pid = next(iter(self.hello))
                     got = (pid, self.hello.pop(pid))
                 if got:
-                    print(f"[gpu] 顯示卡處理程式 {got[0]} 已連上（{time.time() - t0:.1f} 秒）", flush=True)
-                    return _Worker(proc, got[1], got[0])
+                    print(f"[gpu] {self.label} {got[0]} 已連上（{time.time() - t0:.1f} 秒）", flush=True)
+                    w = _Worker(proc, got[1], got[0])
+                    w.err = err
+                    return w
                 if proc.poll() is not None:
-                    raise WorkerFailed(f"顯示卡處理程式啟動失敗（代碼 {proc.returncode}），詳細原因在 logs/app.log")
+                    raise WorkerFailed(f"{self.label}啟動失敗（代碼 {proc.returncode}）：{_exit_reason(err)}")
                 if time.time() > end:
                     try:
                         _kill_tree(proc)
                     except Exception:
                         pass
                     proc.kill()
-                    raise WorkerFailed("顯示卡處理程式啟動逾時")
+                    raise WorkerFailed(f"{self.label}啟動逾時（{SPAWN_TIMEOUT:.0f} 秒還沒連上）")
                 self.cv.wait(0.5)
 
     def _acquire(self) -> _Worker:
@@ -610,7 +639,8 @@ class Pool:
         check = getattr(CURRENT, "check", None)
         stall = _stall(name, args)
         t0 = last = time.time()
-        print(f"[gpu] {name} 交給處理程式 {w.pid}" + ("（直播中，低優先順序）" if low else ""), flush=True)
+        print(f"[gpu] {name} 交給{'CPU ' if self.cpu else ''}處理程式 {w.pid}" + ("（直播中，低優先順序）" if low else ""),
+              flush=True)
         try:
             w.conn.send(("task", name, args, kw, low))
             while True:
@@ -632,9 +662,9 @@ class Pool:
                 if check:
                     check()
                 if not w.alive():
-                    raise RuntimeError(f"顯示卡處理程式意外結束（代碼 {w.proc.returncode}），詳細原因在 logs/app.log")
+                    raise RuntimeError(f"{self.label}意外結束（代碼 {w.proc.returncode}）：{_exit_reason(w.err)}")
                 if time.time() - last > stall:
-                    raise GpuStalled(f"顯示卡處理程式 {stall:.0f} 秒沒有回應（{name}）")
+                    raise GpuStalled(f"{self.label} {stall:.0f} 秒沒有回應（{name}）")
         finally:
             if ok and w.alive():
                 self._release(w)
@@ -715,18 +745,36 @@ class _gate:
         return False
 
 
-def _local(name: str, *args, progress=None, **kw):
-    """備援：在主程式裡直接做（會載入 CUDA，顯示卡記憶體要等練唱台關掉才會完全還）。"""
-    import pipeline as P
-    print(f"[gpu] {name} 改在主程式裡執行（{_BROKEN['why']}）", flush=True)
-    return TASKS[name](P, progress or (lambda s, p: None), *args, **kw)
+def broken_info() -> dict | None:
+    """fork（第 7 批）：顯示卡處理程式開不起來、暫時改用 CPU 處理程式的期間（到什麼時候、原因）；不在期間是 None。
+    /api/status 用，狀態列顯示。"""
+    if time.time() < _BROKEN["until"]:
+        return {"until": _BROKEN["until"], "why": _BROKEN["why"]}
+    return None
+
+
+def _cpu_fallback(name: str, args: tuple, progress, kw: dict):
+    """fork（第 7 批，next-version-plan.md 第 1 節）：顯示卡處理程式開不起來時交給 CPU 處理程式，不在伺服器裡做
+    （原本的 _local 會讓伺服器載入 torch、CUDA）。CPU 處理程式也開不起來就讓這首失敗，錯誤訊息是真正的原因。
+    CURRENT.cpu_fallback 記下原因，佇列做完這首後寫進歌曲的說明（Jobs._work）。"""
+    why = _BROKEN["why"]
+    print(f"[gpu] {name} 交給 CPU 處理程式（顯示卡處理程式無法啟動：{why}）", flush=True)
+    CURRENT.cpu_fallback = why
+    try:
+        return CPU_POOL.call(name, *args, progress=progress, low=True, **kw)
+    except GpuStalled:
+        raise   # CPU 處理程式開起來了、只是沒有回應：照一般的卡住處理
+    except WorkerFailed as e:
+        traceback.print_exc()
+        import pipeline as P
+        raise P.UserError(f"顯示卡和 CPU 處理程式都無法啟動：{e}（顯示卡處理程式：{why}）") from e
 
 
 def call(name: str, *args, progress=None, cpu: bool = False, **kw):
     """主程式呼叫：直播中（偵測到直播軟體）子程式用較低的優先順序跑。
     cpu=True：在完全不碰顯示卡的處理程式裡跑（直播中用：直播軟體和 VTube Studio 佔著顯示卡時，
     顯示卡運算會被擠到幾乎停住，實測分離一首卡在 2% 好幾分鐘）。
-    子程式開不起來或卡住時，這次改在主程式裡做，接下來 10 分鐘也先不開子程式，避免每首都卡一次。"""
+    顯示卡處理程式開不起來時交給 CPU 處理程式（fork，第 7 批），接下來 10 分鐘也先不開，避免每首都等一次。"""
     if cpu:
         return CPU_POOL.call(name, *args, progress=progress, low=True, **kw)
     low = False
@@ -735,8 +783,11 @@ def call(name: str, *args, progress=None, cpu: bool = False, **kw):
         low = bool(P.live_status()["hold"])
     except Exception:
         pass
+    if _BROKEN["until"] and time.time() >= _BROKEN["until"]:
+        print("[gpu] 10 分鐘到了，重新試著開顯示卡處理程式", flush=True)
+        _BROKEN.update(until=0.0, why="")
     if time.time() < _BROKEN["until"]:
-        return _local(name, *args, progress=progress, **kw)
+        return _cpu_fallback(name, args, progress, kw)
     try:
         with _gate(progress):
             return POOL.call(name, *args, progress=progress, low=low, **kw)
@@ -751,7 +802,8 @@ def call(name: str, *args, progress=None, cpu: bool = False, **kw):
             print("[gpu] 顯示卡太忙，音高分析改用 CPU 處理", flush=True)
             return CPU_POOL.call(name, *args, progress=progress, low=True, **kw)
         raise   # separate：由 pipeline 改用 CPU＋標準模型重做；其他工作直接回報失敗
-    except WorkerFailed as e:   # 子程式根本開不起來：才改在主程式裡做
-        print(f"[gpu] {e}", flush=True)
+    except WorkerFailed as e:   # 子程式根本開不起來：交給 CPU 處理程式
+        traceback.print_exc()
         _BROKEN.update(until=time.time() + 600, why=str(e))
-        return _local(name, *args, progress=progress, **kw)
+        print(f"[gpu] 顯示卡處理程式無法啟動，接下來 10 分鐘的工作改交給 CPU 處理程式：{e}", flush=True)
+        return _cpu_fallback(name, args, progress, kw)

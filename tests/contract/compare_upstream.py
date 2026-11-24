@@ -162,12 +162,15 @@ OWN_CHANGES: list[tuple[str, str]] = [
     ("static/app.js", r"\+\s*// fork（Codex r5-7）：nn .*"),
     # 複審 P3-5：讀不到顯示卡用量時畫面提示一次（next-version-plan.md）
     ("static/app.js", r"\+.*gpuErrWas.*"),
+    # 第 7 批：顯示卡處理程式開不起來、暫時改用 CPU 時狀態列和 toast 提示（/api/status 的 gpu_fallback）
+    ("static/app.js", r"\+.*(gpuFbWas|syncGpuFallback|fbSum).*"),
 ]
 
 # 伺服器 log 裡代表「這次執行條件和平常不同」的訊息：一律列進報告，不然結果會被誤解
 LOG_ALERTS = [
     ("Traceback", "Python 例外"),
     ("改在主程式裡執行", "顯示卡子程式開不起來，改在主程式裡做"),
+    ("交給 CPU 處理程式（顯示卡處理程式無法啟動", "顯示卡處理程式開不起來，改交給 CPU 處理程式（第 7 批）"),
     ("改用 CPU", "改用 CPU"),
     ("退回", "退回較低品質的模型或做法"),
     ("改用標準模型", "高品質模型失敗，改用標準模型"),

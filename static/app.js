@@ -1083,6 +1083,7 @@ async function pollJobs() {
   try { st = await api(`/api/status${window.LIVE && LIVE.on ? "?live=1" : ""}`); } catch { jobTimer = setTimeout(pollJobs, 3000); return; }
   syncLiveHold(st.live);
   syncPauseBar(st);
+  syncGpuFallback(st.gpu_fallback);
   if (!!st.yt !== ytOn) applyYt(st.yt);
   updateClaudeChip(st.claude_ready, st.session_cost);
   remoteOpen(st.remote);
@@ -1236,6 +1237,13 @@ function syncPauseBar(st) {
   const run = proc.filter(j => j.status === "running").length;
   $("#jobs-sum").textContent = proc.length ? `處理中 ${run} 首、排隊 ${proc.length - run} 首` : "";
 }
+let gpuFbWas = false;   // fork（第 7 批）：顯示卡處理程式開不起來、暫時改用 CPU（/api/status 的 gpu_fallback）
+function syncGpuFallback(fb) {
+  const fbSum = $("#jobs-sum");
+  fbSum.title = fb ? `原因：${fb.why}` : "";
+  if (fb) fbSum.textContent += (fbSum.textContent ? "；" : "") + "顯示卡處理程式無法啟動，暫時改用 CPU";
+  if (fb && !gpuFbWas) toast(`顯示卡處理程式無法啟動，接下來 10 分鐘改用 CPU 處理：${fb.why}`, 8000);
+  gpuFbWas = !!fb; }
 let liveHoldWas = null;
 let gpuErrWas = false;
 function syncLiveHold(l) {
