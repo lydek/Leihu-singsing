@@ -104,6 +104,25 @@ def test_parts_resolve_all_names(app_module):
         assert C.unresolved(_text(p), str(p), set(vars(P))) == [], p.name
 
 
+def test_shared_namespace_imports_used_and_names_unique(app_module):
+    """取代 ruff 對 pipeline.py 的 F401、F811（拆檔後 import 只有分出去的檔案用到時會誤報）：pipeline.py 模組層級
+    import 的名稱，在 pipeline.py 或方式一的檔案裡要用得到；同一個最上層名稱在這些檔案裡只定義一次。"""
+    import pipeline as P
+
+    texts = [_text(ROOT / "pipeline.py"), *(_text(P.PARTS_DIR / f"{n}.py") for n in P._PARTS)]
+    assert C.unused_imports(texts[0], texts[1:]) == []
+    counts: dict[str, int] = {}
+    for t in texts:
+        for nm, ds in D.defs(t).items():
+            counts[nm] = counts.get(nm, 0) + len(ds)
+    assert [nm for nm, k in counts.items() if k > 1] == []
+
+
+def test_unused_imports_finds_leftovers():
+    main = "import os\nimport re\nimport json  # noqa: F401  轉出\nfrom __future__ import annotations\n"
+    assert C.unused_imports(main, ["def f():\n    return os.sep\n"]) == ["re"]
+
+
 def test_ruff_f821_excluded_only_for_shared_namespace(app_module):
     """ruff 只對 pipeline.py 和方式一的檔案排除 F821（逐檔登記）；方式二的模組、其他檔案照樣檢查。"""
     import tomllib

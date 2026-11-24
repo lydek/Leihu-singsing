@@ -63,6 +63,22 @@ def unresolved(src: str, filename: str, known: set[str]) -> list[str]:
     return sorted(missing)
 
 
+def unused_imports(pipeline_text: str, part_texts: list[str]) -> list[str]:
+    """pipeline.py 模組層級 import 的名稱，pipeline.py 和方式一的檔案都沒用到的（取代 ruff 對 pipeline.py 的 F401：
+    import 留在 pipeline.py、只有分出去的檔案用到時，ruff 會誤報）。轉出用的 import（寫了 noqa: F401）和 __future__ 不算。"""
+    lines = pipeline_text.split("\n")
+    imported: dict[str, int] = {}
+    for n in ast.parse(pipeline_text).body:
+        if not isinstance(n, (ast.Import, ast.ImportFrom)) or getattr(n, "module", None) == "__future__":
+            continue
+        if "noqa: F401" in "\n".join(lines[n.lineno - 1:n.end_lineno]):
+            continue
+        for a in n.names:
+            imported[a.asname or a.name.split(".")[0]] = n.lineno
+    used = {x.id for t in [pipeline_text, *part_texts] for x in ast.walk(ast.parse(t)) if isinstance(x, ast.Name)}
+    return sorted(k for k in imported if k not in used)
+
+
 def compare(base: str, files: dict[str, str], parts: set[str], base_files: dict[str, str] | None = None) -> list[str]:
     """base：搬移前的 pipeline.py；base_files：搬移前已經分出去的方式一檔案（路徑 → 內容）；files：搬移後的
     pipeline.py、leihu/*.py、leihu/core/*.py；parts：搬移後方式一的檔案路徑。回傳問題清單（空的就是都對）。

@@ -27,7 +27,8 @@ SPLIT = ("app.py", "pipeline.py")  # 拆過的檔案；其他檔案的改動原�
 # 拆過的檔案的程式現在可能在哪裡（同名的定義只在這個範圍裡找：app.py 的 furigana 路由和 pipeline.furigana 不同）
 MOVED_TO = {
     "app.py": ("app.py", "leihu/web/"),
-    "pipeline.py": ("pipeline.py", "leihu/pitch.py", "leihu/lyrics_text.py"),
+    # leihu/core/：拆檔（docs/pipeline-split-plan.md）分出去的檔案。同步改用 defmerge.py，這支只在下一次同步時跑來比較
+    "pipeline.py": ("pipeline.py", "leihu/pitch.py", "leihu/lyrics_text.py", "leihu/core/"),
 }
 HUNK = re.compile(r"^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@.*$")
 APP_RULES = [  # 步驟 1 搬移時唯一改過的寫法（3.19）
