@@ -502,6 +502,8 @@ class Merge:
         name = bound_name(k)
         if k[1] == "__future__":
             return False, ["__future__ 要放在檔案最前面"]
+        if name == "*":   # 第 2 輪審查 6：看不出匯入哪些名稱，就找不到哪些檔案用到
+            return False, ["星號 import 看不出哪些檔案用到"]
         users = sorted({f for nm, f in self.dest.items() if re.search(rf"(?<![.\w]){re.escape(name)}\b", self.code[nm])})
         elsewhere = [f for f in users if f != target]
         why = [f"用到它的定義在 {'、'.join(elsewhere)}"] if elsewhere else []

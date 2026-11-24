@@ -504,3 +504,11 @@ def test_conflicted_file_still_checked_for_missing_import(tmp_path, monkeypatch)
                  {"app.py": "", "leihu/web/common.py": "X = 1\n", "leihu/web/x.py": fork})
     assert r["stats"]["conflict"] == 1
     assert any("leihu/web/x.py 用到 helper" in x for x in r["report"] if x.startswith("手動"))
+
+
+def test_star_import_is_manual(tmp_path):
+    """第 2 輪 6：from x import * 的名稱是 "*"，比不到用到的地方，原本自動加進 pipeline.py。"""
+    new = OLD.replace("import os\n", "import os\nfrom helpers import *\n")
+    r, out = merge(tmp_path, {"pipeline.py": OLD}, {"pipeline.py": new}, {"pipeline.py": OLD})
+    assert r["stats"]["imports"] == 0
+    assert any("星號" in x for x in r["report"] if x.startswith("手動"))
