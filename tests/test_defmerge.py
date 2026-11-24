@@ -436,3 +436,17 @@ def test_merged_definition_using_import_at_load_is_manual(tmp_path):
     new = "import os\nimport re\ndef f(x=re.compile('x')):\n    return x\nimport sys\n"
     r, _ = merge(tmp_path, {"pipeline.py": old}, {"pipeline.py": new}, {"pipeline.py": old})
     assert any("之前就用到 re" in x for x in r["report"] if x.startswith("手動"))
+
+
+# ---------------------------------------------------------------- 第 2 輪審查（2026-11-24，PR #26）
+
+
+def test_binary_file_in_git_ref_is_not_text():
+    """第 2 輪 1：git() 用 text=True 時，Windows 上解碼失敗只在背景執行緒印 traceback、stdout 是 None，
+    二進位檔被當成「上游刪掉了」。要丟 UnicodeDecodeError，file() 列為「不是文字檔」。"""
+    with pytest.raises(UnicodeDecodeError):
+        D.show("HEAD", "static/icon.png")
+    head = D.Source(ref="HEAD")
+    m = D.Merge(head, D.Source(ref="HEAD"), D.Source(ref="HEAD"))
+    m.file("static/icon.png")
+    assert m.report == ["手動    static/icon.png：不是文字檔"]
