@@ -75,3 +75,54 @@ def test_powershell_env_handles_quote_and_brackets(installer):
         LEIHU_T=odd,
     )
     assert out == "True"
+
+
+# ---------------------------------------------------------------- 續傳時 .part 已經下載完（antigravity 第二輪審查 6）
+
+
+class _Resp:
+    def __init__(self, data: bytes, status: int = 200):
+        self.status, self.headers, self._buf = status, {"Content-Length": str(len(data))}, [data, b""]
+
+    def read(self, n=-1):
+        return self._buf.pop(0) if self._buf else b""
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *a):
+        return False
+
+
+def _fake_urlopen(data: bytes, seen: list):
+    import urllib.error
+
+    def urlopen(req, timeout=None):
+        rng = req.headers.get("Range")
+        seen.append(rng)
+        if rng and int(rng.split("=")[1].rstrip("-")) >= len(data):
+            raise urllib.error.HTTPError(req.full_url, 416, "Range Not Satisfiable", {}, None)
+        return _Resp(data)
+
+    return urlopen
+
+
+@pytest.mark.parametrize("part", [b"wheel-bytes", b"broken-bytes"])
+def test_download_full_part_file_416(installer, monkeypatch, tmp_path, part):
+    """上次中斷在 .part 寫滿、還沒改名時：Range 從檔尾開始，伺服器回 416，原本連試 4 次都失敗。
+    .part 核對正確就直接用；不正確就刪掉從頭下載。"""
+    import hashlib
+    import urllib.request
+
+    data = b"wheel-bytes"
+    seen = []
+    monkeypatch.setattr(urllib.request, "urlopen", _fake_urlopen(data, seen))
+    monkeypatch.setattr(installer, "progress", lambda *a, **k: None)
+    monkeypatch.setattr(installer.time, "sleep", lambda s: None)
+    dest = tmp_path / "dl" / "torch.whl"
+    dest.parent.mkdir()
+    (dest.parent / "torch.whl.part").write_bytes(part)
+    out = installer.download("https://example.invalid/torch.whl", dest, hashlib.sha256(data).hexdigest())
+    assert out.read_bytes() == data
+    assert seen[0] == f"bytes={len(part)}-"
+    assert len(seen) <= 2

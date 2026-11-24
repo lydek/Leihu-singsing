@@ -316,6 +316,18 @@ def _sha(path: Path) -> str:
     return h.hexdigest()
 
 
+def _part_complete(e: Exception, have: int, tmp: Path, sha256: str, last: bool) -> bool:
+    """fork：下載失敗後要不要直接用 .part。上次中斷在改名前、.part 已經下載完時，從檔尾續傳會回 416：
+    核對正確就用（回 True）；不正確就刪掉，下次從頭下載。最後一次還是失敗就丟出原本的錯誤。"""
+    if have and getattr(e, "code", None) == 416:
+        if not sha256 or _sha(tmp) == sha256:
+            return True
+        tmp.unlink(missing_ok=True)
+    if last:
+        raise e
+    return False
+
+
 def download(url: str, dest: Path, sha256: str = "", label: str = "", part: tuple[float, float] = (0, 1)) -> Path:
     """下載檔案並更新進度條；中斷過的檔案會從斷點續傳，下載完核對 SHA-256。"""
     import urllib.request
@@ -348,8 +360,8 @@ def download(url: str, dest: Path, sha256: str = "", label: str = "", part: tupl
             break
         except Exception as e:
             LOG.write(f"download {url} attempt {attempt + 1}: {e}\n")
-            if attempt == 3:
-                raise
+            if _part_complete(e, have, tmp, sha256, last=attempt == 3):
+                break
             time.sleep(3)
     if sha256 and _sha(tmp) != sha256:
         tmp.unlink(missing_ok=True)

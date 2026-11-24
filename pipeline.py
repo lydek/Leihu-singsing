@@ -813,21 +813,31 @@ def read_sheet(data: bytes, name: str) -> list[dict]:
             z = zipfile.ZipFile(io.BytesIO(data))
         except zipfile.BadZipFile:
             raise UserError("讀不到這個 Excel 檔，請另存成 .xlsx 或 .csv 再試")
+
+        def xml(name: str):   # fork：XML 壞掉原本丟 ParseError（500）
+            try:
+                return ET.fromstring(z.read(name))
+            except ET.ParseError:
+                raise UserError("讀不到這個 Excel 檔，請另存成 .xlsx 或 .csv 再試") from None
         shared = []
         if "xl/sharedStrings.xml" in z.namelist():
-            for si in ET.fromstring(z.read("xl/sharedStrings.xml")).findall("m:si", ns):
+            for si in xml("xl/sharedStrings.xml").findall("m:si", ns):
                 shared.append("".join(t.text or "" for t in si.iter("{%s}t" % ns["m"])))
         sheets = sorted(n for n in z.namelist() if re.fullmatch(r"xl/worksheets/sheet\d+\.xml", n))
         if not sheets:
             raise UserError("Excel 檔裡沒有工作表")
         first = "xl/worksheets/sheet1.xml" if "xl/worksheets/sheet1.xml" in sheets else sheets[0]
-        for r in ET.fromstring(z.read(first)).iter("{%s}row" % ns["m"]):
+        for r in xml(first).iter("{%s}row" % ns["m"]):
             cells = {}
+            col = 0
             for c in r.findall("m:c", ns):
-                ref = re.match(r"([A-Z]+)", c.get("r", "A"))
-                col = 0
-                for ch in ref.group(1):
-                    col = col * 26 + ord(ch) - 64
+                ref = re.match(r"([A-Z]+)", c.get("r") or "")
+                if ref:
+                    col = 0
+                    for ch in ref.group(1):
+                        col = col * 26 + ord(ch) - 64
+                else:   # fork：規格允許省略 r，接在前一格後面（原本省略時都算 A 欄，r="" 丟 AttributeError）
+                    col += 1
                 t, v = c.get("t"), c.find("m:v", ns)
                 if t == "s" and v is not None:
                     val = shared[int(v.text)]
@@ -1180,10 +1190,10 @@ def _cancel_requested() -> bool:
     try:
         if check:
             check()
+    except JobDeferred:   # 子類別要先接：全部暫停不是停止
+        return False
     except JobCancelled:
         return True
-    except JobDeferred:
-        return False
     return False
 
 
@@ -3640,7 +3650,8 @@ _LIVE_LAST = {"reason": None}
 
 def _live_log(st: dict) -> dict:
     # fork（複審 P3-5、Codex r6-3）：每一種狀態都帶，偵測到直播軟體時少了這欄，畫面會當成恢復、之後重複提示
-    if GPU_LOAD["err"] and cuda_ok():   # 沒有可用顯示卡的電腦本來就讀不到，不提示
+    # 沒有可用顯示卡的電腦本來就讀不到，不提示；不用 cuda_ok()：主程式裡會等顯示卡子程式探測完（/api/status 每秒經過這裡）
+    if GPU_LOAD["err"] and (gpu_info(block=False) or {}).get("ok"):
         st["gpu_err"] = GPU_LOAD["err"]
     r = st.get("reason") or ""
     key = ("gpu" if st.get("gpu") else r)   # 顯示卡用量的數字每次都不一樣，只在狀態改變時記
