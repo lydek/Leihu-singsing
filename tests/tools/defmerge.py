@@ -204,13 +204,16 @@ def import_lines(keys: set[tuple]) -> list[str]:
 
 
 def last_import_end(text: str) -> int:
-    """最後一個模組層級 import 的下一行（行號從 0 起）；沒有 import 時放在模組 docstring 之後。"""
+    """最後一個模組層級 import 的下一行（行號從 0 起）；沒有 import 時放在模組 docstring 之後。
+    docstring 只認第一個敘述是字串的（第 2 輪審查 8：原本後面的常數敘述也算，import 會插到程式中間）。"""
+    body = ast.parse(text).body
     end = 0
-    for n in ast.parse(text).body:
+    if body and isinstance(body[0], ast.Expr) and isinstance(body[0].value, ast.Constant) \
+            and isinstance(body[0].value.value, str):
+        end = body[0].end_lineno
+    for n in body:
         if isinstance(n, (ast.Import, ast.ImportFrom)):
             end = n.end_lineno
-        elif end == 0 and isinstance(n, ast.Expr) and isinstance(getattr(n, "value", None), ast.Constant):
-            end = n.end_lineno   # 模組 docstring
     return end
 
 
