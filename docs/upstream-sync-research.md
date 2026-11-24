@@ -44,7 +44,7 @@ python tests/tools/defmerge.py <舊上游> <新上游> --tree=<資料夾> --out=
 1. 解析舊、新上游的 `app.py`、`pipeline.py`，列出每個最上層定義（函式、類別、模組層級的指定）。
 2. 在 fork 裡依名稱找這個定義：app.py 的在 `app.py`、`leihu/web/*.py`，pipeline.py 的在 `pipeline.py`、`leihu/*.py`、`leihu/core/*.py`（`GROUPS`，可以擴充）。名稱改了的登記在 `RENAMES`。
 3. 上游改過的定義：
-   - fork 的版本和舊上游逐行相同（只忽略行尾空白，**註解要算**）→ 直接換成新上游的。
+   - fork 的版本和舊上游逐行相同（只去掉頭尾空行，行尾空白、**註解都要算**，見第 12 點）→ 直接換成新上游的。
    - 不同 → `git merge-file` 三方合併；兩邊改到同一段（或相鄰的行，和 git 合併相同）就留下衝突標記，列為「衝突」。
    - app.py 的定義先把 `@app.X` 換成 fork 的 `@bp.X`（和 `upstream_map` 相同的規則）。
 4. **版號**（`VERSIONED`：`VERSION`、`USER_AGENT`；`VERSION` 檔）：三方合併前先把三份裡的版號（含 fork 的第 4 段）換成記號，合併後一律換成 3.15 的「新上游版本＋.1」。版號本身不會再衝突，fork 在同一行的註解、F1 改過的網址照樣留著。
@@ -56,7 +56,8 @@ python tests/tools/defmerge.py <舊上游> <新上游> --tree=<資料夾> --out=
 10. 不自動處理、列為「手動」的：同一個敘述指定好幾個名稱（`A = B = 1`）、同一個檔案有兩個以上同名定義、解包指定與 `X[...] =` 這類指定（歸在模組層級敘述）、上游刪掉的模組層級敘述與 import、用到它的定義搬到別的檔案的新 import、`__future__`、在 import 位置之前就用到的新 import、替換範圍互相重疊的檔案。
 11. 套用編輯：同一個位置的插入照上游順序合成一塊；同一個起點先替換、再插入；替換範圍重疊的整個檔案不寫出。
 12. 比對「有沒有改過」只去掉頭尾空行，行尾空白、註解都算（三引號字串裡的行尾空白是資料）；Blueprint 改寫只改裝飾器那一行；整個檔案合併保留檔尾空行；git 參照打錯直接中止，不當成檔案不存在。
-13. 單元測試：`tests/test_defmerge.py`（41 個，舊上游、新上游、fork 都用暫存資料夾）。
+13. 單元測試：`tests/test_defmerge.py`（52 個測試函式，含參數化共 64 項；舊上游、新上游、fork 都用暫存資料夾，讀二進位檔那一項用這個 repo 的 `HEAD`）。
+14. 不能自動處理的也列為「手動」、不寫出（PR #26 審查）：從 git 參照讀到二進位檔；fork、舊上游、新上游有一份找不到該有的版號；`git merge-file` 執行失敗（不是有衝突）；星號 import；新增的 import 和目標檔案裡同名的 import 或定義衝突。衝突標記固定用 merge 樣式（不受使用者的 `merge.conflictStyle` 影響）；`app.static_folder`、`app.response_class` 和 `upstream_map` 一樣換成 `current_app.*`；命令列用 argparse，拼錯的選項回報錯誤。
 
 ## 5. 驗證
 
@@ -76,12 +77,13 @@ fork 用每次同步前的 commit，`--expect` 用手動同步後的 commit：
 
 | 版本 | 直接換 | 版號 | 衝突 | 新增 | 手動 | 和手動同步不同 |
 |---|---|---|---|---|---|---|
-| 2.3.3 | 9 | 2 | 2（`take_export`、`main`） | 10 | 1（`background.py` 用到 `QUEUE_FILE` 要 import） | 衝突 2、fork 的調整 1（`QUEUE_FILE`） |
+| 2.3.3 | 9 | 2 | 2（`take_export`、`main`） | 10 | 3（`background.py` 用到 `QUEUE_FILE`、`app.py` 用到 `queue_saver`、`restore_queue` 要 import；後兩項是 PR #26 審查修正後才列出來的） | 衝突 2、fork 的調整 1（`QUEUE_FILE`） |
 | 2.3.4 | 0 | 2 | 0 | 4 | 0 | fork 的調整 1（`UI_PREFS`） |
 | 2.3.5 | 8 | 2 | 0 | 6 | 3（`background`、`system`、`library` 用到 `submit_unfinished` 要 import） | **無** |
 
 - 這三次同步裡，所有「內容不同」都是工具標了衝突的（`take_export`、`main`），或是 fork 在同步時另外做的調整（`QUEUE_FILE`、`UI_PREFS` 放 `P.DATA`，工具本來就不會知道）。**這只代表這三次沒有看到靜默錯誤**：`--expect` 只比定義的內容和所在檔案，不比定義之間的順序和模組層級敘述。
 - **Codex CLI 審查（2026-11-24，`tests/private/reviews/codex-2026-11-24-r3.md`）** 用合成案例找出 3 項 P1、14 項 P2、2 項 P3 會靜默合併錯或漏報的路徑：插入和替換同一個起點留下舊版函式、連續新增的定義反序、`A = B = 1` 被重複編輯、解包指定和 `X[...] =` 被忽略、同一個檔案的同名定義、刪除遇到同名、上游刪除模組敘述／import、搬走的定義新增依賴時 import 加錯檔案、`__future__`、`@(` 裝飾器、Blueprint 改寫改到字串、忽略行尾空白、`--expect` 跨組同名、整檔合併刪掉檔尾空行、版號後面接句點、git 錯誤當成檔案不存在、混合別名 import 排序、`--expect` 兩邊都刪掉也算不同、內容裡本來就有版號記號（r3-19）。都已修正，每一項有對應的單元測試（舊原型 20 個失敗）；第 1 輪複審（`tests/private/reviews/review-2026-11-24-round1.md`）找到漏修的 r3-19，以及「import 之前就用到」原本整個略過函式和類別（裝飾器、預設參數、類別內容載入時就會執行），也已修正。修正後重跑上面三次同步，結果和修正前相同（2.3.5 仍和手動同步完全相同）。
+- **PR #26 審查（2026-11-24）** 找到 6 項必改、4 項應該改：從 git 參照讀二進位檔被當成「上游刪掉了」（Windows 的 `text=True` 在背景執行緒解碼，例外被吞掉）、fork 版號對不上舊上游時保留舊版號還回報成功、`git merge-file` 執行失敗時把內容寫成空白（另外使用者的 `diff3` 衝突樣式會讓 `--expect` 去不乾淨）、漏了 `app.static_folder`／`app.response_class` 的改寫、有衝突的檔案整個略過跨檔案 import 檢查、星號 import 自動加錯檔案；同名 import 被蓋掉、docstring 判斷、命令列拼錯選項被忽略、本文件兩處過時。都已修正（第 4 節第 14 點），新測試在舊程式上 15 項失敗。重跑三次同步：「和手動同步不同」不變；2.3.3 的「手動」從 1 項變 3 項，多出來的是 `app.py` 要 import `queue_saver`、`restore_queue`，正是手動同步時加的那兩個（`main` 有衝突，原本整個 `app.py` 被略過）。
 - 真正的衝突就是手動同步時也要手動合併的地方：`take_export`（fork 的 M4 和上游的匯出編號改同一段）、`main`（fork 為了 S28 把整段縮排放進 `if not P.NO_BACKGROUND:`，上游在同一段加了兩行）。
 - 版號規則之後，`VERSION`、`USER_AGENT` 和手動同步完全相同（fork 的註解、`lydek` 網址都留著）。
 - 2.3.5 的 `upgrade_separation` 用 patch 因 CRLF 套不上，用定義合併沒有問題。
