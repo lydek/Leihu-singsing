@@ -463,3 +463,20 @@ def test_fork_version_not_matching_old_upstream_is_manual(tmp_path):
     assert any("pipeline.py:VERSION" in x and "版號" in x for x in manual)
     assert any("VERSION：" in x and "版號" in x for x in manual)
     assert r["stats"]["version"] == 0 and r["files"] == []
+
+
+def test_merge_file_failure_is_manual_not_empty(tmp_path):
+    """第 2 輪 3：git merge-file 出錯（含 NUL 的檔案當成二進位）回傳 255、輸出空字串，原本整個檔案寫成空白。"""
+    with pytest.raises(D.MergeFailed):
+        D.merge3("a\x00b\n", "a\n", "c\n")
+    r, _ = merge(tmp_path, {"data.txt": "a\nX\n"}, {"data.txt": "a\nY\n"}, {"data.txt": "a\x00b\nX\n"}, extra=["data.txt"])
+    assert r["files"] == [] and r["stats"]["manual"] == 1
+
+
+def test_merge_ignores_global_conflict_style(monkeypatch):
+    """第 2 輪 3：merge.conflictStyle=diff3 多出 ||||||| 區塊，--expect 去掉衝突標記時會留下來。"""
+    monkeypatch.setenv("GIT_CONFIG_COUNT", "1")
+    monkeypatch.setenv("GIT_CONFIG_KEY_0", "merge.conflictStyle")
+    monkeypatch.setenv("GIT_CONFIG_VALUE_0", "diff3")
+    out, c = D.merge3("x = 1", "x = 0", "x = 2")
+    assert c == 1 and "|||||||" not in out
