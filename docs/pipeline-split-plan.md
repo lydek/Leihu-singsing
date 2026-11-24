@@ -63,7 +63,7 @@ PR #26 合併後，`tests/tools/defmerge.py` 以定義為單位三方合併，fo
 
 代價：
 - 這不是真正的模組，沒有相依邊界，只是把一個大檔案分成幾個檔案。
-- `leihu/core/*.py` 不能單獨 import。ruff、IDE 看不到 `pipeline` 的其他名稱，會報未定義名稱，要在 ruff 設定裡排除這幾個檔案的 F821。排除後，函式裡打錯名稱（例如 `reslut`）ruff 也抓不到，所以改用 `symtable` 逐層檢查：每個檔案裡、每個作用域的全域或未綁定名稱，都要在 `pipeline.__dict__` 或 builtins 裡找得到。這樣跨檔漏掉的名稱和函式裡的筆誤都抓得到。
+- `leihu/core/*.py` 不能單獨 import。ruff、IDE 看不到 `pipeline` 的其他名稱，會報未定義名稱，要在 ruff 設定裡排除這幾個檔案的 F821（每一步在 `pyproject.toml` 的 per-file-ignores 逐檔登記，不用 `leihu/core/*.py` 整批排除：同一個資料夾裡方式二的模組要保留 F821）。排除後，函式裡打錯名稱（例如 `reslut`）ruff 也抓不到，所以改用 `symtable` 逐層檢查：每個檔案裡、每個作用域的全域或未綁定名稱，都要在 `pipeline.__dict__` 或 builtins 裡找得到。這樣跨檔漏掉的名稱和函式裡的筆誤都抓得到。
 - 每次 `import pipeline` 都要重新編譯這些檔案，不經過 `.pyc` 快取。顯示卡子程式每次開也會 import。第 7 節量啟動時間，明顯變慢再補快取。
 
 載入的規格（步驟 0 定下來，第 1 輪計畫審查補）：
@@ -109,12 +109,18 @@ PR #26 合併後，`tests/tools/defmerge.py` 以定義為單位三方合併，fo
 
 | 步驟 | 內容 | 方式 |
 |---|---|---|
-| 0 | 載入機制與檢查，搬移本身寫成可以重跑的腳本（`tests/tools/`），之後能套到舊 commit 上做模擬同步：<br>・`pipeline.py` 的載入函式，照第 3 節的規格（位置、`__future__` 旗標）<br>・`symtable` 名稱檢查的測試<br>・搬移前後的 AST 比對腳本<br>・「`pipeline` 的名稱齊全、是同一個物件」的測試<br>・ruff 設定排除 F821<br>・`defmerge.py` 支援共用命名空間（含單元測試）<br>・`installer/build.sh` 複製 `leihu/core/*.py`。目前寫死只複製 `leihu/*.py`、`leihu/web/*.py`，不改的話測試版啟動就會失敗；`leihu.nsi` 用 `File /r "payload\*"`，不用改 | 只加工具，不搬程式 |
+| 0 | 載入機制與檢查，搬移本身寫成可以重跑的腳本（`tests/tools/`），之後能套到舊 commit 上做模擬同步：<br>・`pipeline.py` 的載入函式，照第 3 節的規格（位置、`__future__` 旗標）<br>・`symtable` 名稱檢查的測試<br>・搬移前後的 AST 比對腳本<br>・「`pipeline` 的名稱齊全、是同一個物件」的測試<br>・`defmerge.py` 支援共用命名空間（含單元測試）<br>・`installer/build.sh` 複製 `leihu/core/*.py`。目前寫死只複製 `leihu/*.py`、`leihu/web/*.py`，不改的話測試版啟動就會失敗；`leihu.nsi` 用 `File /r "payload\*"`，不用改<br>**2026-11-24 完成**，見表下說明 | 只加工具，不搬程式 |
 | 1 | `Jobs` 和直播中暫停背景處理（`JobCancelled`、`JobDeferred`、`live_status`、`LIVE_BACKGROUND` 等，約 700 行）→ `leihu/core/jobs.py` | 方式一 |
 | 2 | 分離（78 個定義、約 900 行）→ `leihu/core/separation.py` | 方式一 |
 | 3 | `process_song` 等處理流程、YouTube 與批次匯入 → `leihu/core/process.py`、`leihu/core/youtube.py` | 方式一 |
 | 4 | 線上歌詞搜尋、依主唱聲音對時間 → `leihu/core/lyrics_search.py`、`leihu/core/voice_align.py` | 方式一 |
 | 之後 | 曲名／歌手／預設 KEY、音量標準化等穩定區塊：先看相依和有沒有讀重新指派的變數，適合的才用方式二 | 個別評估 |
+
+**步驟 0 的結果（2026-11-24）**：
+- `pipeline.py` 加了 `PARTS_DIR`、`_PARTS`、`_load_part`（登記在 fork 修改表），還沒有呼叫，行為不變。
+- `tests/tools/split_check.py`（`symtable` 名稱檢查、和搬移前的 git 參照比對每個定義）、`tests/tools/split_moves.py`（搬一段連續的定義，原位置留 `_load_part`）、`installer/build.sh` 打包 `leihu/core/`、`defmerge.py` 支援共用命名空間。
+- `tests/test_pipeline_split.py` 在 `pipeline.py` 的副本上真的搬了「分類」一段（`_cats_path` 讀執行中重新指派的 `LIB`），import 起來的名稱檢查、AST 比對、`P.LIB` 重新指派後的行為都對。
+- 還沒做、留到步驟 1：ruff 的 F821 逐檔排除（還沒有方式一的檔案）；模擬同步。`defmerge.py` 的 `--expect` 只吃 git 參照，搬移後的 `43ddbb0` 要先 commit 到暫時的分支，或讓 `--expect` 也能用資料夾。
 
 每一步搬完，`pipeline.py` 留下設定、檔案、共用的小函式，以及依序載入各檔案的那幾行。
 
