@@ -241,7 +241,7 @@ def test_delete_moves_folder_while_holding_queue_locks(app_module, queues, song,
     assert r.status_code == 200 and not d.exists()
     assert seen == {"replace_locked": True, "rmtree_locked": False}
     import pipeline as P
-    assert not any((P.LIB / ".trash").iterdir())
+    assert not (P.LIB / ".trash").exists()   # 複審 P3-1：清空就移掉，不會被算成一首歌
 
 
 def test_delete_failure_keeps_queued_jobs(app_module, queues, song, monkeypatch):
@@ -278,3 +278,29 @@ def test_waiting_for_stems_is_not_reported_as_live_hold(app_module):
     q2.submit("process", "bgsong001", lambda r: None, label="upgrade")
     with q2.lock:
         assert q2._next(hold=True, slots=1)[2] is True   # 直播中跳過背景工作：照舊回報
+
+
+def test_delete_twice_says_song_not_found(app_module, queues, song, monkeypatch):
+    """複審 P3-2：同一首歌連按兩次刪除，第二個請求通過 song_dir 時資料夾還在、拿到鎖時已經被移走：
+    原本 os.replace 丟 FileNotFoundError，回「刪不掉這首歌（檔案可能被其他程式開著）」。"""
+    import pipeline as P
+    from leihu.web import library
+
+    monkeypatch.setattr(library.P, "song_dir", lambda sid: P.LIB / sid)   # 模擬通過檢查後才被移走
+    r = app_module.app.test_client().delete("/api/songs/delgone001")
+    assert r.status_code == 400 and r.get_json()["error"] == "找不到這首歌"
+
+
+def test_storage_report_skips_trash(app_module, song):
+    """複審 P3-1：刪不乾淨留下的 .trash 不算一首歌。"""
+    import pipeline as P
+
+    song("storage001")
+    shutil.rmtree(P.LIB / ".trash", ignore_errors=True)   # 前面的刪除測試可能留下
+    before = P.storage_report()["songs"]
+    left = P.LIB / ".trash" / "old-abc123"
+    left.mkdir(parents=True, exist_ok=True)
+    try:
+        assert P.storage_report()["songs"] == before
+    finally:
+        shutil.rmtree(P.LIB / ".trash", ignore_errors=True)
