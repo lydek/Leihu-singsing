@@ -62,3 +62,4 @@ ignore = [
 # 這幾個檔案的未定義名稱改由 tests/test_pipeline_split.py 用 symtable 檢查（函式裡的筆誤也抓得到）。每搬一個檔案就登記一行
 "pipeline.py" = ["F821"]
 "leihu/core/jobs.py" = ["F821"]
+"leihu/core/separation.py" = ["F821"]
