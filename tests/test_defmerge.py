@@ -480,3 +480,14 @@ def test_merge_ignores_global_conflict_style(monkeypatch):
     monkeypatch.setenv("GIT_CONFIG_VALUE_0", "diff3")
     out, c = D.merge3("x = 1", "x = 0", "x = 2")
     assert c == 1 and "|||||||" not in out
+
+
+def test_app_static_folder_uses_current_app(tmp_path):
+    """第 2 輪 4：upstream_map 會把 app.static_folder、app.response_class 換成 current_app.*，defmerge 漏了：
+    fork 沒改過的路由被當成改過（假衝突），上游新寫的用法照抄進 Blueprint 會 NameError。"""
+    old = '@app.get("/a")\ndef a():\n    p = app.static_folder\n    return p\n'
+    new = old.replace("return p", "return p + '/x'")
+    fork = old.replace("@app.", "@bp.").replace("app.static_folder", "current_app.static_folder")
+    r, out = merge(tmp_path, {"app.py": old}, {"app.py": new}, {"app.py": "", "leihu/web/x.py": fork})
+    assert r["stats"]["fast"] == 1 and r["stats"]["conflict"] == 0
+    assert "current_app.static_folder" in out("leihu/web/x.py") and " app.static_folder" not in out("leihu/web/x.py")
