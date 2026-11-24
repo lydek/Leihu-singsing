@@ -1,6 +1,7 @@
 """歌曲庫：加入歌曲、YouTube 與批次匯入、歌曲資訊、處理、移調、音訊、分類。"""
 from __future__ import annotations
 
+import contextlib
 import os
 import shutil
 import sys
@@ -342,11 +343,9 @@ def delete_song(sid):
             shutil.rmtree(p, ignore_errors=True)
             if p.exists():   # 歌已經從歌曲庫移走了，只是檔案還沒刪乾淨：記在 app.log
                 print(f"[library] 刪除歌曲留下的資料夾刪不掉，下次刪除歌曲時再試：{p}", flush=True)
-        with jobs.lock:   # 複審 P3-1：清空就移掉 .trash；和別的刪除建立 .trash、移進來的那段互斥
-            try:
-                trash.rmdir()
-            except OSError:
-                pass   # 還有刪不掉的，或另一個刪除剛移進來
+        # 複審 P3-1：清空就移掉 .trash；和別的刪除建立 .trash、移進來的那段互斥。還有刪不掉的、或另一個刪除剛移進來就留著
+        with jobs.lock, contextlib.suppress(OSError):
+            trash.rmdir()
     return jsonify(ok=True)
 
 

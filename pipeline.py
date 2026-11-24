@@ -3893,8 +3893,9 @@ class Jobs:
         self.pending = [(jid, fn) for jid, fn in self.pending
                         if not (self.state[jid]["song"] == song_id and self.state[jid]["status"] == "cancelled")]
 
-    def cancel(self, jid: str) -> bool:
-        """使用者按「停止」：排隊中的直接取消；執行中的在下一個檢查點停下。"""
+    def cancel(self, jid: str, queued_only: bool = False) -> bool:
+        """使用者按「停止」：排隊中的直接取消；執行中的在下一個檢查點停下。
+        queued_only（fork，複審 P3-4）：已經開始的不動、回 False。"""
         with self.lock:
             j = self.state.get(jid)
             if not j:
@@ -3903,7 +3904,7 @@ class Jobs:
             if j["status"] == "queued":
                 j.update(status="cancelled", step="已取消")
                 cb = self._on_cancel.pop(jid, None)
-            elif j["status"] == "running":
+            elif j["status"] == "running" and not queued_only:
                 j["cancel"] = True
                 j["step"] = "停止中…"
             else:
