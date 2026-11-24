@@ -5,6 +5,7 @@ import os
 import shutil
 import sys
 import tempfile
+import threading
 import time
 from pathlib import Path
 
@@ -32,6 +33,7 @@ from .common import (
 from .live import _SETLIST_LOCK, _setlist_read
 
 bp = Blueprint("library", __name__)
+_TRASH_LOCK = threading.Lock()   # fork（複審 P3-2）：同時刪兩首歌時不互相 rmtree、誤報刪不掉
 
 
 @bp.post("/api/youtube/resume")
@@ -322,6 +324,8 @@ def delete_song(sid):
                 raise P.UserError("這首歌正在處理，請先停止工作再刪除")
             # fork（Codex r4-2、r4-3）：還拿著佇列的鎖時先把資料夾移走（同一個磁碟，很快）：放開鎖之後新的工作
             # 找不到這首歌，不會在刪到一半的資料夾裡開始；移不走（檔案被其他程式開著）就整個不刪，排隊的工作照舊
+            if not d.exists():   # 複審 P3-2：同一首歌連按兩次刪除，另一個請求已經移走了
+                raise P.UserError("找不到這首歌")
             trash.mkdir(exist_ok=True)
             gone = trash / f"{sid}-{os.urandom(3).hex()}"
             try:
@@ -332,10 +336,17 @@ def delete_song(sid):
             vjobs.cancel_song(sid)
     finally:
         dl.release()
-    for p in trash.iterdir():   # 這次的，加上之前刪不乾淨留下的
-        shutil.rmtree(p, ignore_errors=True)
-        if p.exists():   # 歌已經從歌曲庫移走了，只是檔案還沒刪乾淨：記在 app.log
-            print(f"[library] 刪除歌曲留下的資料夾刪不掉，下次刪除歌曲時再試：{p}", flush=True)
+    with _TRASH_LOCK:
+        # 這次的，加上之前刪不乾淨留下的；另一個刪除可能已經連這次的一起清掉、移掉 .trash
+        for p in list(trash.iterdir()) if trash.exists() else []:
+            shutil.rmtree(p, ignore_errors=True)
+            if p.exists():   # 歌已經從歌曲庫移走了，只是檔案還沒刪乾淨：記在 app.log
+                print(f"[library] 刪除歌曲留下的資料夾刪不掉，下次刪除歌曲時再試：{p}", flush=True)
+        with jobs.lock:   # 複審 P3-1：清空就移掉 .trash；和別的刪除建立 .trash、移進來的那段互斥
+            try:
+                trash.rmdir()
+            except OSError:
+                pass   # 還有刪不掉的，或另一個刪除剛移進來
     return jsonify(ok=True)
 
 

@@ -1270,7 +1270,7 @@ def storage_report() -> dict:
     total = convertible = removable = 0
     songs = 0
     for d in LIB.iterdir() if LIB.exists() else []:
-        if not d.is_dir():
+        if not d.is_dir() or d.name.startswith("."):   # fork（複審 P3-1）：.trash 不是歌
             continue
         songs += 1
         for f in d.rglob("*"):
