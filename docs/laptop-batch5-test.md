@@ -1,8 +1,8 @@
 # 第 5 批筆電實測步驟（RTX 3060 筆電）
 
-對應 PR：[lydek/Leihu-singsing#17](https://github.com/lydek/Leihu-singsing/pull/17)（draft）。分支 `claude/next-version-batch5`，2026-11-24 rebase 到 2.3.5 之後是 commit `7d2b39e`（第一段的高品質退回改用上游 2.3.5 的寫法）。改了什麼見 `docs/next-version-plan.md` 第 3 節「5：」各列。
+對應 PR：[lydek/Leihu-singsing#17](https://github.com/lydek/Leihu-singsing/pull/17)（draft）。分支 `claude/next-version-batch5`，2026-11-24 rebase 到合併 PR #23 之後的 `refactor`（`e4e93d5`）。第 5 批改程式的是 `cec2c28`～`cbfd6a1`，之後只有測試和文件。改了什麼見 `docs/next-version-plan.md` 第 3 節「5：」各列。
 
-rebase 前的 `bd140a0` 已經在筆電錄過數值基準（和 `263833a` 逐檔 38／38 相同），手動實測還沒做。rebase 後要重錄一次，手動實測照第三節做。
+rebase 前的 `bd140a0` 已經在筆電錄過兩次數值基準（11-23、11-24，測試工具都是 `43aacda`，和 `263833a` 逐檔 38／38 相同），那是舊的程式，不能代替這次。手動實測還沒做。先照第一節把筆電的分支換成遠端的版本，再照第二節重錄、第三節實測。
 
 測完把兩份 `numeric-report.md`、每項實測的結果和 `app.log` 的相關幾行傳回來，再決定能不能把 PR 轉成正式的。
 
@@ -28,6 +28,12 @@ git switch claude/next-version-batch5
 
 ```powershell
 git reset --hard origin/claude/next-version-batch5
+```
+
+確認換好了：下面這行顯示的要是遠端最新的 commit（不是 `43aacda`），而且第二節的報告開頭「測試工具：commit」也要是它。
+
+```powershell
+git log --oneline -1
 ```
 
 還沒有 repo：
@@ -59,16 +65,16 @@ git clone https://github.com/lydek/Leihu-singsing.git
 關掉其他吃顯示卡的程式，插上電源。在 repo 根目錄依序執行（同一時間只能錄一個，第一個跑完再跑第二個）：
 
 ```powershell
-& "$env:LOCALAPPDATA\LeihuLiantai\python\python.exe" tests\numeric\baseline.py e1da07b --label=laptop-3060-gpu --plan=tests/private/plans/refactor.json --against=263833a
+& "$env:LOCALAPPDATA\LeihuLiantai\python\python.exe" tests\numeric\baseline.py e4e93d5 --label=laptop-3060-gpu --plan=tests/private/plans/refactor.json --against=263833a
 ```
 
 ```powershell
-& "$env:LOCALAPPDATA\LeihuLiantai\python\python.exe" tests\numeric\baseline.py 7d2b39e --label=laptop-3060-gpu --plan=tests/private/plans/refactor.json --against=e1da07b
+& "$env:LOCALAPPDATA\LeihuLiantai\python\python.exe" tests\numeric\baseline.py cbfd6a1 --label=laptop-3060-gpu --plan=tests/private/plans/refactor.json --against=e4e93d5
 ```
 
 - `263833a`：2.3.4.2（上次已錄）。
-- `e1da07b`：第 5 批開始前（2.3.5 同步、分離失敗診斷、顯示卡忙碌判斷、app.log 時間）。和 2.3.4.2 比，2.3.5 改了線上歌詞對時間和跳過前奏，這組素材的歌詞輸出可能不同，有差異要看是不是這兩項造成的。
-- `7d2b39e`：第 5 批。
+- `e4e93d5`：第 5 批開始前（`refactor`：2.3.5 同步、分離失敗診斷、顯示卡忙碌判斷、app.log 時間、PR #23 的審查修正）。和 2.3.4.2 比，2.3.5 改了線上歌詞對時間和跳過前奏，這組素材的歌詞輸出可能不同，有差異要看是不是這兩項造成的。
+- `cbfd6a1`：第 5 批（最後一個改程式的 commit）。
 
 看報告 `tests\private\upstream\<版本>\numeric\laptop-3060-gpu-refactor\numeric-report.md`：
 
