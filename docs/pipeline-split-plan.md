@@ -112,7 +112,7 @@ PR #26 合併後，`tests/tools/defmerge.py` 以定義為單位三方合併，fo
 | 0 | 載入機制與檢查，搬移本身寫成可以重跑的腳本（`tests/tools/`），之後能套到舊 commit 上做模擬同步：<br>・`pipeline.py` 的載入函式，照第 3 節的規格（位置、`__future__` 旗標）<br>・`symtable` 名稱檢查的測試<br>・搬移前後的 AST 比對腳本<br>・「`pipeline` 的名稱齊全、是同一個物件」的測試<br>・`defmerge.py` 支援共用命名空間（含單元測試）<br>・`installer/build.sh` 複製 `leihu/core/*.py`。目前寫死只複製 `leihu/*.py`、`leihu/web/*.py`，不改的話測試版啟動就會失敗；`leihu.nsi` 用 `File /r "payload\*"`，不用改<br>**2026-11-24 完成**，見表下說明 | 只加工具，不搬程式 |
 | 1 | `Jobs` 和直播中暫停背景處理（`JobCancelled`、`JobDeferred`、`live_status`、`LIVE_BACKGROUND` 等，約 700 行）→ `leihu/core/jobs.py`。**2026-11-24 完成**，見表下說明 | 方式一 |
 | 2 | 分離（78 個定義、約 900 行）→ `leihu/core/separation.py`。**2026-11-24 完成**，見表下說明 | 方式一 |
-| 3 | `process_song` 等處理流程、YouTube 與批次匯入 → `leihu/core/process.py`、`leihu/core/youtube.py` | 方式一 |
+| 3 | `process_song` 等處理流程、YouTube 與批次匯入 → `leihu/core/process.py`、`leihu/core/youtube.py`。**2026-11-24 完成**：YouTube 相關不連續，分成 `leihu/core/youtube.py`（下載）和 `leihu/core/batch_import.py`（ffmpeg、網址、批次匯入），見表下說明 | 方式一 |
 | 4 | 線上歌詞搜尋、依主唱聲音對時間 → `leihu/core/lyrics_search.py`、`leihu/core/voice_align.py` | 方式一 |
 | 之後 | 曲名／歌手／預設 KEY、音量標準化等穩定區塊：先看相依和有沒有讀重新指派的變數，適合的才用方式二 | 個別評估 |
 
@@ -141,6 +141,19 @@ PR #26 合併後，`tests/tools/defmerge.py` 以定義為單位三方合併，fo
 - CPU 數值基準（`0b3b9c6`，1 次，1336.8 秒）：異常「無」，和步驟 1 的 `fc657e0` 逐檔 38／38 相同。顯示卡子程式（`gpu_worker`）用到的分離名稱也走這條路。
 - 啟動時間（和 `c5ae22e` 交錯各 15 次）：`import pipeline, share` 0.211 → 0.205 秒，`import app` 0.374 → 0.377 秒，範圍重疊。
 - 模擬同步（這次是真的改到搬走的區塊）：同樣的兩次搬移套到 `263833a`、`43ddbb0` 後同步 2.3.5，上游的分離改動都進了 `separation.py`：新增的 `STD_VOCAL`、`_HQ_FAIL`、`_hq_fail_note`、`_MODEL_CHECKED`、`_check_model_file` 放在 `HQV_DL` 後面，`vocal_model`、`karaoke_model`、`separate_uvr` 直接換；沒有衝突，和搬移後的 `43ddbb0` 沒有不同的定義，`pipeline.py` 和手動同步完全相同。差別只有新定義前後的空行和 3 個 `submit_unfinished` 的 import，和沒拆檔時一樣（空行從 `pipeline.py` 移到 `separation.py`）。
+
+**步驟 3 的結果（2026-11-25）**：
+- 三段，各用 `split_moves.py` 搬：
+  - `process.py`：`process_song`、早一步找歌詞、`search_lyrics_later`（接在 `jobs` 後面）。檔尾的 `try: ffmpeg_path()` 留在 `pipeline.py`，仍在 `ffmpeg_path` 載入之後執行。
+  - `youtube.py`：「曲名／歌手／預設 KEY」區塊裡從 `DL_SUFFIX` 到 `youtube_job` 的 YouTube 下載。曲名、KEY 的解析留在 `pipeline.py`。
+  - `batch_import.py`：「ffmpeg 與 YouTube」「批次匯入」兩個區塊（`ffmpeg_path` 到 `read_sheet`）。
+  - YouTube 相關的定義中間隔著曲名、KEY 的解析，不連續，所以分成兩個檔案（`split_moves` 只搬連續的一段，順序不變）。`pipeline.py` 剩 2822 行。
+- ruff：`import queue`、`subprocess` 留在 `pipeline.py`、只有分出去的檔案用到，ruff 誤報 F401、F811；`pipeline.py` 另外排除 F401、F811（轉出用 import 的 `noqa: F401` 因此變成 RUF100，也排除；拆檔前 `pipeline.py` 沒有 RUF100）。改由測試檢查：`pipeline.py` 的 import 在共用命名空間裡有被讀到（`unused_imports`），模組層級的定義和 import 都只綁定一次（`duplicate_names`，Agy 審查補上 import）。全 repo 仍是 311。
+- `upstream_map.py` 的 `MOVED_TO` 加 `leihu/core/`，下一次同步拿來和 `defmerge.py` 比較時找得到搬走的定義。
+- `split_check.py 7306856`：330 個定義都在、逐字相同，整份還原也相同。pytest 全過。契約：`check_snapshot.py` 兩次都是 144 個案例和快照相同。
+- CPU 數值基準（`609b7bf`，1 次，1164.3 秒）：異常「無」，和步驟 2 的 `0b3b9c6` 逐檔 38／38 相同。
+- 啟動時間（和 `7306856` 交錯各 15 次）：`import pipeline, share` 0.202 → 0.201 秒，`import app` 0.374 → 0.370 秒，範圍重疊。
+- 模擬同步：五次搬移都套到 `263833a`、`43ddbb0` 後同步 2.3.5，結果和步驟 2 相同（沒有衝突、沒有不同的定義、`pipeline.py` 和手動同步完全相同）。2.3.5 沒有改到這一步搬的三段。
 
 每一步搬完，`pipeline.py` 留下設定、檔案、共用的小函式，以及依序載入各檔案的那幾行。
 
