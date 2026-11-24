@@ -1239,7 +1239,10 @@ function syncPauseBar(st) {
 }
 let gpuFbWas = false;   // fork（第 7 批）：顯示卡處理程式開不起來、暫時改用 CPU（/api/status 的 gpu_fallback）
 function syncGpuFallback(fb) {
-  const fbSum = $("#jobs-sum");
+  const fbSum = $("#jobs-sum"), fbBar = $("#jobs-bar");
+  const fbOnly = !!fb && fbBar.hidden && !pausedNow;   // 沒有處理中的歌也看得到（Agy 審查 3）；這時不顯示「全部暫停」
+  if (fbOnly) fbBar.hidden = false;
+  $("#jobs-pause").hidden = fbOnly;
   fbSum.title = fb ? `原因：${fb.why}` : "";
   if (fb) fbSum.textContent += (fbSum.textContent ? "；" : "") + "顯示卡處理程式無法啟動，暫時改用 CPU";
   if (fb && !gpuFbWas) toast(`顯示卡處理程式無法啟動，接下來 10 分鐘改用 CPU 處理：${fb.why}`, 8000);

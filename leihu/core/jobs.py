@@ -21,6 +21,12 @@ def _stalled(e: Exception) -> bool:
     return type(e).__name__ == "GpuStalled"
 
 
+def _no_worker(e: Exception) -> bool:
+    """fork（第 7 批）：處理程式開不起來（gpu_worker 標的 worker_unavailable）。不是模型或精度的問題：不重試、
+    不退回標準模型或聲像分離（Agy 審查 1：原本會誤停用高品質模型、用聲像分離蓋掉分軌），這首直接失敗、顯示原因。"""
+    return bool(getattr(e, "worker_unavailable", False))
+
+
 class JobCancelled(Exception):
     """工作被新的要求取代（例如又換了 KEY），中途停止。"""
 
