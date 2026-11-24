@@ -509,7 +509,7 @@ def test_conflicted_file_still_checked_for_missing_import(tmp_path, monkeypatch)
 def test_star_import_is_manual(tmp_path):
     """第 2 輪 6：from x import * 的名稱是 "*"，比不到用到的地方，原本自動加進 pipeline.py。"""
     new = OLD.replace("import os\n", "import os\nfrom helpers import *\n")
-    r, out = merge(tmp_path, {"pipeline.py": OLD}, {"pipeline.py": new}, {"pipeline.py": OLD})
+    r, _ = merge(tmp_path, {"pipeline.py": OLD}, {"pipeline.py": new}, {"pipeline.py": OLD})
     assert r["stats"]["imports"] == 0
     assert any("星號" in x for x in r["report"] if x.startswith("手動"))
 
@@ -519,7 +519,7 @@ def test_new_import_shadowing_fork_name_is_manual(tmp_path, fork_has):
     """第 2 輪 7：fork 已經有同名的 import 或定義，上游加 from foo import bar 會把它蓋掉，要手動。"""
     new = OLD.replace("import os\n", "import os\nfrom foo import bar\n")
     fork = OLD.replace("import os\n", "import os\n" + fork_has)
-    r, out = merge(tmp_path, {"pipeline.py": OLD}, {"pipeline.py": new}, {"pipeline.py": fork})
+    r, _ = merge(tmp_path, {"pipeline.py": OLD}, {"pipeline.py": new}, {"pipeline.py": fork})
     assert r["stats"]["imports"] == 0
     assert any("同名" in x and "bar" in x for x in r["report"] if x.startswith("手動"))
 
