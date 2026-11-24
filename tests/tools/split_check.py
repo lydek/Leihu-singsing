@@ -21,14 +21,23 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import defmerge as D
+import split_moves as M
 
 ROOT = Path(__file__).resolve().parents[2]
-LOAD_RX = re.compile(r'(?m)^_load_part\("(\w+)"\)\s*$')
 
 
 def part_names(pipeline_text: str) -> list[str]:
-    """pipeline.py 依序載入的方式一檔案（模組層級的 _load_part("名稱") 呼叫）。"""
-    return LOAD_RX.findall(pipeline_text)
+    """pipeline.py 依序載入的方式一檔案（模組層級的 _load_part("名稱") 呼叫，和 defmerge 用同一個規則）。"""
+    return D.LOAD_RX.findall(pipeline_text)
+
+
+def reassemble(pipeline_text: str, files: dict[str, str]) -> str:
+    """把 pipeline.py 裡的每一行 _load_part("名稱") 換回那個檔案的內容（去掉 split_moves 加的檔頭）。"""
+    def body(m: re.Match) -> str:
+        text = files.get(f"leihu/core/{m.group(1)}.py", "")
+        head = M.HEADER + "\n\n"
+        return (text[len(head):] if text.startswith(head) else text).rstrip("\n")
+    return D.LOAD_RX.sub(body, pipeline_text)
 
 
 def unresolved(src: str, filename: str, known: set[str]) -> list[str]:
@@ -56,7 +65,23 @@ def unresolved(src: str, filename: str, known: set[str]) -> list[str]:
 
 def compare(base: str, files: dict[str, str], parts: set[str]) -> list[str]:
     """base：搬移前的 pipeline.py；files：搬移後的 pipeline.py、leihu/*.py、leihu/core/*.py（路徑 → 內容）；
-    parts：方式一的檔案路徑。回傳問題清單（空的就是都對）。"""
+    parts：方式一的檔案路徑。回傳問題清單（空的就是都對）。
+    每個定義都還在 pipeline.py 或方式一的檔案時（這一步沒有方式二的搬移），另外把 _load_part 換回原本的內容，
+    整份和搬移前逐字比對：定義以外的模組層級敘述（try、if、運算式）和順序也要相同（Agy 審查 1）。"""
+    problems = _compare_defs(base, files, parts)
+    only_method1 = all(f == "pipeline.py" or f in parts for f in _homes(base, files))
+    if not problems and only_method1 and D.norm(reassemble(files["pipeline.py"], files)) != D.norm(base):
+        problems.append("把 _load_part 換回原本的內容後，整份和搬移前不同（定義以外的敘述或順序變了）")
+    return problems
+
+
+def _homes(base: str, files: dict[str, str]) -> set[str]:
+    """搬移前的定義現在在哪些檔案。"""
+    names = set(D.defs(base))
+    return {f for f, text in files.items() if names & set(D.defs(text))}
+
+
+def _compare_defs(base: str, files: dict[str, str], parts: set[str]) -> list[str]:
     where: dict[str, list[tuple[str, str]]] = {}
     for f, text in files.items():
         for nm, ds in D.defs(text).items():
