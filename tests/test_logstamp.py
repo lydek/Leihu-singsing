@@ -130,6 +130,46 @@ def test_flush_writes_unfinished_line():
     assert STAMP.sub("", buf.getvalue()) == "下載中 10%"
 
 
+def test_other_thread_flush_keeps_unfinished_line():
+    """複審 P3-3：A 寫到一半時 B print(..., flush=True)，原本把 A 的半行先寫出去，下一行接在 A 後面。"""
+    import threading
+
+    from leihu.logstamp import Stamped
+
+    buf = io.StringIO()
+    s = Stamped(buf)
+    s.write("A-part")
+
+    def b():
+        s.write("B line\n")
+        s.flush()
+        s.write("C line\n")
+
+    t = threading.Thread(target=b)
+    t.start()
+    t.join()
+    s.write(" A-tail\n")
+    lines = [STAMP.sub("", x) for x in buf.getvalue().splitlines()]
+    assert lines == ["B line", "C line", "A-part A-tail"]
+
+
+def test_flush_all_writes_every_thread():
+    """程式結束時（atexit）所有執行緒沒寫完的行都寫出。"""
+    import threading
+
+    from leihu.logstamp import Stamped
+
+    buf = io.StringIO()
+    s = Stamped(buf)
+    t = threading.Thread(target=lambda: s.write("別的執行緒的半行"))
+    t.start()
+    t.join()
+    s.flush()
+    assert buf.getvalue() == ""
+    s.flush_all()
+    assert STAMP.sub("", buf.getvalue()) == "別的執行緒的半行"
+
+
 def test_install_shares_state_only_for_same_file(monkeypatch, tmp_path):
     from leihu import logstamp
 

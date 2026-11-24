@@ -4,10 +4,12 @@ app.log 是伺服器和顯示卡處理程式的 stdout／stderr 直接寫進檔�
 本來都沒有時間，看不出事情的先後和間隔。伺服器 main() 和顯示卡處理程式 serve() 一開始各呼叫一次 install()。
 
 一整行才寫出去：print 會把文字和換行分兩次寫，多個執行緒、或 stdout 和 stderr 寫同一個檔案時，
-別人的一行才不會插在中間、時間也不會落在行中。沒寫完的一行（沒有換行）留到換行或 flush 時才寫出。
+別人的一行才不會插在中間、時間也不會落在行中。沒寫完的一行（沒有換行）留到換行、同一個執行緒 flush，
+或程式結束時才寫出（別的執行緒 flush 不會把它寫出去，不然下一個人的一行會接在後面）。
 """
 from __future__ import annotations
 
+import atexit
 import os
 import sys
 import threading
@@ -48,12 +50,24 @@ class Stamped:
         return len(text)
 
     def flush(self):
-        """沒寫完的行（所有執行緒的）也寫出去：程式結束、print(flush=True)、進度條更新時都會呼叫。"""
+        """這個執行緒沒寫完的行也寫出去：print(flush=True)、進度條更新時都會呼叫。
+        別的執行緒寫到一半的不動（複審 P3-3），程式結束時 flush_all 才寫出。"""
         with self._dest.lock:
-            rest, self._pending = list(self._pending.values()), {}
-            for s in rest:
-                self._emit(s)
+            rest = self._pending.pop(threading.get_ident(), "")
+            if rest:
+                self._emit(rest)
         return self._stream.flush()
+
+    def flush_all(self):
+        """所有執行緒沒寫完的行都寫出去（程式結束時）。"""
+        try:
+            with self._dest.lock:
+                rest, self._pending = list(self._pending.values()), {}
+                for s in rest:
+                    self._emit(s)
+            self._stream.flush()
+        except (OSError, ValueError):
+            pass   # 程式結束時串流可能已經關了
 
     def _emit(self, text: str) -> None:   # 呼叫前要拿著 self._dest.lock
         out = []
@@ -82,5 +96,7 @@ def install() -> None:
     shared = _Dest() if out is not None and err is not None and _same_file(out, err) else None
     if out is not None:
         sys.stdout = Stamped(out, shared)
+        atexit.register(sys.stdout.flush_all)
     if err is not None:
         sys.stderr = Stamped(err, shared)
+        atexit.register(sys.stderr.flush_all)
