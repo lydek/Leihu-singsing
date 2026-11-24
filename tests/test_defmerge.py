@@ -450,3 +450,16 @@ def test_binary_file_in_git_ref_is_not_text():
     m = D.Merge(head, D.Source(ref="HEAD"), D.Source(ref="HEAD"))
     m.file("static/icon.png")
     assert m.report == ["手動    static/icon.png：不是文字檔"]
+
+
+def test_fork_version_not_matching_old_upstream_is_manual(tmp_path):
+    """第 2 輪 2：fork 的版號對不上舊上游（漏改成 2.3.3.1）時，三方合併保留 fork 的舊版號，原本回報成功。"""
+    old = OLD + '\n\nVERSION = "2.3.4"\n'
+    new = old.replace("2.3.4", "2.3.5")
+    fork = old.replace('"2.3.4"', '"2.3.3.1"')
+    r, _ = merge(tmp_path, {"pipeline.py": old, "VERSION": "2.3.4\n"}, {"pipeline.py": new, "VERSION": "2.3.5\n"},
+                 {"pipeline.py": fork, "VERSION": "2.3.3.1\n"}, extra=["VERSION"])
+    manual = [x for x in r["report"] if x.startswith("手動")]
+    assert any("pipeline.py:VERSION" in x and "版號" in x for x in manual)
+    assert any("VERSION：" in x and "版號" in x for x in manual)
+    assert r["stats"]["version"] == 0 and r["files"] == []
