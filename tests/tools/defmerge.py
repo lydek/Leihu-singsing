@@ -58,7 +58,9 @@ IMPORT_TARGET = {"pipeline.py": "pipeline.py"}   # 上游新增的 import 要加
 
 # ---------------------------------------------------------------- 讀檔
 def git(*args: str) -> str:
-    return subprocess.run(["git", *args], capture_output=True, text=True, encoding="utf-8", check=True).stdout
+    # 第 2 輪審查 1：在主執行緒解碼。text=True 時 Windows 在背景執行緒解碼，二進位檔的 UnicodeDecodeError 只印出來、
+    # stdout 變成 None，會被當成檔案不存在
+    return subprocess.run(["git", *args], capture_output=True, check=True).stdout.decode("utf-8")
 
 
 def check_ref(ref: str) -> None:
