@@ -143,6 +143,20 @@ PR #26 合併後，`tests/tools/defmerge.py` 以定義為單位三方合併，fo
 - **模擬同步**：把搬移腳本套到 `263833a`（2.3.5 同步前）和 `43ddbb0`（手動同步後），用 `defmerge.py` 同步 2.3.5，`--expect` 和搬移後的 `43ddbb0` 比較，要沒有差異。研究文件 5.2 的壓力測試只搬了文字，這一步在能執行的程式上做，合併結果也要跑一次 pytest。
 - **安裝檔**：測試版安裝檔（3.14）實際安裝、開一首歌，確認 `leihu/core/` 有被打包（`installer/build.sh`）、子程式能載入。
 
+### 拆檔前的對照（2026-11-24，`80aed5b`，開發機 9900X3D，只用 CPU）
+
+PR #28 只改文件，所以 `80aed5b` 就是拆檔前的程式。之後每一步都和這組比：
+
+- **CPU 數值基準**（`tests/numeric/baselines/80aed5b-desktop-9900x3d-cpu-refactor.json`，測試計畫 `refactor`，1 次，1183.7 秒）：
+  - 異常「無」，全部步驟都在 CPU 上。
+  - 和第 5 批的 `7d2b39e` 逐檔 38／38 相同：第 5 批之後的 `39ec007`、`80aed5b` 沒有改變這組素材的輸出。
+- **啟動時間**（內嵌 Python，`LIANTAI_NO_BACKGROUND=1`、`LIANTAI_NO_JOBS=1`，交錯各 15 次）：
+  - `import pipeline, share`：中位數 0.210 秒（0.204～0.256）。
+  - `import app`：中位數 0.392 秒（0.382～0.445）。
+
+  和 3.19 的數字量法不同，不能直接比；拆檔後照同樣的方式和 `80aed5b` 交錯量。
+- **契約**：`check_snapshot.py` 兩次都是 144 個案例和快照相同，94 條路由都有案例。
+
 ## 8. 不做、限制
 
 - 不拆 `gpu_worker.py`、`static/app.js`、`installer.py`。
