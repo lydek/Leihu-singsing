@@ -440,3 +440,69 @@ def test_whisper_worker_raises_oom_when_asked(monkeypatch):
                               pick_language=lambda *a: ("ja", ""), PITCH_SR=16000)
     with pytest.raises(RuntimeError, match="out of memory"):
         G.t_whisper(P, lambda *a: None, np.zeros(16000, np.float32), {}, "", False, raise_oom=True)
+
+
+# ---------------------------------------------------------------- 第 1 輪複審（2026-11-24）P3-7、P3-8
+
+
+def test_oom_retry_waits_for_all_running_jobs_via_next(app_module):
+    """複審 P3-7（r2-2）：走 _next：記憶體不夠重做的工作，上一首的旋律分析（post）還在跑時不挑它。"""
+    import pipeline as P
+
+    q = P.Jobs(pipeline=True)
+    prev = q.submit("process", "other00001", lambda r: None, label="all")
+    retry = q.submit("process", SID, lambda r: None, label="all")
+    with q.lock:
+        q.pending[:] = [(j, f) for j, f in q.pending if j != prev]
+        q.state[prev]["status"] = "running"
+        q.running[prev] = "post"
+        q.state[retry]["oom_retry"] = True
+        assert q._next(hold=False, slots=2)[0] is None
+        q.running.clear()
+        assert q._next(hold=False, slots=2)[0] == retry
+
+
+@pytest.mark.parametrize("stage", ["load", "detect"])
+def test_whisper_model_raises_oom_when_asked(monkeypatch, app_module, stage):
+    """複審 P3-7（r2-3）：載入模型、試算一小段（detect_language）時 OOM：raise_oom 為真直接丟出去，
+    否則照原本改用 CPU。"""
+    import sys
+    import types
+
+    import pipeline as P
+
+    class Model:
+        def __init__(self, name, device, **kw):
+            if device == "auto" and stage == "load":
+                raise RuntimeError("CUDA failed with error out of memory")
+            self.device = device
+            self.model = types.SimpleNamespace(device="cuda" if device == "auto" else "cpu")
+
+        def detect_language(self, *a, **k):
+            raise RuntimeError("CUDA failed with error out of memory")
+
+    monkeypatch.setitem(sys.modules, "faster_whisper", types.SimpleNamespace(WhisperModel=Model))
+    with pytest.raises(RuntimeError, match="out of memory"):
+        P._whisper_model({}, raise_oom=True)
+    assert P._whisper_model({}).device == "cpu"
+
+
+def test_queue_retries_oom_right_after_other_song_finished(app_module, monkeypatch):
+    """複審 P3-8：沒經過 _overlap_oom 的 OOM（例如旋律分析），另一首在 OVERLAP_GRACE 內剛做完：
+    原本用 len(running) > 1 判定，只剩一首就直接標成錯誤；改用 _overlapping，照樣排回去重做。"""
+    import pipeline as P
+
+    q = P.Jobs(pipeline=True)
+    jid = q.submit("process", SID, lambda r: None, label="all")
+
+    def fn(report):
+        raise RuntimeError("CUDA out of memory")
+
+    with q.lock:
+        q.pending.clear()
+        q.state[jid].update(status="running", overlap_end=P.time.time())   # 別首剛做完
+        q.running[jid] = "gpu"
+    monkeypatch.setattr(P, "free_gpu", lambda: None)
+    q._work(jid, fn)
+    st = q.get(jid)
+    assert st["status"] == "queued" and st.get("oom_retry")
