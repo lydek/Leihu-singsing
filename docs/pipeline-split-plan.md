@@ -111,7 +111,7 @@ PR #26 合併後，`tests/tools/defmerge.py` 以定義為單位三方合併，fo
 |---|---|---|
 | 0 | 載入機制與檢查，搬移本身寫成可以重跑的腳本（`tests/tools/`），之後能套到舊 commit 上做模擬同步：<br>・`pipeline.py` 的載入函式，照第 3 節的規格（位置、`__future__` 旗標）<br>・`symtable` 名稱檢查的測試<br>・搬移前後的 AST 比對腳本<br>・「`pipeline` 的名稱齊全、是同一個物件」的測試<br>・`defmerge.py` 支援共用命名空間（含單元測試）<br>・`installer/build.sh` 複製 `leihu/core/*.py`。目前寫死只複製 `leihu/*.py`、`leihu/web/*.py`，不改的話測試版啟動就會失敗；`leihu.nsi` 用 `File /r "payload\*"`，不用改<br>**2026-11-24 完成**，見表下說明 | 只加工具，不搬程式 |
 | 1 | `Jobs` 和直播中暫停背景處理（`JobCancelled`、`JobDeferred`、`live_status`、`LIVE_BACKGROUND` 等，約 700 行）→ `leihu/core/jobs.py`。**2026-11-24 完成**，見表下說明 | 方式一 |
-| 2 | 分離（78 個定義、約 900 行）→ `leihu/core/separation.py` | 方式一 |
+| 2 | 分離（78 個定義、約 900 行）→ `leihu/core/separation.py`。**2026-11-24 完成**，見表下說明 | 方式一 |
 | 3 | `process_song` 等處理流程、YouTube 與批次匯入 → `leihu/core/process.py`、`leihu/core/youtube.py` | 方式一 |
 | 4 | 線上歌詞搜尋、依主唱聲音對時間 → `leihu/core/lyrics_search.py`、`leihu/core/voice_align.py` | 方式一 |
 | 之後 | 曲名／歌手／預設 KEY、音量標準化等穩定區塊：先看相依和有沒有讀重新指派的變數，適合的才用方式二 | 個別評估 |
@@ -133,6 +133,14 @@ PR #26 合併後，`tests/tools/defmerge.py` 以定義為單位三方合併，fo
   - 把同樣的搬移套到 `263833a`、`43ddbb0`（起點是 `JobCancelled`：`_overlap_oom` 是第 5 批才加的），用 `defmerge.py` 同步 2.3.5，`--expect` 用搬移後的 `43ddbb0` 資料夾：「不同的定義」無；手動 3 項（`submit_unfinished` 的 import）和空行位置，都和沒拆檔時完全相同。2.3.5 沒有改到這一段。
   - 合成：在拆好的程式上模擬上游在 `Jobs` 加方法（用新的 `import html`）、在 `Jobs` 後面新增定義：`Jobs` 三方合併進 `jobs.py`，新定義放進 `jobs.py`，`import html` 自動加在 `pipeline.py`，手動 0 項；合併後的程式 import 起來能執行，名稱檢查通過。
 - 安裝檔：交給 PR 的 installer workflow。
+
+**步驟 2 的結果（2026-11-24）**：
+- 範圍是「分離」區塊從 `_stem_kind` 到 `step_separate` 的 78 個定義、約 1000 行（模型清單與下載、高品質模型的判斷與退回、主唱補回、精細處理、tqdm 進度、`separate_uvr`、`separate_dsp`、`step_separate`），用 `split_moves.py separation _stem_kind step_separate` 搬。`pipeline.py` 剩 3494 行。
+- `leihu/core/separation.py` 登記在 ruff 的 F821 逐檔排除；全 repo 仍是 311。
+- `split_check.py c5ae22e`：330 個定義都在、逐字相同，整份還原也相同。pytest 457 項全過。契約：`check_snapshot.py` 兩次都是 144 個案例和快照相同。
+- CPU 數值基準（`0b3b9c6`，1 次，1336.8 秒）：異常「無」，和步驟 1 的 `fc657e0` 逐檔 38／38 相同。顯示卡子程式（`gpu_worker`）用到的分離名稱也走這條路。
+- 啟動時間（和 `c5ae22e` 交錯各 15 次）：`import pipeline, share` 0.211 → 0.205 秒，`import app` 0.374 → 0.377 秒，範圍重疊。
+- 模擬同步（這次是真的改到搬走的區塊）：同樣的兩次搬移套到 `263833a`、`43ddbb0` 後同步 2.3.5，上游的分離改動都進了 `separation.py`：新增的 `STD_VOCAL`、`_HQ_FAIL`、`_hq_fail_note`、`_MODEL_CHECKED`、`_check_model_file` 放在 `HQV_DL` 後面，`vocal_model`、`karaoke_model`、`separate_uvr` 直接換；沒有衝突，和搬移後的 `43ddbb0` 沒有不同的定義，`pipeline.py` 和手動同步完全相同。差別只有新定義前後的空行和 3 個 `submit_unfinished` 的 import，和沒拆檔時一樣（空行從 `pipeline.py` 移到 `separation.py`）。
 
 每一步搬完，`pipeline.py` 留下設定、檔案、共用的小函式，以及依序載入各檔案的那幾行。
 
