@@ -529,3 +529,20 @@ def test_last_import_end_only_takes_leading_docstring():
     assert D.last_import_end("X = 1\n42\nY = 2\n") == 0
     assert D.last_import_end('"""說明。"""\nX = 1\n"字串"\n') == 1
     assert D.last_import_end("42\nX = 1\n") == 0
+
+
+@pytest.mark.parametrize("argv", [["a", "b", "c", "--al", "--out=o"], ["a", "b", "c", "--alll", "--out=o"],
+                                  ["a", "b", "c"], ["a", "b", "--out=o"]])
+def test_cli_rejects_bad_options(argv):
+    """第 2 輪 9：拼錯的選項原本被靜默忽略（--all 打錯就少合併其他檔案），缺 fork 參照要報錯。"""
+    with pytest.raises(SystemExit) as e:
+        D.parse_args(argv)
+    assert e.value.code == 2
+
+
+def test_cli_out_with_space():
+    """第 2 輪 9：--out foo（沒有等號）原本寫進 ./1/。"""
+    a = D.parse_args(["a", "b", "c", "--out", "foo", "--all"])
+    assert (a.out, a.all, a.refs) == ("foo", True, ["a", "b", "c"])
+    a = D.parse_args(["a", "b", "--tree=t", "--out=o", "--expect=e"])
+    assert (a.tree, a.out, a.expect, a.all) == ("t", "o", "e", False)

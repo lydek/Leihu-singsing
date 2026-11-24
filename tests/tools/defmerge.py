@@ -22,7 +22,7 @@ upstream_map.py 是「hunk 落在哪個定義 → 那個名稱現在在哪個檔
     --all：app.py、pipeline.py 以外上游改過的檔案也整個檔案三方合併。
   python tests/tools/defmerge.py <舊上游> <新上游> --tree=<資料夾> --out=<資料夾>
     fork 用一個資料夾（例如模擬拆檔後的副本），不用 git 參照；寫出時保留原本的換行（CRLF／LF）。
-結束代碼：有衝突或要手動處理的是 1，否則 0；參照不存在等 git 錯誤直接中止。
+結束代碼：有衝突或要手動處理的是 1，否則 0；參數錯誤（含拼錯的選項）是 2；參照不存在等 git 錯誤直接中止。
 
 限制：類別整個當成一個定義合併（不拆到方法）；名稱改了的定義要登記在 RENAMES；
 fork 為了排版把上游的整段縮排，三方合併會把整段當成改過（研究文件第 6 節）。
@@ -701,26 +701,40 @@ def changed_files(old_ref: str, new_ref: str) -> list[str]:
     return [f for f in out if f not in GROUPS]
 
 
+def parse_args(argv: list[str]):
+    """第 2 輪審查 9：原本手寫解析，拼錯的選項被靜默忽略、--out foo（沒有等號）寫進 ./1/。不接受縮寫（--al 不算 --all）。"""
+    import argparse
+
+    p = argparse.ArgumentParser(prog="defmerge.py", description=__doc__, allow_abbrev=False,
+                                formatter_class=argparse.RawDescriptionHelpFormatter)
+    p.add_argument("refs", nargs="+", metavar="參照", help="<舊上游> <新上游> [<fork 的參照>]（用 --tree 時不給 fork）")
+    p.add_argument("--out", required=True, help="寫出合併結果的資料夾")
+    p.add_argument("--tree", help="fork 用資料夾，不用 git 參照")
+    p.add_argument("--expect", help="和這個參照比較合併結果（驗證用）")
+    p.add_argument("--all", action="store_true", help="app.py、pipeline.py 以外上游改過的檔案也整個檔案三方合併")
+    a = p.parse_args(argv)
+    if len(a.refs) != (2 if a.tree else 3):
+        p.error("要給 <舊上游> <新上游> <fork 的參照>；用 --tree 時只給前兩個")
+    return a
+
+
 def main() -> int:
-    args = [a for a in sys.argv[1:] if not a.startswith("--")]
-    opt = dict(a[2:].split("=", 1) if "=" in a else (a[2:], "1") for a in sys.argv[1:] if a.startswith("--"))
-    if len(args) < 2 or "out" not in opt or ("tree" not in opt and len(args) < 3):
-        print(__doc__)
-        return 2
-    for ref in [*args[:2], *([] if "tree" in opt else [args[2]]), *([opt["expect"]] if "expect" in opt else [])]:
+    a = parse_args(sys.argv[1:])
+    for ref in [*a.refs, *([a.expect] if a.expect else [])]:
         check_ref(ref)
-    fork = Source(tree=Path(opt["tree"])) if "tree" in opt else Source(ref=args[2])
-    expect = Source(ref=opt["expect"]) if "expect" in opt else None
-    extra = changed_files(args[0], args[1]) if "all" in opt else None
-    r = run(Source(ref=args[0]), Source(ref=args[1]), fork, Path(opt["out"]), expect, extra)
+    fork = Source(tree=Path(a.tree)) if a.tree else Source(ref=a.refs[2])
+    expect = Source(ref=a.expect) if a.expect else None
+    extra = changed_files(a.refs[0], a.refs[1]) if a.all else None
+    r = run(Source(ref=a.refs[0]), Source(ref=a.refs[1]), fork, Path(a.out), expect, extra)
     print("\n".join(r["report"]))
     print("統計：", r["stats"])
     print("寫出：", r["files"])
     if expect:
-        print("和", opt["expect"], "不同的定義：", r["diffs"] or "無")
+        print("和", a.expect, "不同的定義：", r["diffs"] or "無")
     return 1 if r["stats"]["conflict"] or r["stats"]["manual"] else 0
 
 
 if __name__ == "__main__":
     sys.stdout.reconfigure(encoding="utf-8")
+    sys.stderr.reconfigure(encoding="utf-8")   # argparse 的用法、錯誤寫到 stderr
     sys.exit(main())
