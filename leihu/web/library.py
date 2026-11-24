@@ -78,8 +78,12 @@ def add_song():
     fd, name = tempfile.mkstemp(suffix=Path(f.filename).suffix, dir=P.LIB)
     os.close(fd)  # Windows 上檔案開著就無法搬移
     tmp = Path(name)
-    f.save(tmp)
-    sid = P.new_song(f.filename, tmp)
+    try:
+        f.save(tmp)
+        sid = P.new_song(f.filename, tmp)
+    except BaseException:   # fork：上傳或建立歌曲失敗，不在歌曲庫留下暫存檔（成功時 new_song 已經搬走）
+        tmp.unlink(missing_ok=True)
+        raise
     cat = request.form.get("category") or None
     if cat in P.load_categories():
         P.update_meta(P.song_dir(sid), category=cat)

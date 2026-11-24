@@ -242,3 +242,108 @@ def test_ui_prefs_set_with_non_dict_file(client, monkeypatch, tmp_path, bad):
     r = client.post("/api/ui-prefs", json={key: 0.5})
     assert r.status_code == 200, r.get_data(as_text=True)
     assert json.loads(p.read_text("utf-8")) == {key: 0.5}
+
+
+# ================================================================ 第二輪審查（2026-11-24）
+
+
+def test_youtube_pause_puts_download_back_in_queue(app_module, monkeypatch):
+    """全部暫停時 check() 丟 JobDeferred（JobCancelled 的子類別），原本被 except JobCancelled 先接走，
+    當成按了停止：歌停在下載中，不會改回排隊下載。"""
+    import shutil
+
+    import gpu_worker as G
+    import pipeline as P
+
+    sid = "ytpause01"
+    d = P.LIB / sid
+    d.mkdir(parents=True, exist_ok=True)
+    (d / "meta.json").write_text(json.dumps({"id": sid, "dl_state": "downloading"}), "utf-8")
+
+    def step_youtube(d, url, report):
+        raise P.JobDeferred("paused")
+
+    def check():
+        raise P.JobDeferred("paused")
+
+    monkeypatch.setattr(P, "step_youtube", step_youtube)
+    monkeypatch.setattr(G.CURRENT, "check", check, raising=False)
+    try:
+        with pytest.raises(P.JobDeferred):
+            P.youtube_job(sid, "https://youtu.be/x")(lambda *a: None)
+        assert P.read_meta(d).get("dl_state") == "queued"
+    finally:
+        shutil.rmtree(d, ignore_errors=True)
+
+
+def test_live_log_does_not_wait_for_gpu_probe(app_module, monkeypatch):
+    """/api/status 每秒經過 _live_log：讀不到 nvidia-smi 時原本呼叫 cuda_ok()，主程式裡是 gpu_info(block=True)，
+    還沒有 gpu_probe.json 時要等顯示卡子程式探測完（最久 90 秒）。"""
+    import pipeline as P
+
+    calls = []
+    monkeypatch.setattr(P, "gpu_info", lambda block=True: calls.append(block))
+    monkeypatch.setitem(P.GPU_LOAD, "err", "FileNotFoundError: nvidia-smi")
+    st = P._live_log({"hold": False, "reason": "", "apps": []})
+    assert calls == [False]
+    assert "gpu_err" not in st   # 還不知道有沒有可用的顯示卡：先不提示
+
+
+def test_add_song_failure_removes_temp_file(client, monkeypatch):
+    """上傳後建立歌曲失敗，原本暫存檔留在歌曲庫資料夾。"""
+    import io
+
+    import pipeline as P
+
+    def new_song(name, path):
+        raise P.UserError("讀不到這個音訊檔")
+
+    monkeypatch.setattr(P, "new_song", new_song)
+    before = {p.name for p in P.LIB.iterdir()}
+    r = client.post("/api/songs", data={"file": (io.BytesIO(b"x" * 100), "a.mp3")},
+                    content_type="multipart/form-data")
+    assert r.status_code == 400
+    assert {p.name for p in P.LIB.iterdir()} == before
+
+
+_NS = 'xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"'
+
+
+def _xlsx(rows_xml: str) -> bytes:
+    import io
+    import zipfile
+
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as z:
+        z.writestr("xl/worksheets/sheet1.xml", f"<worksheet {_NS}><sheetData>{rows_xml}</sheetData></worksheet>")
+    return buf.getvalue()
+
+
+def _cell(text: str, r: str | None) -> str:
+    attr = "" if r is None else f' r="{r}"'
+    return f'<c{attr} t="inlineStr"><is><t>{text}</t></is></c>'
+
+
+@pytest.mark.parametrize("ref", [None, ""])
+def test_xlsx_cells_without_reference(app_module, ref):
+    """規格允許儲存格省略 r（接在前一格後面）。原本省略時全部擠到 A 欄（只剩最後一格），r="" 丟 AttributeError（500）。"""
+    import pipeline as P
+
+    rows = (f'<row>{_cell("歌手", ref)}{_cell("曲名", ref)}</row>'
+            f'<row>{_cell("周杰倫", ref)}{_cell("告白氣球", ref)}</row>')
+    got = P.read_sheet(_xlsx(rows), "a.xlsx")
+    assert [(g["artist"], g["song"]) for g in got] == [("周杰倫", "告白氣球")]
+
+
+def test_xlsx_broken_xml_is_user_error(app_module):
+    """工作表的 XML 壞掉原本丟 ParseError（500）。"""
+    import io
+    import zipfile
+
+    import pipeline as P
+
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as z:
+        z.writestr("xl/worksheets/sheet1.xml", "<worksheet><sheetData><row>")
+    with pytest.raises(P.UserError, match="讀不到這個 Excel 檔"):
+        P.read_sheet(buf.getvalue(), "a.xlsx")

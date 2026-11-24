@@ -139,11 +139,11 @@ def test_live_status_reports_unreadable_gpu_load(app_module, monkeypatch):
     monkeypatch.setattr(P, "gpu_busy_reason", lambda: "")
     monkeypatch.setitem(P.GPU_LOAD, "err", "TimeoutExpired: nvidia-smi")
     cfg = {"pause_while_streaming": False}
-    monkeypatch.setattr(P, "cuda_ok", lambda: True)
+    monkeypatch.setattr(P, "gpu_info", lambda block=True: {"ok": True})   # 主程式不等探測：看 gpu_info(block=False)
     assert P.live_status(cfg)["gpu_err"] == "TimeoutExpired: nvidia-smi"
-    monkeypatch.setattr(P, "cuda_ok", lambda: False)
+    monkeypatch.setattr(P, "gpu_info", lambda block=True: {"ok": False})
     assert "gpu_err" not in P.live_status(cfg)
-    monkeypatch.setattr(P, "cuda_ok", lambda: True)
+    monkeypatch.setattr(P, "gpu_info", lambda block=True: {"ok": True})
     monkeypatch.setitem(P.GPU_LOAD, "err", "")
     assert "gpu_err" not in P.live_status(cfg)
 
@@ -152,7 +152,7 @@ def test_gpu_err_reported_in_every_live_state(app_module, monkeypatch):
     """Codex r6-3：偵測到直播軟體、按了照常處理時提早回傳，原本少了 gpu_err，畫面當成恢復，關掉 OBS 後同一個錯誤再提示一次。"""
     import pipeline as P
 
-    monkeypatch.setattr(P, "cuda_ok", lambda: True)
+    monkeypatch.setattr(P, "gpu_info", lambda block=True: {"ok": True})
     monkeypatch.setitem(P.GPU_LOAD, "err", "TimeoutExpired: nvidia-smi")
     monkeypatch.setitem(P.LIVE_HOLD, "override_until", 0.0)
     monkeypatch.setitem(P.LIVE_HOLD, "checked", P.time.time())   # 不重新查程式清單
