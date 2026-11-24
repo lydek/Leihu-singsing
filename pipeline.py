@@ -3620,9 +3620,10 @@ def live_status(cfg: dict | None = None) -> dict:
         if now - LIVE_HOLD["live_seen"] < 20:
             return _live_log({"hold": True, "reason": "直播模式開著", "apps": []})
     busy = gpu_busy_reason()
-    if busy:
-        return _live_log({"hold": True, "reason": busy, "apps": [], "gpu": True})
-    return _live_log({"hold": False, "reason": "", "apps": []})
+    st = {"hold": True, "reason": busy, "apps": [], "gpu": True} if busy else {"hold": False, "reason": "", "apps": []}
+    if GPU_LOAD["err"] and cuda_ok():   # fork（複審 P3-5）：畫面也提示讀不到顯示卡用量（沒有可用顯示卡的電腦不提示）
+        st["gpu_err"] = GPU_LOAD["err"]
+    return _live_log(st)
 
 
 # 直播中要先停住的背景工作（使用者沒有在等結果的）
