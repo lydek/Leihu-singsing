@@ -124,8 +124,8 @@ fork 用每次同步前的 commit，`--expect` 用手動同步後的 commit：
 
 1. ~~補單元測試~~（2026-11-24 完成，`tests/test_defmerge.py`）。
 2. ~~補功能：版號規則、放置位置對照、import、其他檔案整個三方合併~~（2026-11-24 完成，第 4 節）。還沒做：把結果直接寫回工作目錄（目前寫到 `--out`，要自己複製）、commit 沿用上游作者與日期（3.21 步驟 3）。
-3. 下一次同步上游時，`upstream_map.py` 和 `defmerge.py` 兩種做法都跑，比較結果，確認後把 3.21 改成用 `defmerge.py`。
-4. 確定後，修改 3.4／3.19／`next-version-plan.md` 第 1 節的原則，再規劃 `pipeline.py` 怎麼拆（例如先搬 `Jobs`）。
+3. ~~把 3.21 改成用 `defmerge.py`~~（2026-11-24 決定現在就改，不等下一次同步；下一次同步時 `upstream_map.py` 照樣跑一次比較結果）。
+4. ~~修改 3.4／3.19／`next-version-plan.md` 第 1 節的原則，規劃 `pipeline.py` 怎麼拆~~（2026-11-24 完成，`pipeline-split-plan.md`）。拆檔的步驟 0 要先讓 `defmerge.py` 支援和 `pipeline.py` 共用命名空間的檔案。
 
 ## 8. 沒有驗證的部分
 

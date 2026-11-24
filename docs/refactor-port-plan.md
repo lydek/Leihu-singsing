@@ -166,7 +166,7 @@ F 組的修正跟著程式落點放進對應的步驟；改變行為的修正依
 
 1. **上游有沒有已經解決了？** 有的話優先沿用上游的寫法，只補不足的地方。這樣跟上游的差異小，以後同步比較容易。
 2. **後來有沒有修正這個 commit？** 舊分支有不少審查修正是在修重構時產生的問題，例如 28 的並行和輸入驗證、36。重做時要一開始就寫對，不要先重現問題再修。
-3. **以後同步上游要花多少成本？** 搬動或改名越多，每次上游更新時要對應的地方就越多。如果效益不夠大，就不要搬動。
+3. **以後同步上游要花多少成本？** 搬動或改名越多，每次上游更新時要對應的地方就越多。如果效益不夠大，就不要搬動。**2026-11-24 起放寬**（`pipeline-split-plan.md` 第 4、6 節）：同步改用 `tests/tools/defmerge.py`，以定義為單位三方合併，搬到別的檔案的定義照樣找得到，手動合併只剩兩邊改到同一段的地方。搬動仍要守住：名稱不變（`pipeline` 照樣提供，改名登記 `RENAMES`）、定義內容逐字不變、不為了排版或包條件縮排上游的定義、上游新增定義的位置登記 `PLACE`。
 4. **有沒有更小的改法？** 優先用現成的程式、標準函式庫、已安裝的套件，不加沒人要求的抽象。
 
 評估結果有三種，寫在第 2 節的備註：
@@ -501,12 +501,12 @@ Codex 第 7 次審查後補的（同類問題和繞過路徑）：
 - **步驟 2（值物件、`update_song`、背景工作佇列）**：不做。
   - 上游 2.3.2 已有：`meta.json` 讀寫共用 `_META_LOCK`、先寫暫存檔再取代、鎖內讀改寫的 `update_meta`；`Jobs` 的 Condition、取消、優先處理、全部暫停。
   - 延後（會改變行為）：舊 commit 的 API 變更（`step2-plan.md` 的 D1–D6，和 `upstream-sync-2.3.2.md` 的 D1–D5 不同；例如 KEY 不合法回 400、刪除處理中的歌回 400）；`step_import`（`pipeline.py:1419`，v2.3.2 是 1342）在鎖外讀出 `steps` 再交給 `update_meta`，是上游既有的並行問題。只有 `steps` 欄位可能被舊值蓋掉（其他欄位在 `update_meta` 的鎖內合併），蓋掉的是處理狀態、不是使用者資料，所以不列為防止資料遺失的修正。
-  - 不做：值物件、把 `Jobs` 搬出 `pipeline`。不改行為，但要動 `pipeline.py`，以後同步上游要對應的地方變多（3.4 第 3 點），效益不夠。
+  - 不做：值物件、把 `Jobs` 搬出 `pipeline`。不改行為，但要動 `pipeline.py`，以後同步上游要對應的地方變多（3.4 第 3 點），效益不夠。**2026-11-24 改變**：`Jobs` 照 `pipeline-split-plan.md` 的方式一（分檔、共用 `pipeline` 的命名空間）搬到 `leihu/core/jobs.py`，是拆檔的步驟 1；值物件仍不做。
 - **步驟 3 的非 ml-worker 部分**：這個版本不實作。
   - 已做：`LIANTAI_NO_JOBS` 從 `LIANTAI_NO_BACKGROUND` 拆出（C 組 S28）；數值比對工具（D 組，改成配合 `gpu_worker`，`child_hook.py` 取代舊分支的 `worker_nodither.py`；`measure_r4.py` 不搬）。
   - 延後（效能調整，3.8 第二階段）：伺服器不載入 librosa、scipy、numba（舊分支的 `leihu/dsp.py`、soxr）。伺服器行程的 `read_audio`、`_block_power`、`separate_dsp`、`shift_audio`、`share._resample`、`share.peak_limit` 會載入它們；改用 soxr 重新取樣的結果不同（舊 commit 寫人聲頻段差 < −50 dB），不是行為等價。舊分支的 `test_server_memory` 一起延後。
   - 不做：舊分支的 `LIANTAI_URL_BASE` 與背景工作契約快照（`fake_net.py`、`contract_jobs.json`）。沒設定時行為不變，但要改 `pipeline.py` 的歌詞搜尋網址（LRCLIB、網易雲、酷狗）和 `leihu/web/update.py` 的 GitHub 更新檢查，約 12 處；同步上游的成本大於讓測試離線跑歌詞搜尋、更新檢查的好處（3.4 第 3 點）。
-- **步驟 4（拆 `pipeline.py`）**：改用只拆穩定區塊。
+- **步驟 4（拆 `pipeline.py`）**：改用只拆穩定區塊。**2026-11-24 起**上游常改的區塊也可以拆，做法和順序見 `pipeline-split-plan.md`（常改的區塊用方式一，相依少的穩定區塊照這裡的做法用方式二）。
   - 依據：`v2.0.0`～`v2.3.2`（10 天）上游有 25 個 commit 改 `pipeline.py`；從 `v1.6` 算起 40 個 commit，沒改過的定義，行數只占 26%。最常改的是 `Jobs`、`USER_AGENT`、`process_song`、`DEFAULT_CONFIG`、`separate_uvr`，舊步驟 4 的 config、dsp、media、lyrics 每一類都有。
   - 搬出去的（`v1.6` 以來沒改過、只依賴標準函式庫和 numpy；`to_simplified` 會選用 `opencc`，沒裝就原樣回傳）：`leihu/pitch.py`（`bridge_gaps`、`octave_low_score`、`fix_octaves`、`trim_glides`、`clean_pitch`、`segment_notes`，連同 `PITCH_SR`、`HOP`、`HOP_S`）；`leihu/lyrics_text.py`（`fmt_lrc_time`、`parse_lrc`、`to_lrc`、`lyric_queries`、`to_simplified`、`clean_lrc`、`_norm`、`similarity`、`srt_to_lrc`、`align_to_recognized`，連同 `_NOISE`、`_CREDIT`）。21 個定義的 AST 和搬移前相同，`pipeline` 只多了轉出這些名稱的 import，`P.<名稱>` 拿到的是同一個物件。
   - 沒搬的：假名（`tw_to_ja` 用 `log_error`，`furigana` 用安裝狀態 `_kana_lock`、`_KANA_TK`）、`align_by_voice`（用上游常改的 `voice_phrases`）、線上歌詞搜尋（呼叫 `P._http_json`，`tests/test_fork_update.py` 會替換它）、`gpu_worker` 用到的名稱（`PITCH_SR` 除外：搬到 `leihu/pitch.py`，`pipeline` 轉出同一個值，`P.PITCH_SR` 不變）。測試或沙盒會替換的 `P.<名稱>` 都留在 `pipeline`：搬走的話，搬過去的模組直接呼叫它，替換就會靜默失效。
@@ -524,6 +524,8 @@ Codex 第 7 次審查後補的（同類問題和繞過路徑）：
 - 沒有逐行看 diff 的：36 的「建議與可選」各小項、70 的 `cancel_song`、`on_cancel` 細節，只依 commit 說明判成「會改變行為」。
 
 ### 3.21 同步上游的流程（2026-11-22）
+**2026-11-24 起改用 `tests/tools/defmerge.py`**（`upstream-sync-research.md`、`pipeline-split-plan.md` 第 6 節）。下面的步驟 2、3 是 `upstream_map.py` 的做法：下一次同步時兩種都跑一次、比較結果，之後只用 `defmerge.py`。`defmerge.py` 還沒演練過的：逐個上游 commit 跑（`<commit>^ <commit>`，每次的 fork 用上一次的結果 `--tree`），才能照步驟 3 一個上游 commit 一個同步 commit、沿用上游的作者和日期；結果寫到 `--out`，要自己複製回工作目錄。拆檔的步驟 0 讓它支援共用命名空間之前，不搬程式。步驟 4 的檢查照舊；拆檔之後另外跑 `symtable` 的名稱檢查。
+
 `refactor` 要求線性歷史，不能 merge 上游，只能把上游的 commit 逐一套進來。步驟 1、4 之後，上游改 `app.py` 的 commit 直接 cherry-pick 一定會衝突；程式是原封搬的、函式名稱沒變，所以用 `tests/tools/upstream_map.py` 依「hunk 落在上游哪個最上層定義裡 → 那個名稱現在在哪個檔案」改寫路徑。
 
 1. `git fetch upstream --tags`，從 `refactor` 開同步分支。
