@@ -522,3 +522,10 @@ def test_new_import_shadowing_fork_name_is_manual(tmp_path, fork_has):
     r, out = merge(tmp_path, {"pipeline.py": OLD}, {"pipeline.py": new}, {"pipeline.py": fork})
     assert r["stats"]["imports"] == 0
     assert any("同名" in x and "bar" in x for x in r["report"] if x.startswith("手動"))
+
+
+def test_last_import_end_only_takes_leading_docstring():
+    """第 2 輪 8：沒有 import 時只有第一個敘述是字串才算模組 docstring；後面的常數敘述不算。"""
+    assert D.last_import_end("X = 1\n42\nY = 2\n") == 0
+    assert D.last_import_end('"""說明。"""\nX = 1\n"字串"\n') == 1
+    assert D.last_import_end("42\nX = 1\n") == 0
