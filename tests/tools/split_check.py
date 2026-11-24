@@ -63,11 +63,13 @@ def unresolved(src: str, filename: str, known: set[str]) -> list[str]:
     return sorted(missing)
 
 
-def compare(base: str, files: dict[str, str], parts: set[str]) -> list[str]:
-    """base：搬移前的 pipeline.py；files：搬移後的 pipeline.py、leihu/*.py、leihu/core/*.py（路徑 → 內容）；
-    parts：方式一的檔案路徑。回傳問題清單（空的就是都對）。
-    每個定義都還在 pipeline.py 或方式一的檔案時（這一步沒有方式二的搬移），另外把 _load_part 換回原本的內容，
+def compare(base: str, files: dict[str, str], parts: set[str], base_files: dict[str, str] | None = None) -> list[str]:
+    """base：搬移前的 pipeline.py；base_files：搬移前已經分出去的方式一檔案（路徑 → 內容）；files：搬移後的
+    pipeline.py、leihu/*.py、leihu/core/*.py；parts：搬移後方式一的檔案路徑。回傳問題清單（空的就是都對）。
+    搬移前的 pipeline.py 先把它自己的 _load_part 換回當時的檔案內容，之前的步驟搬走的定義也一起比。
+    每個定義都還在 pipeline.py 或方式一的檔案時（這一步沒有方式二的搬移），另外把搬移後的 _load_part 也換回內容，
     整份和搬移前逐字比對：定義以外的模組層級敘述（try、if、運算式）和順序也要相同（Agy 審查 1）。"""
+    base = reassemble(base, base_files or {})
     problems = _compare_defs(base, files, parts)
     only_method1 = all(f == "pipeline.py" or f in parts for f in _homes(base, files))
     if not problems and only_method1 and D.norm(reassemble(files["pipeline.py"], files)) != D.norm(base):
@@ -117,12 +119,15 @@ def main() -> int:
     if len(sys.argv) != 2:
         print(__doc__)
         return 2
-    base = subprocess.run(["git", "show", f"{sys.argv[1]}:pipeline.py"], capture_output=True, check=True,
-                          cwd=ROOT).stdout.decode("utf-8").replace("\r\n", "\n")
+    def show(path: str) -> str:
+        return subprocess.run(["git", "show", f"{sys.argv[1]}:{path}"], capture_output=True, check=True,
+                              cwd=ROOT).stdout.decode("utf-8").replace("\r\n", "\n")
+    base = show("pipeline.py")
+    base_files = {f"leihu/core/{n}.py": show(f"leihu/core/{n}.py") for n in part_names(base)}
     files = tree_files(ROOT)
     parts = {f"leihu/core/{n}.py" for n in part_names(files["pipeline.py"])}
-    problems = compare(base, files, parts)
-    print("\n".join(problems) or f"{len(D.defs(base))} 個定義都在，內容和搬移前相同")
+    problems = compare(base, files, parts, base_files)
+    print("\n".join(problems) or f"{len(D.defs(reassemble(base, base_files)))} 個定義都在，內容和搬移前相同")
     return 1 if problems else 0
 
 
