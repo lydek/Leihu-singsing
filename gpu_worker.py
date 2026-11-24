@@ -759,15 +759,36 @@ def _cpu_fallback(name: str, args: tuple, progress, kw: dict):
     CURRENT.cpu_fallback 記下原因，佇列做完這首後寫進歌曲的說明（Jobs._work）。"""
     why = _BROKEN["why"]
     print(f"[gpu] {name} 交給 CPU 處理程式（顯示卡處理程式無法啟動：{why}）", flush=True)
-    CURRENT.cpu_fallback = why
     try:
-        return CPU_POOL.call(name, *args, progress=progress, low=True, **kw)
+        res = CPU_POOL.call(name, *args, progress=progress, low=True, **kw)
     except GpuStalled:
         raise   # CPU 處理程式開起來了、只是沒有回應：照一般的卡住處理
     except WorkerFailed as e:
         traceback.print_exc()
-        import pipeline as P
-        raise P.UserError(f"顯示卡和 CPU 處理程式都無法啟動：{e}（顯示卡處理程式：{why}）") from e
+        raise _unavailable(f"顯示卡和 CPU 處理程式都無法啟動：{e}（顯示卡處理程式：{why}）") from e
+    CURRENT.cpu_fallback = why   # Agy 審查 2：CPU 真的做完才記（失敗的那首不寫「改用 CPU 處理」）
+    return res
+
+
+def _cpu_call(name: str, args: tuple, progress, kw: dict):
+    """直播中直接用 CPU 處理程式（call 的 cpu=True）。開不起來也是處理程式開不起來的錯誤（第 7 批），這首直接失敗、
+    顯示原因；開起來但沒有回應照一般的卡住處理。"""
+    try:
+        return CPU_POOL.call(name, *args, progress=progress, low=True, **kw)
+    except GpuStalled:
+        raise
+    except WorkerFailed as e:
+        traceback.print_exc()
+        raise _unavailable(f"CPU 處理程式無法啟動：{e}") from e
+
+
+def _unavailable(msg: str):
+    """處理程式開不起來的錯誤：UserError（佇列直接顯示訊息），標 worker_unavailable，分離不會當成模型或精度的
+    問題去重試、退回聲像分離（jobs._no_worker）。"""
+    import pipeline as P
+    err = P.UserError(msg)
+    err.worker_unavailable = True
+    return err
 
 
 def call(name: str, *args, progress=None, cpu: bool = False, **kw):
@@ -776,7 +797,7 @@ def call(name: str, *args, progress=None, cpu: bool = False, **kw):
     顯示卡運算會被擠到幾乎停住，實測分離一首卡在 2% 好幾分鐘）。
     顯示卡處理程式開不起來時交給 CPU 處理程式（fork，第 7 批），接下來 10 分鐘也先不開，避免每首都等一次。"""
     if cpu:
-        return CPU_POOL.call(name, *args, progress=progress, low=True, **kw)
+        return _cpu_call(name, args, progress, kw)
     low = False
     try:
         import pipeline as P

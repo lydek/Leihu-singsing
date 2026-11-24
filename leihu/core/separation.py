@@ -817,7 +817,7 @@ def separate_uvr(d: Path, cfg: dict, report) -> bool:
         except JobCancelled:
             raise
         except Exception as e:
-            if not (vhq and autocast) or "out of memory" in str(e).lower() or "GpuStalled" in type(e).__name__:
+            if not (vhq and autocast) or "out of memory" in str(e).lower() or "GpuStalled" in type(e).__name__ or _no_worker(e):
                 raise
             log_error("autocast vocal separation", e)
             outs = _separate(vmodel, stem_path(d, "mix"), tmp, overlap, False, vlabel, report, 0.08, 0.26, cpu)
@@ -829,7 +829,7 @@ def separate_uvr(d: Path, cfg: dict, report) -> bool:
         raise
     except Exception as e:
         # fork（36）：和別首重疊處理時記憶體不夠，交給佇列一次一首重做，不在這裡退回標準模型
-        if not vhq or type(e).__name__ == "GpuStalled" or _overlap_oom(e):
+        if not vhq or type(e).__name__ == "GpuStalled" or _overlap_oom(e) or _no_worker(e):
             raise
         # 2.3.5：高品質人聲模型載入或執行失敗（模型檔損壞、顯示卡不支援…）：改用標準模型，不要整首退回聲像分離。
         # 模型檔核對不過就刪掉，下次會重新下載
@@ -868,7 +868,7 @@ def separate_uvr(d: Path, cfg: dict, report) -> bool:
         except JobCancelled:
             raise
         except Exception as e:
-            if _stalled(e) or not (hq and autocast) or "out of memory" in str(e).lower():
+            if _stalled(e) or not (hq and autocast) or "out of memory" in str(e).lower() or _no_worker(e):
                 raise
             log_error("autocast separation", e)
             outs2 = run_kara(kara, label, False)
@@ -879,7 +879,7 @@ def separate_uvr(d: Path, cfg: dict, report) -> bool:
     except Exception as e:
         # fork：顯示卡卡住交給 step_separate 改用 CPU（原本會在顯示卡上改用標準模型、不設 live_light）；
         # 36：重疊處理時記憶體不夠交給佇列重做
-        if not hq or _stalled(e) or _overlap_oom(e):
+        if not hq or _stalled(e) or _overlap_oom(e) or _no_worker(e):
             raise
         # 高品質模型下載失敗或顯示卡記憶體不夠：改用標準模型，不要整首失敗
         print(f"[separate] 高品質主唱分離失敗，改用標準模型：{type(e).__name__}: {e}", flush=True)
@@ -1001,8 +1001,8 @@ def step_separate(d: Path, cfg: dict, report) -> bool:
         except JobCancelled:
             raise   # fork（22）：停止、讓位不是分離失敗，不改跑聲像分離
         except Exception as e:
-            if _overlap_oom(e):
-                raise   # fork（36）：交給佇列一次一首重做
+            if _overlap_oom(e) or _no_worker(e):
+                raise   # fork（36）：交給佇列一次一首重做；第 7 批：處理程式開不起來直接失敗
             traceback.print_exc()
             notes.append(f"AI 分離失敗，改用聲像分離：{e}")
             separate_dsp(d, report)

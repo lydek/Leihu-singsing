@@ -88,6 +88,55 @@ def test_both_fail_reports_real_reason(G, monkeypatch, capsys):
     msg = str(e.value)
     assert msg.startswith("顯示卡和 CPU 處理程式都無法啟動") and "DLL load failed" in msg and "No module named 'torch'" in msg
     assert capsys.readouterr().err.count("Traceback") >= 2   # 兩次失敗都有完整 traceback
+    assert e.value.worker_unavailable
+    assert G.CURRENT.cpu_fallback is None   # Agy 審查 2：CPU 也失敗的那首不寫「改用 CPU 處理」
+
+
+def test_live_cpu_pool_start_failure_is_unavailable(G, monkeypatch):
+    """直播中直接用 CPU 處理程式（cpu=True）、它開不起來：一樣是處理程式開不起來的錯誤，分離不會去重試、退回。"""
+    import pipeline as P
+
+    monkeypatch.setattr(G.CPU_POOL, "call",
+                        lambda *a, **k: (_ for _ in ()).throw(G.WorkerFailed("CPU 處理程式啟動失敗（代碼 1）：ImportError: x")))
+    with pytest.raises(P.UserError) as e:
+        G.call("separate", "m", cpu=True)
+    assert str(e.value).startswith("CPU 處理程式無法啟動") and e.value.worker_unavailable
+
+
+def test_separation_fails_without_retry_when_no_worker(G, app_module, monkeypatch, tmp_path):
+    """Agy 審查 1：兩種處理程式都開不起來時，分離原本會當成混合精度、高品質模型的問題重試，累加 _HQ_FAIL、寫「高品質
+    人聲分離模型無法使用」，最後改跑聲像分離蓋掉分軌。現在第一次就直接失敗、顯示原因。"""
+    import numpy as np
+
+    import pipeline as P
+
+    sid = "cpufb0002"
+    d = P.LIB / sid
+    d.mkdir(parents=True, exist_ok=True)
+    try:
+        (d / "meta.json").write_text(json.dumps({"id": sid, "steps": {"import": True}, "notes": []}), "utf-8")
+        P.save_stem(d, "mix", np.full((2, 4410), 0.3, np.float32))
+        calls, dsp, checked = [], [], []
+
+        def _separate(model, *a, **k):
+            calls.append(model)
+            raise G._unavailable("顯示卡和 CPU 處理程式都無法啟動：探針")
+
+        for name, val in [("module_status", lambda: {"uvr": True}), ("is_acapella", lambda d: False),
+                          ("cuda_ok", lambda: True), ("hqv_ready", lambda: True), ("hq_ready", lambda: True),
+                          ("ensure_model", lambda *a, **k: None), ("_autocast_ok", lambda: True),
+                          ("_check_model_file", checked.append), ("_separate", _separate),
+                          ("separate_dsp", lambda d, report: dsp.append(d)), ("_HQ_FAIL", {"vocal": 0, "kara": 0})]:
+            monkeypatch.setattr(P, name, val)
+        cfg = {"vocal_quality": "auto", "karaoke_quality": "auto",
+               "separation_model": "std_vocal.onnx", "karaoke_model": "std_kara.onnx"}
+        with pytest.raises(P.UserError, match="都無法啟動"):
+            P.step_separate(d, cfg, lambda *a: None)
+        assert calls == [P.HQ_VOCAL]   # 不改一般精度重試、不換標準模型
+        assert dsp == [] and checked == [] and P._HQ_FAIL == {"vocal": 0, "kara": 0}
+        assert not any("高品質" in n for n in P.read_meta(d)["notes"])
+    finally:
+        shutil.rmtree(d, ignore_errors=True)
 
 
 def test_cpu_pool_stall_is_not_reported_as_start_failure(G, monkeypatch):

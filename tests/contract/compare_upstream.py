@@ -163,7 +163,7 @@ OWN_CHANGES: list[tuple[str, str]] = [
     # 複審 P3-5：讀不到顯示卡用量時畫面提示一次（next-version-plan.md）
     ("static/app.js", r"\+.*gpuErrWas.*"),
     # 第 7 批：顯示卡處理程式開不起來、暫時改用 CPU 時狀態列和 toast 提示（/api/status 的 gpu_fallback）
-    ("static/app.js", r"\+.*(gpuFbWas|syncGpuFallback|fbSum).*"),
+    ("static/app.js", r"\+.*(gpuFbWas|syncGpuFallback|fbSum|fbBar|fbOnly).*"),
 ]
 
 # 伺服器 log 裡代表「這次執行條件和平常不同」的訊息：一律列進報告，不然結果會被誤解
