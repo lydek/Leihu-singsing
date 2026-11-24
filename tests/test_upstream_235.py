@@ -297,10 +297,68 @@ def test_prioritize_queued_unfinished_runs_while_live(library_songs):
 
 def test_reprioritize_leaves_started_job_alone(library_songs):
     """複審 P3-4：取消 unfinished 工作時它剛好開始了，不能把執行中的工作停掉、也不重排。"""
+    import pipeline as P
     from leihu.web import system
 
     jobs, (_, b) = library_songs
     jid = jobs.submit("process", b, lambda r: None, label="unfinished")
     jobs.state[jid]["status"] = "running"
-    assert system._reprioritize_unfinished(b, jid) is None
+    with pytest.raises(P.UserError, match="正在處理中"):   # Codex r6-2：也不能往下補排一份
+        system._reprioritize_unfinished(b, jid)
     assert jobs.state[jid]["status"] == "running" and not jobs.state[jid].get("cancel")
+
+
+def test_double_prioritize_makes_one_replacement(library_songs, monkeypatch):
+    """Codex r6-2：連按兩次優先處理：第一次取消 unfinished、還沒重排時第二次進來看不到工作，又補排一份，
+    同一首歌排了兩個 separate,pitch。"""
+    import threading
+
+    import app
+    from leihu.web import system
+
+    jobs, (_, b) = library_songs
+    app.app.test_client().post("/api/upgrade-separation")
+    entered, go = threading.Event(), threading.Event()
+    real = system.submit_unfinished
+
+    def slow_submit(sid, steps, label=None):
+        entered.set()
+        go.wait(2)   # 第一次取消舊的、還沒重排
+        return real(sid, steps, label)
+
+    monkeypatch.setattr(system, "submit_unfinished", slow_submit)
+    codes = []
+
+    def press():
+        codes.append(app.app.test_client().post(f"/api/songs/{b}/prioritize").status_code)
+
+    t1 = threading.Thread(target=press)
+    t1.start()
+    assert entered.wait(2)
+    t2 = threading.Thread(target=press)
+    t2.start()
+    t2.join(0.3)
+    go.set()
+    t1.join(5)
+    t2.join(5)
+    mine = [j for j in jobs.state.values() if j["song"] == b and j["status"] == "queued"]
+    assert codes == [200, 200] and [j["label"] for j in mine] == ["separate,pitch"]
+
+
+def test_prioritize_started_between_check_and_cancel(library_songs, monkeypatch):
+    """Codex r6-2：看的時候還在排隊、取消前剛好開始了：回「這首正在處理中」，不能再補排一份。"""
+    import app
+    from leihu.web import system
+
+    jobs, (_, b) = library_songs
+    app.app.test_client().post("/api/upgrade-separation")
+    real_cancel = jobs.cancel
+
+    def cancel(jid, queued_only=False):
+        jobs.state[jid]["status"] = "running"   # 佇列剛好開始做
+        return real_cancel(jid, queued_only=queued_only)
+
+    monkeypatch.setattr(system.jobs, "cancel", cancel)
+    r = app.app.test_client().post(f"/api/songs/{b}/prioritize")
+    assert r.status_code == 400 and r.get_json()["error"] == "這首正在處理中"
+    assert [j["label"] for j in jobs.state.values() if j["song"] == b] == ["unfinished"]

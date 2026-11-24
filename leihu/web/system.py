@@ -226,16 +226,26 @@ def _reprioritize_unfinished(sid: str, old: str) -> str | None:
     """fork（複審 P3-4）：「重做全部歌曲」排的在 LIVE_BACKGROUND，只移到最前面直播中還是會暫停；
     取消後改用單首優先處理的步驟標籤重排到最前面（unfinished 一律是分離＋旋律）。已經不在排隊就回 None。"""
     if not jobs.cancel(old, queued_only=True):   # 剛好開始了就不動
+        if (jobs.get(old) or {}).get("status") == "running":   # Codex r6-2：不能再往下補排一份
+            raise P.UserError("這首正在處理中")
         return None
     jid = submit_unfinished(sid, ["separate", "pitch"])
     jobs.to_front(jid)
     return jid
 
 
+_PRIORITIZE_LOCK = threading.Lock()   # fork（Codex r6-2）：連按兩次時，第二次要看得到第一次重排的工作
+
+
 @bp.post("/api/songs/<sid>/prioritize")
 def prioritize(sid):
     """2.1.1「優先處理」：這首歌排到處理佇列最前面。
     已經在排隊 → 移到最前面；還沒排（沒下載完、沒分離完、旋律沒分析完、還沒升級高品質）→ 補排並放最前面。"""
+    with _PRIORITIZE_LOCK:
+        return _prioritize(sid)
+
+
+def _prioritize(sid):
     d = P.song_dir(sid)
     meta = P.read_meta(d)
     mine = [j for j in jobs.active() if j.get("song") == sid and j.get("kind") == "process"]
