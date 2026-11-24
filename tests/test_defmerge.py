@@ -400,3 +400,30 @@ def test_expect_both_deleted_is_same(tmp_path):
     old_s, new_s = tree(tmp_path / "old", {"pipeline.py": OLD}), tree(tmp_path / "new", {"pipeline.py": new})
     fork, expect = tree(tmp_path / "fork", {"pipeline.py": OLD}), tree(tmp_path / "expect", {"pipeline.py": new})
     assert D.run(old_s, new_s, fork, tmp_path / "out", expect=expect)["diffs"] == []
+
+
+# ---------------------------------------------------------------- 第 1 輪複審（2026-11-24）P3-10、P3-11
+
+
+def test_version_mark_already_in_content_is_manual(tmp_path):
+    """複審 P3-10（Codex r3-19）：內容裡本來就有版號記號，換回版號時會連它一起換掉，要手動。"""
+    old = OLD + f'\n\nUSER_AGENT = "LeihuLiantai/2.3.4 {D.VER_MARK}"\n'
+    new = old.replace("2.3.4", "2.3.5")
+    r, out = merge(tmp_path, {"pipeline.py": old, "VERSION": "2.3.4\n"}, {"pipeline.py": new, "VERSION": "2.3.5\n"},
+                   {"pipeline.py": old, "VERSION": "2.3.4.2\n"}, extra=["VERSION"])
+    assert any("版號記號" in x and "USER_AGENT" in x for x in r["report"] if x.startswith("手動"))
+    assert out("VERSION") == "2.3.5.1\n"   # 別的版號照常換
+
+
+@pytest.mark.parametrize(("code", "want"), [
+    ("@functools.cache(re)\ndef f():\n    return 1\n", True),         # 裝飾器載入時執行
+    ("def f(x=re.compile('x')):\n    return x\n", True),            # 預設值載入時執行
+    ("class C:\n    PAT = re.compile('x')\n", True),                 # 類別內容載入時執行
+    ("class C(re.Pattern):\n    pass\n", True),                      # 基底
+    ("def f():\n    return re.compile('x')\n", False),              # 函式內容要呼叫時才執行
+    ("class C:\n    def m(self):\n        return re\n", False),    # 方法內容也是
+])
+def test_used_before_counts_load_time_parts(code, want):
+    """複審 P3-11：原本整個略過函式和類別；裝飾器、預設參數、類別內容其實在載入時就會執行。"""
+    text = "import os\n" + code + "import sys\n"
+    assert D.used_before(text, "re", D.last_import_end(text)) is want

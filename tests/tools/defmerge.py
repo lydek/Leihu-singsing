@@ -212,14 +212,28 @@ def last_import_end(text: str) -> int:
     return end
 
 
+def uses_at_load(n: ast.AST, name: str) -> bool:
+    """這個模組層級敘述在載入時就會用到 name 嗎。函式只看裝飾器、預設值、型別註記（內容要呼叫時才執行）；
+    類別看裝飾器、基底、keywords 和類別內容（類別內容載入時就執行，裡面的方法照函式的規則）。
+    有 from __future__ import annotations 時註記不會執行，這裡照樣算（寧可多列手動）。"""
+    if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef)):
+        a = n.args
+        parts = [*n.decorator_list, *a.defaults, *a.kw_defaults, n.returns,
+                 *(x.annotation for x in (*a.posonlyargs, *a.args, *a.kwonlyargs, a.vararg, a.kwarg) if x)]
+    elif isinstance(n, ast.ClassDef):
+        return any(uses_at_load(p, name) for p in (*n.decorator_list, *n.bases, *n.keywords, *n.body))
+    else:
+        parts = [n]
+    return any(isinstance(x, ast.Name) and x.id == name for p in parts if p is not None for x in ast.walk(p))
+
+
 def used_before(text: str, name: str, line: int) -> bool:
-    """在 line（從 0 起）之前的模組層級敘述（不含 import、函式和類別的內容）有沒有用到 name。"""
+    """在 line（從 0 起）之前的模組層級敘述（不含 import）載入時有沒有用到 name（複審 P3-11：函式的裝飾器、
+    預設值和類別內容也算）。"""
     for n in ast.parse(text).body:
         if n.lineno - 1 >= line:
             break
-        if isinstance(n, (ast.Import, ast.ImportFrom, ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
-            continue
-        if any(isinstance(x, ast.Name) and x.id == name for x in ast.walk(n)):
+        if not isinstance(n, (ast.Import, ast.ImportFrom)) and uses_at_load(n, name):
             return True
     return False
 
@@ -286,8 +300,11 @@ class Merge:
         self.oldver = vold.strip() if vold else None
         self.upver = vnew.strip() if vnew else None
 
-    def vmerge(self, ours: str, base: str, theirs: str) -> tuple[str, int]:
-        """3.15：版號不管三方合併的結果，一律是「新上游版本＋.1」；版號以外照常三方合併（fork 的註解、網址會留著）。"""
+    def vmerge(self, ours: str, base: str, theirs: str) -> tuple[str | None, int]:
+        """3.15：版號不管三方合併的結果，一律是「新上游版本＋.1」；版號以外照常三方合併（fork 的註解、網址會留著）。
+        內容裡本來就有 VER_MARK 時回傳 (None, 0)：換回版號會連它一起換掉（Codex r3-19），要手動。"""
+        if any(VER_MARK in s for s in (ours, base, theirs)):
+            return None, 0
         o, b, t = unver(ours, self.oldver), unver(base, self.oldver), unver(theirs, self.upver)
         merged, c = (t, 0) if norm(o) == norm(b) else merge3(o, b, t)
         return merged.replace(VER_MARK, self.upver + ".1"), c
@@ -399,6 +416,9 @@ class Merge:
                 self.note("手動", f"{origin}:{name}：新上游的這個定義裡找不到版號 {self.upver}", "manual")
                 return
             merged, c = self.vmerge(d.src, base, theirs)
+            if merged is None:
+                self.note("手動", f"{origin}:{name}：內容裡本來就有版號記號 {VER_MARK}，不能自動換版號", "manual")
+                return
             kind, stat = ("版號", "version") if c == 0 else (f"衝突 {c} 處", "conflict")
         elif norm(d.src) == norm(base):
             merged, kind, stat = theirs, "直接換", "fast"
@@ -465,7 +485,7 @@ class Merge:
         return True, why
 
     def merged_uses_before(self, target: str, name: str, at: int) -> bool:
-        """這次合併進 target、放在 import 位置之前的模組層級定義（不是函式、類別）有沒有用到 name。"""
+        """這次合併進 target、放在 import 位置之前的模組層級定義，載入時有沒有用到 name（uses_at_load）。"""
         for nm, f in self.dest.items():
             if f != target or self.pos[nm] >= at:
                 continue
@@ -473,8 +493,7 @@ class Merge:
                 node = ast.parse(self.code[nm]).body[0]
             except (SyntaxError, IndexError):   # 有衝突標記：衝突已經列在報告裡
                 continue
-            if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)) and any(
-                    isinstance(x, ast.Name) and x.id == name for x in ast.walk(node)):
+            if uses_at_load(node, name):
                 return True
         return False
 
@@ -487,6 +506,9 @@ class Merge:
             return
         if path in VERSION_FILES and None not in (o, n, f) and self.upver and self.oldver:
             merged, c = self.vmerge(f.rstrip("\n"), o.rstrip("\n"), n.rstrip("\n"))
+            if merged is None:
+                self.note("手動", f"{path}：內容裡本來就有版號記號 {VER_MARK}，不能自動換版號", "manual")
+                return
             self.whole[path] = merged + ("\n" if n.endswith("\n") else "")
             self.note("版號" if c == 0 else f"衝突 {c} 處", path, "version" if c == 0 else "conflict")
         elif n is None:
