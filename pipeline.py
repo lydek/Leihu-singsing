@@ -3576,6 +3576,12 @@ GPU_CALM_SAMPLES = 3    # fork：判定忙碌後要連續這麼多次取樣（�
 GPU_STALE = 120         # fork：這麼久沒有成功取樣，就不再沿用舊的忙碌結果（不然 nvidia-smi 壞掉後會一直暫停）
 
 
+def _gpu_min_free(total: float | None) -> float:
+    """fork：剩下的顯示卡記憶體少於這個算被其他程式佔用。小於 5 GB 的卡光是桌面就剩不到 3.5 GB，
+    改成其他程式用掉超過 1.5 GB 才算；6 GB 以上的卡和原本一樣是 3.5 GB。"""
+    return min(GPU_MIN_FREE, total - 1.5e9) if total else GPU_MIN_FREE
+
+
 def gpu_stalled_mark(seconds: float = 300) -> None:
     """顯示卡處理程式剛剛卡住：接下來一段時間先當作顯示卡很忙。"""
     GPU_LOAD["stalled_until"] = time.time() + seconds
@@ -3606,7 +3612,7 @@ def _sample_gpu_load() -> None:
     free = (total - used) * 2**20
     GPU_LOAD.update(err="", ok_at=time.time(), free=free, total=total * 2**20, util=util,
                     hot=GPU_LOAD["hot"] + 1 if util >= GPU_BUSY_UTIL else 0,
-                    calm=GPU_LOAD["calm"] + 1 if util < GPU_BUSY_UTIL and free >= GPU_MIN_FREE else 0)
+                    calm=GPU_LOAD["calm"] + 1 if util < GPU_BUSY_UTIL and free >= _gpu_min_free(total * 2**20) else 0)
 
 
 def gpu_busy_reason() -> str:
@@ -3620,7 +3626,7 @@ def gpu_busy_reason() -> str:
         # fork：取樣一直失敗，舊的數字不能再用：忘掉它們（log 已經記了讀不到的原因）
         GPU_LOAD.update(free=None, util=None, hot=0, calm=0, busy="")
     free = GPU_LOAD["free"]
-    if free is not None and free < GPU_MIN_FREE:
+    if free is not None and free < _gpu_min_free(GPU_LOAD["total"]):
         GPU_LOAD["busy"] = f"顯示卡記憶體只剩 {free / 1e9:.1f} GB（被其他程式佔用）"
     elif GPU_LOAD["hot"] >= 2:
         GPU_LOAD["busy"] = f"顯示卡已被其他程式用到 {GPU_LOAD['util']:.0f}%"
@@ -5055,7 +5061,8 @@ def move_storage(target: str, what: list[str], report) -> dict:
         a, b = dir_size(dst)
         exp = sum(sz for s, d, sz in files if _inside(d, dst))
         if a != exp:
-            shutil.rmtree(dst, ignore_errors=True)
+            for _k, _src, dst2 in plan:   # fork：先複製好的那一項也要清，不然重試同一個位置會被擋（已經有檔案）
+                shutil.rmtree(dst2, ignore_errors=True)
             raise UserError("核對失敗：新位置的檔案總大小不符，已停止搬移（仍使用原本的位置）")
     cfg = load_config()
     old = list(cfg.get("storage_old", []))

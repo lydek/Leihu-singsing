@@ -203,8 +203,12 @@ def claude_align(sid):
         prev = t
     lrc = P.to_lrc([{"t": t, "text": txt} for t, txt in zip(clean, ref_lines)])
     P.atomic_write_text(d / "lyrics.lrc", lrc)
-    steps = dict(P.read_meta(d).get("steps") or {}, lyrics=True)
-    P.update_meta(d, steps=steps, lyrics_source="claude")   # Claude 回應要等一陣子，不能整段鎖住
+    # Claude 回應要等一陣子，不能整段鎖住；fork：寫回時鎖內重讀，只改 lyrics，不蓋掉期間背景記下的步驟
+    with P._META_LOCK:
+        m = P.read_meta(d)
+        m["steps"] = {**(m.get("steps") or {}), "lyrics": True}
+        m["lyrics_source"] = "claude"
+        P.write_meta(d, m)
     return jsonify(lrc=lrc, usage=usage)
 
 
