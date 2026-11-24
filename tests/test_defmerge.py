@@ -512,3 +512,13 @@ def test_star_import_is_manual(tmp_path):
     r, out = merge(tmp_path, {"pipeline.py": OLD}, {"pipeline.py": new}, {"pipeline.py": OLD})
     assert r["stats"]["imports"] == 0
     assert any("星號" in x for x in r["report"] if x.startswith("手動"))
+
+
+@pytest.mark.parametrize("fork_has", ["from leihu.mine import bar\n", "def bar():\n    return 1\n"])
+def test_new_import_shadowing_fork_name_is_manual(tmp_path, fork_has):
+    """第 2 輪 7：fork 已經有同名的 import 或定義，上游加 from foo import bar 會把它蓋掉，要手動。"""
+    new = OLD.replace("import os\n", "import os\nfrom foo import bar\n")
+    fork = OLD.replace("import os\n", "import os\n" + fork_has)
+    r, out = merge(tmp_path, {"pipeline.py": OLD}, {"pipeline.py": new}, {"pipeline.py": fork})
+    assert r["stats"]["imports"] == 0
+    assert any("同名" in x and "bar" in x for x in r["report"] if x.startswith("手動"))
