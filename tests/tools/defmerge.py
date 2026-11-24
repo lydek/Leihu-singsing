@@ -302,13 +302,20 @@ class Merge:
         self.oldver = vold.strip() if vold else None
         self.upver = vnew.strip() if vnew else None
 
-    def vmerge(self, ours: str, base: str, theirs: str) -> tuple[str | None, int]:
+    def vmerge(self, ours: str, base: str, theirs: str) -> tuple[str | None, int | str]:
         """3.15：版號不管三方合併的結果，一律是「新上游版本＋.1」；版號以外照常三方合併（fork 的註解、網址會留著）。
-        內容裡本來就有 VER_MARK 時回傳 (None, 0)：換回版號會連它一起換掉（Codex r3-19），要手動。"""
+        不能自動換時回傳 (None, 原因)，要手動：內容裡本來就有 VER_MARK（換回版號會連它一起換掉，Codex r3-19）；
+        三份裡有一份找不到該有的版號（fork 漏改、帶後綴，第 2 輪審查 2：三方合併會保留 fork 的舊版號、還回報成功）。"""
         if any(VER_MARK in s for s in (ours, base, theirs)):
-            return None, 0
+            return None, f"內容裡本來就有版號記號 {VER_MARK}，不能自動換版號"
         o, b, t = unver(ours, self.oldver), unver(base, self.oldver), unver(theirs, self.upver)
+        missing = [w for w, s, v in (("fork", o, self.oldver), ("舊上游", b, self.oldver), ("新上游", t, self.upver))
+                   if VER_MARK not in s]
+        if missing:
+            return None, f"{'、'.join(missing)}找不到版號 {self.oldver}／{self.upver}，不能自動換版號"
         merged, c = (t, 0) if norm(o) == norm(b) else merge3(o, b, t)
+        if c == 0 and VER_MARK not in merged:
+            return None, "合併後找不到版號，不能自動換版號"
         return merged.replace(VER_MARK, self.upver + ".1"), c
 
     def note(self, kind: str, msg: str, stat: str | None = None) -> None:
@@ -419,7 +426,7 @@ class Merge:
                 return
             merged, c = self.vmerge(d.src, base, theirs)
             if merged is None:
-                self.note("手動", f"{origin}:{name}：內容裡本來就有版號記號 {VER_MARK}，不能自動換版號", "manual")
+                self.note("手動", f"{origin}:{name}：{c}", "manual")
                 return
             kind, stat = ("版號", "version") if c == 0 else (f"衝突 {c} 處", "conflict")
         elif norm(d.src) == norm(base):
@@ -509,7 +516,7 @@ class Merge:
         if path in VERSION_FILES and None not in (o, n, f) and self.upver and self.oldver:
             merged, c = self.vmerge(f.rstrip("\n"), o.rstrip("\n"), n.rstrip("\n"))
             if merged is None:
-                self.note("手動", f"{path}：內容裡本來就有版號記號 {VER_MARK}，不能自動換版號", "manual")
+                self.note("手動", f"{path}：{c}", "manual")
                 return
             self.whole[path] = merged + ("\n" if n.endswith("\n") else "")
             self.note("版號" if c == 0 else f"衝突 {c} 處", path, "version" if c == 0 else "conflict")
