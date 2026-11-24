@@ -103,8 +103,20 @@ def test_hq_disabled_this_run_is_not_a_finished_upgrade(song, monkeypatch):
     import pipeline as P
 
     _fake_models(P, monkeypatch, hq_fail={"vocal": 2, "kara": 0})
-    assert P.hq_disabled()
+    assert P.hq_disabled(CFG)
     assert P.step_separate(song, dict(CFG), lambda *a: None) is True
+
+
+def test_failures_of_model_no_longer_wanted_do_not_count(song, monkeypatch):
+    """Codex r6-1：人聲高品質失敗兩次後改成「標準」、主唱維持高品質：原本 hq_disabled 只看失敗次數，背景補做整批跳過；
+    分離用足目前要求的品質也回報「沒用到要求的品質」，live_light 清不掉。"""
+    import pipeline as P
+
+    _fake_models(P, monkeypatch, hq_fail={"vocal": 2, "kara": 0})
+    cfg = dict(CFG, vocal_quality="standard")
+    assert not P.hq_disabled(cfg)
+    assert P.step_separate(song, cfg, lambda *a: None) is False
+    assert P.hq_disabled(CFG)   # 人聲還要高品質：照樣停用
 
 
 def test_standard_quality_requested_is_not_degraded(song, monkeypatch):
@@ -165,7 +177,7 @@ def _upgrade_once(monkeypatch, disabled_at_schedule: bool, disabled_at_run: bool
     monkeypatch.setattr(P, "load_config", lambda: {})
     monkeypatch.setattr(P, "live_status", lambda cfg: {"hold": False})
     monkeypatch.setattr(P, "hq_models_ready", lambda cfg: True)
-    monkeypatch.setattr(P, "hq_disabled", lambda: state["disabled"])
+    monkeypatch.setattr(P, "hq_disabled", lambda cfg: state["disabled"])
     monkeypatch.setattr(P, "list_songs", lambda: [{"id": SID, "live_light": True}])
     monkeypatch.setattr(P, "process_song", lambda sid, steps: lambda report: ran.append(sid))
     monkeypatch.setattr(B, "prerender_key", lambda sid: None)
