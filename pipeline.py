@@ -59,6 +59,22 @@ from leihu.pitch import (  # noqa: F401
 
 APP_NAME = "雷虎練唱台"
 ROOT = Path(__file__).resolve().parent
+PARTS_DIR = ROOT / "leihu" / "core"   # fork（拆檔，docs/pipeline-split-plan.md 方式一）：分出去的檔案
+_PARTS: list[str] = []                # 已載入的分出去的檔案（依載入順序）
+
+
+def _load_part(name: str) -> None:
+    """fork（拆檔，docs/pipeline-split-plan.md 方式一）：把 PARTS_DIR/<name>.py 載入這個模組的命名空間，等於那段程式
+    寫在呼叫的位置：P.<名稱> 是同一個物件，測試的替換、global 重新指派照常有效。呼叫要放在那段程式原本的位置
+    （模組層級有載入時就執行的敘述）。__future__ 的 annotations 明確指定、不靠繼承，型別註記和原本一樣不在載入時執行。"""
+    import __future__
+
+    p = PARTS_DIR / f"{name}.py"
+    code = compile(p.read_bytes().decode("utf-8"), str(p), "exec",
+                   flags=__future__.annotations.compiler_flag, dont_inherit=True)
+    exec(code, globals())   # noqa: S102  內容是 repo 裡的程式，和寫在這裡相同
+    _PARTS.append(name)
+
 # S28：使用者資料（歌曲庫、設定、用量、歌單、logs）的根目錄。測試用 LIANTAI_DATA 指到暫存資料夾；沒設時就是程式資料夾。
 # 只給伺服器（app.py）的測試用：桌面版、安裝程式不支援。相對路徑先轉成絕對路徑寫回環境變數，
 # gpu_worker 子程式（cwd 是 ROOT）繼承後才會指到同一個地方
