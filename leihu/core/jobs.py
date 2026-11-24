@@ -253,6 +253,24 @@ def parallel_ok() -> bool:
     return bool(info.get("ok")) and (info.get("vram") or 0) >= PARALLEL_MIN_VRAM
 
 
+def _cpu_fallback_note(song_id: str | None, why: str) -> None:
+    """fork（第 7 批）：顯示卡處理程式開不起來、這首改用 CPU 處理時，歌曲的說明寫原因（同一種只留最新一則，
+    和 2.3.5 的 _hq_fail_note 相同做法）。寫不了只記 log，不影響這首的結果。"""
+    if not song_id:
+        return
+    try:
+        d = song_dir(song_id)
+        if not (d / "meta.json").exists():
+            return
+        msg = f"顯示卡處理程式無法啟動，這首改用 CPU 處理：{str(why)[:160]}"
+        with _META_LOCK:
+            meta = read_meta(d)
+            meta["notes"] = [x for x in meta.get("notes", []) if not x.startswith("顯示卡處理程式無法啟動")] + [msg]
+            write_meta(d, meta)
+    except Exception as e:
+        log_error("cpu fallback note", e)
+
+
 class Jobs:
     """重工作的佇列。預設一次分離一首；分離完的那首在分析旋律、存檔時，下一首可以先開始分離（pipeline）。
     設定開啟「閒置時兩首同時分離」且沒在直播時，最多兩首同時分離。"""
@@ -593,6 +611,7 @@ class Jobs:
         G.CURRENT.check = check
         # fork（36）：和別首同時在跑、而且這首還沒因為記憶體不夠重做過（重做時照原本的方式退回標準模型）
         G.CURRENT.overlapping = lambda: self._overlapping(jid)
+        G.CURRENT.cpu_fallback = None   # fork（第 7 批）：gpu_worker 改用 CPU 處理程式時記下原因
         try:
             fn(report)
             self.update(jid, status="done", step="完成", progress=1.0)
@@ -635,7 +654,10 @@ class Jobs:
             else:
                 self.update(jid, status="error", error=f"{type(e).__name__}: {e}")
         finally:
-            G.CURRENT.check = G.CURRENT.overlapping = None
+            why = getattr(G.CURRENT, "cpu_fallback", None)
+            G.CURRENT.check = G.CURRENT.overlapping = G.CURRENT.cpu_fallback = None
+            if why:
+                _cpu_fallback_note((self.state.get(jid) or {}).get("song"), why)
             with self.cv:
                 self.running.pop(jid, None)
                 (self.state.get(jid) or {}).pop("pause", None)

@@ -42,7 +42,10 @@ def status():
     live = P.live_status(cfg)
     live["holding"] = jobs.holding
     live["paused"] = jobs.paused
-    return jsonify(version=VERSION, root=str(P.ROOT), modules=mods, cuda_note=P.CUDA_NOTE, hq=hq,
+    import gpu_worker as G  # 不會載入 torch
+    fb = G.broken_info()   # fork（第 7 批）：顯示卡處理程式開不起來、暫時改用 CPU 時才有這一欄（狀態列顯示）
+    return jsonify(**({"gpu_fallback": fb} if fb else {}),
+                   version=VERSION, root=str(P.ROOT), modules=mods, cuda_note=P.CUDA_NOTE, hq=hq,
                    vram=(P.gpu_info(block=False) or {}).get("vram"), parallel_ok=P.parallel_ok(),
                    hq_model=P.HQ_KARAOKE, hqv=hqv, live=live, yt=bool(cfg.get("yt_enabled")),
                    claude_ready=bool(cfg.get("anthropic_api_key") or os.environ.get("ANTHROPIC_API_KEY")),
