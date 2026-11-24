@@ -546,3 +546,48 @@ def test_cli_out_with_space():
     assert (a.out, a.all, a.refs) == ("foo", True, ["a", "b", "c"])
     a = D.parse_args(["a", "b", "--tree=t", "--out=o", "--expect=e"])
     assert (a.tree, a.out, a.expect, a.all) == ("t", "o", "e", False)
+
+
+# ---------------------------------------------------------------- 拆檔方式一：和 pipeline.py 共用命名空間（2026-11-24）
+
+PART_HEAD = "# 從 pipeline.py 搬出\n\n\n"
+FORK_MAIN = OLD.replace("\n\ndef b():\n    return 2\n", '\n\n_load_part("sep")\n')
+
+
+def test_shared_part_import_goes_to_pipeline(tmp_path):
+    """b() 用方式一搬到 leihu/core/sep.py（pipeline.py 有 _load_part("sep")），上游新增 import re 讓 b() 用：
+    共用命名空間，import 照樣加在 pipeline.py，不是手動。"""
+    new = OLD.replace("import os\n", "import os\nimport re\n").replace("    return 2\n", "    return re.compile('x')\n")
+    r, out = merge(tmp_path, {"pipeline.py": OLD}, {"pipeline.py": new},
+                   {"pipeline.py": FORK_MAIN, "leihu/core/sep.py": PART_HEAD + "def b():\n    return 2\n"})
+    assert r["stats"]["manual"] == 0 and r["stats"]["imports"] == 1
+    assert "import os\nimport re\n" in out("pipeline.py")
+    assert "re.compile('x')" in out("leihu/core/sep.py")
+
+
+def test_shared_part_new_definition_needs_no_import(tmp_path):
+    """上游新增 helper（放在 sep.py 的 b 後面），pipeline.py 的 a() 改成呼叫它：同一個命名空間，不用 import。"""
+    new = OLD.replace("    return x + y + z", "    return x + y + z + helper()") + "\n\ndef helper():\n    return 3\n"
+    r, out = merge(tmp_path, {"pipeline.py": OLD}, {"pipeline.py": new},
+                   {"pipeline.py": FORK_MAIN, "leihu/core/sep.py": PART_HEAD + "def b():\n    return 2\n"})
+    assert r["stats"]["manual"] == 0
+    assert "def helper" in out("leihu/core/sep.py")
+
+
+def test_core_module_without_load_call_is_still_separate(tmp_path):
+    """leihu/core/ 裡沒有被 _load_part 載入的是方式二的模組：上游新增的 import 照舊要手動放進那個檔案。"""
+    new = OLD.replace("import os\n", "import os\nimport re\n").replace("    return 2\n", "    return re.compile('x')\n")
+    fork_main = OLD.replace("\n\ndef b():\n    return 2\n", "\n")
+    r, _ = merge(tmp_path, {"pipeline.py": OLD}, {"pipeline.py": new},
+                 {"pipeline.py": fork_main, "leihu/core/sep.py": "def b():\n    return 2\n"})
+    assert any("leihu/core/sep.py" in x and "import re" in x for x in r["report"] if x.startswith("手動"))
+
+
+def test_shared_part_loaded_before_import_point(tmp_path):
+    """方式一的檔案在最後一個 import 之前就載入，裡面的定義載入時用到新的 import：加在後面會 NameError，要手動。"""
+    old = "import os\nPAT = None\nimport sys\n"
+    new = "import os\nimport re\nPAT = re.compile('x')\nimport sys\n"
+    fork = 'import os\n_load_part("early")\nimport sys\n'
+    r, _ = merge(tmp_path, {"pipeline.py": old}, {"pipeline.py": new},
+                 {"pipeline.py": fork, "leihu/core/early.py": PART_HEAD + "PAT = None\n"})
+    assert any("之前就用到 re" in x for x in r["report"] if x.startswith("手動"))

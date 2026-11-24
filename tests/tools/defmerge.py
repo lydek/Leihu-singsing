@@ -14,6 +14,9 @@ upstream_map.py 是「hunk 落在哪個定義 → 那個名稱現在在哪個檔
   運算式、解包指定、`X[...] =` 這類指定）的新增、改動、刪除都列為「手動」。
 - 其他檔案（gpu_worker.py、static/* 等）：整個檔案三方合併（fork 和舊上游相同就直接換），檔尾的空行照原樣。
 - 同一個敘述指定好幾個名稱（`A = B = 1`）、同一個檔案有兩個以上同名定義：不自動處理，列為「手動」。
+- 拆檔方式一（docs/pipeline-split-plan.md）：pipeline.py 用 `_load_part("名稱")` 載入的 leihu/core/<名稱>.py 和
+  pipeline.py 共用命名空間：用到上游新增 import 的定義在這些檔案裡，import 照樣加在 pipeline.py；在這些檔案之間
+  新增、使用定義不用 import。載入時就執行的部分，位置以 pipeline.py 裡載入它的那一行計算。
 
 用法（repo 根目錄，要先 git fetch upstream --tags）：
   python tests/tools/defmerge.py <舊上游> <新上游> <fork 的參照> --out=<資料夾> [--expect=<參照>] [--all]
@@ -54,6 +57,9 @@ PLACE: dict[str, str] = {
 VERSIONED = {"VERSION", "USER_AGENT"}   # 3.15：內容照新上游、版號改成「上游版本＋.1」
 VERSION_FILES = {"VERSION"}
 IMPORT_TARGET = {"pipeline.py": "pipeline.py"}   # 上游新增的 import 要加進哪個檔案；app.py 拆成很多檔案，要手動放
+# 拆檔方式一（docs/pipeline-split-plan.md）：pipeline.py 裡的 _load_part("名稱") 把 leihu/core/<名稱>.py 載入
+# pipeline 的命名空間。這些檔案和 pipeline.py 算同一個地方：不互相 import，上游新增的 import 一律加在 pipeline.py
+LOAD_RX = re.compile(r'(?m)^_load_part\("(\w+)"\)[ \t]*$')
 
 
 # ---------------------------------------------------------------- 讀檔
@@ -311,6 +317,7 @@ class Merge:
         self.whole: dict[str, str] = {}   # 整個檔案換掉的
         self.touched: set[tuple[str, str]] = set()   # 這次改到的 (來源檔案, fork 名稱)（驗證用）
         self.placed: list[tuple[str, str]] = []   # 上游新增的定義放在哪個檔案
+        self.shared: dict[str, int] = {}   # 方式一的檔案 → pipeline.py 裡載入它的那一行（從 0 起）
         self.dest: dict[str, str] = {}   # 合併後的定義 → 放在哪個檔案（import 依實際位置檢查）
         self.code: dict[str, str] = {}   # 合併後的定義 → 原始碼
         vold, vnew = old.read("VERSION"), new.read("VERSION")
@@ -389,6 +396,9 @@ class Merge:
                 self.texts[f] = t
                 for nm, ds in defs(t).items():
                     self.index.setdefault(nm, []).extend((f, x) for x in ds)
+        p = self.texts.get("pipeline.py") if "pipeline.py" in pats else None
+        if p:
+            self.shared = {f"leihu/core/{m.group(1)}.py": p.count("\n", 0, m.start()) for m in LOAD_RX.finditer(p)}
 
     def where(self, name: str):
         """(檔案, 定義)；找不到是 None，有兩個以上、或和別的名稱寫在同一個指定裡是 "ambiguous"。"""
@@ -503,7 +513,8 @@ class Merge:
             return False, ["__future__ 要放在檔案最前面"]
         if name == "*":   # 第 2 輪審查 6：看不出匯入哪些名稱，就找不到哪些檔案用到
             return False, ["星號 import 看不出哪些檔案用到"]
-        users = sorted({f for nm, f in self.dest.items() if re.search(rf"(?<![.\w]){re.escape(name)}\b", self.code[nm])})
+        users = sorted({self.canon(f) for nm, f in self.dest.items()
+                        if re.search(rf"(?<![.\w]){re.escape(name)}\b", self.code[nm])})
         elsewhere = [f for f in users if f != target]
         why = [f"用到它的定義在 {'、'.join(elsewhere)}"] if elsewhere else []
         if target not in self.texts or (users and target not in users):
@@ -512,17 +523,36 @@ class Merge:
         have = import_keys(text)
         if k in have:
             return False, why
-        if name in defs(text) or any(bound_name(x) == name for x in have):   # 第 2 輪審查 7：加了會蓋掉 fork 的
+        same = [text, *(self.texts[f] for f in self.shared if f in self.texts)] if target == "pipeline.py" else [text]
+        if any(name in defs(t) for t in same) or any(bound_name(x) == name for x in have):   # 第 2 輪審查 7
             return False, [*why, f"{target} 已經有同名的 {name}（import 或定義）"]
         at = last_import_end(text)
-        if used_before(text, name, at) or self.merged_uses_before(target, name, at):
+        if used_before(text, name, at) or self.merged_uses_before(target, name, at) or self.parts_use_before(name, at):
             return False, [*why, f"{target} 在 import 的位置之前就用到 {name}"]
         return True, why
 
+    def canon(self, f: str) -> str:
+        """和 pipeline.py 共用命名空間的檔案（方式一）算成 pipeline.py。"""
+        return "pipeline.py" if f in self.shared else f
+
+    def parts_use_before(self, name: str, at: int) -> bool:
+        """在 import 位置之前就載入的方式一檔案，載入時有沒有用到 name（整個檔案都在載入時執行）。"""
+        for f, line in self.shared.items():
+            if line < at and f in self.texts:
+                try:
+                    body = ast.parse(self.texts[f]).body
+                except SyntaxError:
+                    continue
+                if any(uses_at_load(n, name) for n in body if not isinstance(n, (ast.Import, ast.ImportFrom))):
+                    return True
+        return False
+
     def merged_uses_before(self, target: str, name: str, at: int) -> bool:
-        """這次合併進 target、放在 import 位置之前的模組層級定義，載入時有沒有用到 name（uses_at_load）。"""
+        """這次合併進 target、放在 import 位置之前的模組層級定義，載入時有沒有用到 name（uses_at_load）。
+        方式一檔案裡的定義，位置是 pipeline.py 裡載入它的那一行。"""
         for nm, f in self.dest.items():
-            if f != target or self.pos[nm] >= at:
+            pos = self.shared.get(f, self.pos[nm])
+            if self.canon(f) != target or pos >= at:
                 continue
             try:
                 node = ast.parse(self.code[nm]).body[0]
@@ -607,7 +637,7 @@ class Merge:
         library 都要 from .common import）。只列出來，不自動加：import 要和那個檔案原本的寫法排在一起。"""
         for name, target in self.placed:
             for f in sorted(self.texts):
-                if f == target:
+                if self.canon(f) == self.canon(target):   # 同一個檔案，或同一個命名空間（方式一）
                     continue
                 text = self.whole.get(f, self.texts[f])
                 if not re.search(rf"(?<![.\w]){re.escape(name)}\b", text):   # P.名稱 這種用法不用 import
