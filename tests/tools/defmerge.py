@@ -242,12 +242,14 @@ def used_before(text: str, name: str, line: int) -> bool:
 
 # ---------------------------------------------------------------- 規則
 def to_fork_style(src: str, origin: str) -> str:
-    """上游 app.py 的寫法換成 fork 的 Blueprint 寫法（和 upstream_map 相同）。只改裝飾器那一行，字串、註解不動。"""
+    """上游 app.py 的寫法換成 fork 的 Blueprint 寫法（和 upstream_map 相同）。裝飾器只改那一行（字串、註解不動）；
+    app.static_folder、app.response_class 換成 current_app.*（第 2 輪審查 4：原本漏了，Blueprint 裡沒有 app）。"""
     if origin != "app.py":
         return src
     src = re.sub(r"(?m)^(\s*)@app\.errorhandler", r"\1@bp.app_errorhandler", src)
     src = re.sub(r"(?m)^(\s*)@app\.before_request", r"\1@bp.before_app_request", src)
-    return re.sub(r"(?m)^(\s*)@app\.", r"\1@bp.", src)
+    src = re.sub(r"(?m)^(\s*)@app\.", r"\1@bp.", src)
+    return re.sub(r"\bapp\.(static_folder|response_class)\b", r"current_app.\1", src)
 
 
 VER_MARK = "@@DEFMERGE_VERSION@@"   # 不能用 NUL：git merge-file 會當成二進位檔
