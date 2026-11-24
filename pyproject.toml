@@ -69,3 +69,5 @@ ignore = [
 "leihu/core/process.py" = ["F821"]
 "leihu/core/youtube.py" = ["F821"]
 "leihu/core/batch_import.py" = ["F821"]
+"leihu/core/lyrics_search.py" = ["F821"]
+"leihu/core/voice_align.py" = ["F821"]
