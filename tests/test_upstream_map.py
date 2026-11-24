@@ -80,7 +80,9 @@ def test_current_index_knows_split_locations():
     assert idx["main"] == ["app.py"]
     assert idx["clean_pitch"] == ["leihu/pitch.py"]
     assert idx["parse_lrc"] == ["leihu/lyrics_text.py"]
-    assert idx["process_song"] == ["pipeline.py"]
+    assert idx["song_dir"] == ["pipeline.py"]
+    assert idx["process_song"] == ["leihu/core/process.py"]   # 拆檔步驟 3
+    assert "leihu/core/".startswith(U.MOVED_TO["pipeline.py"])
 
 
 def test_trim_blank_context_for_moved_hunks():

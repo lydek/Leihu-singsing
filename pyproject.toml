@@ -60,6 +60,12 @@ ignore = [
 "tests/**" = ["S101"]   # pytest 用 assert
 # 拆檔方式一（docs/pipeline-split-plan.md）：pipeline.py 和 _load_part 載入的檔案共用命名空間，ruff 看不到彼此的名稱。
 # 這幾個檔案的未定義名稱改由 tests/test_pipeline_split.py 用 symtable 檢查（函式裡的筆誤也抓得到）。每搬一個檔案就登記一行
-"pipeline.py" = ["F821"]
+# pipeline.py 另外排除 F401、F811：import 留在 pipeline.py、只有分出去的檔案用到時會誤報；改由
+# test_shared_namespace_imports_used_and_names_unique 檢查。轉出用的 import 照舊寫 noqa: F401（那個測試靠它分辨），
+# 排除 F401 後 ruff 會說這些 noqa 沒用（RUF100），所以 RUF100 也排除（拆檔前 pipeline.py 沒有 RUF100）
+"pipeline.py" = ["F821", "F401", "F811", "RUF100"]
 "leihu/core/jobs.py" = ["F821"]
 "leihu/core/separation.py" = ["F821"]
+"leihu/core/process.py" = ["F821"]
+"leihu/core/youtube.py" = ["F821"]
+"leihu/core/batch_import.py" = ["F821"]
