@@ -52,26 +52,141 @@ def test_hq_failure_note_survives_step_separate(song, monkeypatch):
     assert "別的說明" in notes
 
 
-@pytest.mark.parametrize(("vocal_model", "karaoke", "want_light"), [
-    ("bs_roformer", "HQ", False),     # 要求的高品質都用到了：補做完成
-    ("mdx", "HQ", True),              # 人聲高品質失敗改標準
-    ("bs_roformer", "std", True),     # 主唱高品質失敗改標準
+def _fake_models(P, monkeypatch, fail=(), hq_fail=None):
+    """真的跑 separate_uvr，只換掉模型推論：fail 裡的高品質模型（"vocal"／"kara"）載入失敗。"""
+    import soundfile as sf
+
+    monkeypatch.setattr(P, "module_status", lambda: {"uvr": True})
+    monkeypatch.setattr(P, "is_acapella", lambda d: False)
+    monkeypatch.setattr(P, "cuda_ok", lambda: True)
+    monkeypatch.setattr(P, "hqv_ready", lambda: True)
+    monkeypatch.setattr(P, "hq_ready", lambda: True)
+    monkeypatch.setattr(P, "ensure_model", lambda *a, **k: None)
+    monkeypatch.setattr(P, "_autocast_ok", lambda: False)
+    monkeypatch.setattr(P, "_check_model_file", lambda name: None)
+    monkeypatch.setattr(P, "fix_lead_gaps", lambda d: None)
+    monkeypatch.setattr(P, "harmony_ratio", lambda d: None)
+    monkeypatch.setattr(P, "_HQ_FAIL", dict(hq_fail or {"vocal": 0, "kara": 0}))
+
+    def _separate(model, inp, tmp, *a):
+        if (model == P.HQ_VOCAL and "vocal" in fail) or (model == P.HQ_KARAOKE and "kara" in fail):
+            raise RuntimeError("模型載入失敗")
+        outs = []
+        for kind in ("Vocals", "Instrumental"):
+            out = tmp / f"{model}_({kind}).wav"
+            sf.write(str(out), np.full((N, 2), 0.1, np.float32), P.SR)
+            outs.append(out)
+        return outs
+
+    monkeypatch.setattr(P, "_separate", _separate)
+
+
+CFG = {"vocal_quality": "auto", "karaoke_quality": "auto",
+       "separation_model": "std_vocal.onnx", "karaoke_model": "std_kara.onnx"}
+
+
+@pytest.mark.parametrize(("fail", "want_light"), [
+    ((), False),           # 要求的高品質都用到了：補做完成
+    (("vocal",), True),    # 這次人聲高品質失敗改標準
+    (("kara",), True),     # 這次主唱高品質失敗改標準
 ])
-def test_standard_fallback_is_not_a_finished_upgrade(song, monkeypatch, vocal_model, karaoke, want_light):
+def test_standard_fallback_is_not_a_finished_upgrade(song, monkeypatch, fail, want_light):
     """r5-3：補做高品質時高品質失敗改用標準模型，step_separate 原本回 False，呼叫端清掉 live_light、之後不再補做。"""
     import pipeline as P
 
-    kara = P.HQ_KARAOKE if karaoke == "HQ" else "std_kara.onnx"
-    _fake_separate(P, monkeypatch, vocal_model, kara, fail_note=False)
-    got = P.step_separate(song, {"vocal_quality": "auto", "karaoke_quality": "auto"}, lambda *a: None)
-    assert got is want_light
+    _fake_models(P, monkeypatch, fail)
+    assert P.step_separate(song, dict(CFG), lambda *a: None) is want_light
+
+
+def test_hq_disabled_this_run_is_not_a_finished_upgrade(song, monkeypatch):
+    """複審 P2-1：高品質這次執行已停用（連續失敗 2 次），直接用標準模型，也不算補做完成。"""
+    import pipeline as P
+
+    _fake_models(P, monkeypatch, hq_fail={"vocal": 2, "kara": 0})
+    assert P.hq_disabled()
+    assert P.step_separate(song, dict(CFG), lambda *a: None) is True
 
 
 def test_standard_quality_requested_is_not_degraded(song, monkeypatch):
+    """複審 P2-1：設定本來就要標準模型，不是「沒用到要求的品質」（原本的副本判斷靠設定重算）。"""
     import pipeline as P
 
-    _fake_separate(P, monkeypatch, "mdx", "std_kara.onnx", fail_note=False)
-    assert P.step_separate(song, {"vocal_quality": "standard", "karaoke_quality": "standard"}, lambda *a: None) is False
+    _fake_models(P, monkeypatch)
+    cfg = dict(CFG, vocal_quality="standard", karaoke_quality="standard")
+    assert P.step_separate(song, cfg, lambda *a: None) is False
+
+
+@pytest.mark.parametrize(("fail", "keep"), [((), False), (("vocal",), True)])
+def test_process_song_keeps_live_light_on_fallback(song, monkeypatch, fail, keep):
+    """複審 P2-1：補做（process_song）途中高品質失敗改標準，live_light 要留著；都用到高品質才清掉。"""
+    import pipeline as P
+
+    _fake_models(P, monkeypatch, fail)
+    P.update_meta(song, live_light=True)
+    monkeypatch.setattr(P, "load_config", lambda: dict(CFG))
+    monkeypatch.setattr(P, "live_light_cfg", lambda cfg: None)
+    monkeypatch.setattr(P, "measure_stem_loudness", lambda d: None)
+    P.process_song(SID, ["separate"])(lambda *a: None)
+    assert bool(P.read_meta(song).get("live_light")) is keep
+
+
+@pytest.mark.parametrize(("fail", "keep"), [((), False), (("kara",), True)])
+def test_fine_job_keeps_live_light_on_fallback(song, monkeypatch, fail, keep):
+    """複審 P2-1：精細處理（高品質模型都在時等於補做）途中高品質失敗改標準，不算補做完成。"""
+    import pipeline as P
+
+    _fake_models(P, monkeypatch, fail)
+    P.update_meta(song, live_light=True)
+    monkeypatch.setattr(P, "load_config", lambda: dict(CFG))
+    monkeypatch.setattr(P, "step_pitch", lambda d, cfg, report: None)
+    P.fine_job(SID)(lambda *a: None)
+    assert bool(P.read_meta(song).get("live_light")) is keep
+
+
+class _Stop(BaseException):
+    pass
+
+
+def _upgrade_once(monkeypatch, disabled_at_schedule: bool, disabled_at_run: bool):
+    """跑一輪 live_light_upgrade：回傳排了幾個工作、排進去的工作執行時有沒有真的處理。"""
+    import pipeline as P
+    from leihu.web import background as B
+
+    sleeps = []
+
+    def sleep(s):
+        sleeps.append(s)
+        if len(sleeps) > 1:   # 第一次是開程式後的等待，第二次是一輪結束
+            raise _Stop()
+
+    state = {"disabled": disabled_at_schedule}
+    submitted, ran = [], []
+    monkeypatch.setattr(B.time, "sleep", sleep)
+    monkeypatch.setattr(P, "load_config", lambda: {})
+    monkeypatch.setattr(P, "live_status", lambda cfg: {"hold": False})
+    monkeypatch.setattr(P, "hq_models_ready", lambda cfg: True)
+    monkeypatch.setattr(P, "hq_disabled", lambda: state["disabled"])
+    monkeypatch.setattr(P, "list_songs", lambda: [{"id": SID, "live_light": True}])
+    monkeypatch.setattr(P, "process_song", lambda sid, steps: lambda report: ran.append(sid))
+    monkeypatch.setattr(B, "prerender_key", lambda sid: None)
+    monkeypatch.setattr(B.jobs, "find", lambda *a: None)
+    monkeypatch.setattr(B.jobs, "submit", lambda kind, sid, fn, label: submitted.append(fn))
+    with pytest.raises(_Stop):
+        B.live_light_upgrade()
+    state["disabled"] = disabled_at_run
+    for fn in submitted:
+        fn(lambda *a: None)
+    return len(submitted), ran
+
+
+@pytest.mark.parametrize(("at_schedule", "at_run", "want"), [
+    (False, False, (1, [SID])),   # 高品質可用：照常補做
+    (True, True, (0, [])),        # 高品質這次執行已停用：不排（原本每次開程式都整批用標準模型重做）
+    (False, True, (1, [])),       # 排隊期間停用了：執行時跳過，標記留著
+])
+def test_live_light_upgrade_skips_when_hq_disabled(app_module, monkeypatch, at_schedule, at_run, want):
+    """複審 P2-1：高品質一直失敗的電腦上，live_light_upgrade 不要每次開程式都把所有 live_light 的歌用標準模型重做。"""
+    assert _upgrade_once(monkeypatch, at_schedule, at_run) == want
 
 
 def test_bad_model_resets_only_its_own_download_state(app_module, monkeypatch, tmp_path):
