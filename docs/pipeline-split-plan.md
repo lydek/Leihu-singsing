@@ -110,7 +110,7 @@ PR #26 合併後，`tests/tools/defmerge.py` 以定義為單位三方合併，fo
 | 步驟 | 內容 | 方式 |
 |---|---|---|
 | 0 | 載入機制與檢查，搬移本身寫成可以重跑的腳本（`tests/tools/`），之後能套到舊 commit 上做模擬同步：<br>・`pipeline.py` 的載入函式，照第 3 節的規格（位置、`__future__` 旗標）<br>・`symtable` 名稱檢查的測試<br>・搬移前後的 AST 比對腳本<br>・「`pipeline` 的名稱齊全、是同一個物件」的測試<br>・`defmerge.py` 支援共用命名空間（含單元測試）<br>・`installer/build.sh` 複製 `leihu/core/*.py`。目前寫死只複製 `leihu/*.py`、`leihu/web/*.py`，不改的話測試版啟動就會失敗；`leihu.nsi` 用 `File /r "payload\*"`，不用改<br>**2026-11-24 完成**，見表下說明 | 只加工具，不搬程式 |
-| 1 | `Jobs` 和直播中暫停背景處理（`JobCancelled`、`JobDeferred`、`live_status`、`LIVE_BACKGROUND` 等，約 700 行）→ `leihu/core/jobs.py` | 方式一 |
+| 1 | `Jobs` 和直播中暫停背景處理（`JobCancelled`、`JobDeferred`、`live_status`、`LIVE_BACKGROUND` 等，約 700 行）→ `leihu/core/jobs.py`。**2026-11-24 完成**，見表下說明 | 方式一 |
 | 2 | 分離（78 個定義、約 900 行）→ `leihu/core/separation.py` | 方式一 |
 | 3 | `process_song` 等處理流程、YouTube 與批次匯入 → `leihu/core/process.py`、`leihu/core/youtube.py` | 方式一 |
 | 4 | 線上歌詞搜尋、依主唱聲音對時間 → `leihu/core/lyrics_search.py`、`leihu/core/voice_align.py` | 方式一 |
@@ -121,6 +121,18 @@ PR #26 合併後，`tests/tools/defmerge.py` 以定義為單位三方合併，fo
 - `tests/tools/split_check.py`（`symtable` 名稱檢查、和搬移前的 git 參照比對每個定義）、`tests/tools/split_moves.py`（搬一段連續的定義，原位置留 `_load_part`）、`installer/build.sh` 打包 `leihu/core/`、`defmerge.py` 支援共用命名空間。
 - `tests/test_pipeline_split.py` 在 `pipeline.py` 的副本上真的搬了「分類」一段（`_cats_path` 讀執行中重新指派的 `LIB`），import 起來的名稱檢查、AST 比對、`P.LIB` 重新指派後的行為都對。
 - 還沒做、留到步驟 1：ruff 的 F821 逐檔排除（還沒有方式一的檔案）；模擬同步。`defmerge.py` 的 `--expect` 只吃 git 參照，搬移後的 `43ddbb0` 要先 commit 到暫時的分支，或讓 `--expect` 也能用資料夾。
+
+**步驟 1 的結果（2026-11-24）**：
+- 範圍是 `pipeline.py` 從 `_overlap_oom` 到 `Jobs` 的 640 行（含 `JobCancelled`、`JobDeferred`、直播判斷、顯示卡忙碌判斷、`LIVE_BACKGROUND`、`wants_hq`、`hq_models_ready`、`parallel_ok`、`Jobs`），用 `split_moves.py jobs _overlap_oom Jobs` 搬。`process_song`、早一步找歌詞、`search_lyrics_later`、檔尾的 `ffmpeg_path()` 留給步驟 3。
+- ruff：拆檔後 `pipeline.py` 也用到分出去的名稱（23 處 F821），所以 `pipeline.py` 和 `leihu/core/jobs.py` 都逐檔排除 F821，`symtable` 檢查也涵蓋 `pipeline.py`；測試確認排除清單只有這幾個檔案。全 repo 仍是 311。
+- `split_check.py 4713179`：330 個定義都在、逐字相同，整份還原也相同。`split_check` 改成先把搬移前的 `_load_part` 換回當時的檔案，之後的步驟也比得到前面分出去的檔案。
+- pytest 457 項全過。契約：`check_snapshot.py` 兩次都是 144 個案例和快照相同、94 條路由都有案例。
+- CPU 數值基準（`fc657e0`，測試計畫 `refactor`，1 次，1117.0 秒）：異常「無」，和 `80aed5b` 逐檔 38／38 相同。
+- 啟動時間（內嵌 Python，和 `80aed5b` 交錯各 15 次）：`import pipeline, share` 0.230 → 0.220 秒，`import app` 0.424 → 0.434 秒，範圍重疊，看不出差別。
+- 模擬同步：
+  - 把同樣的搬移套到 `263833a`、`43ddbb0`（起點是 `JobCancelled`：`_overlap_oom` 是第 5 批才加的），用 `defmerge.py` 同步 2.3.5，`--expect` 用搬移後的 `43ddbb0` 資料夾：「不同的定義」無；手動 3 項（`submit_unfinished` 的 import）和空行位置，都和沒拆檔時完全相同。2.3.5 沒有改到這一段。
+  - 合成：在拆好的程式上模擬上游在 `Jobs` 加方法（用新的 `import html`）、在 `Jobs` 後面新增定義：`Jobs` 三方合併進 `jobs.py`，新定義放進 `jobs.py`，`import html` 自動加在 `pipeline.py`，手動 0 項；合併後的程式 import 起來能執行，名稱檢查通過。
+- 安裝檔：交給 PR 的 installer workflow。
 
 每一步搬完，`pipeline.py` 留下設定、檔案、共用的小函式，以及依序載入各檔案的那幾行。
 
