@@ -56,7 +56,7 @@ python tests/tools/defmerge.py <舊上游> <新上游> --tree=<資料夾> --out=
 10. 不自動處理、列為「手動」的：同一個敘述指定好幾個名稱（`A = B = 1`）、同一個檔案有兩個以上同名定義、解包指定與 `X[...] =` 這類指定（歸在模組層級敘述）、上游刪掉的模組層級敘述與 import、用到它的定義搬到別的檔案的新 import、`__future__`、在 import 位置之前就用到的新 import、替換範圍互相重疊的檔案。
 11. 套用編輯：同一個位置的插入照上游順序合成一塊；同一個起點先替換、再插入；替換範圍重疊的整個檔案不寫出。
 12. 比對「有沒有改過」只去掉頭尾空行，行尾空白、註解都算（三引號字串裡的行尾空白是資料）；Blueprint 改寫只改裝飾器那一行；整個檔案合併保留檔尾空行；git 參照打錯直接中止，不當成檔案不存在。
-13. 單元測試：`tests/test_defmerge.py`（52 個測試函式，含參數化共 64 項；舊上游、新上游、fork 都用暫存資料夾，讀二進位檔那一項用這個 repo 的 `HEAD`）。
+13. 單元測試：`tests/test_defmerge.py`（51 個測試函式，含參數化共 64 項；舊上游、新上游、fork 都用暫存資料夾，讀二進位檔那一項用這個 repo 的 `HEAD`）。
 14. 不能自動處理的也列為「手動」、不寫出（PR #26 審查）：從 git 參照讀到二進位檔；fork、舊上游、新上游有一份找不到該有的版號；`git merge-file` 執行失敗（不是有衝突）；星號 import；新增的 import 和目標檔案裡同名的 import 或定義衝突。衝突標記固定用 merge 樣式（不受使用者的 `merge.conflictStyle` 影響）；`app.static_folder`、`app.response_class` 和 `upstream_map` 一樣換成 `current_app.*`；命令列用 argparse，拼錯的選項回報錯誤。
 
 ## 5. 驗證

@@ -324,8 +324,7 @@ class Merge:
         if any(VER_MARK in s for s in (ours, base, theirs)):
             return None, f"內容裡本來就有版號記號 {VER_MARK}，不能自動換版號"
         o, b, t = unver(ours, self.oldver), unver(base, self.oldver), unver(theirs, self.upver)
-        missing = [w for w, s, v in (("fork", o, self.oldver), ("舊上游", b, self.oldver), ("新上游", t, self.upver))
-                   if VER_MARK not in s]
+        missing = [w for w, s in (("fork", o), ("舊上游", b), ("新上游", t)) if VER_MARK not in s]
         if missing:
             return None, f"{'、'.join(missing)}找不到版號 {self.oldver}／{self.upver}，不能自動換版號"
         merged, c = (t, 0) if norm(o) == norm(b) else merge3(o, b, t)
@@ -450,10 +449,7 @@ class Merge:
     def _merge_def(self, origin: str, name: str, d: Def, base: str, theirs: str) -> tuple[str, str, str] | None:
         """(合併結果, 報告的種類, 統計欄位)；要手動時已經記在報告裡，回傳 None。"""
         if name in VERSIONED and self.upver and self.oldver:
-            if VER_MARK not in unver(theirs, self.upver):
-                self.note("手動", f"{origin}:{name}：新上游的這個定義裡找不到版號 {self.upver}", "manual")
-                return None
-            merged, c = self.vmerge(d.src, base, theirs)
+            merged, c = self.vmerge(d.src, base, theirs)   # 三份各自找不到版號時 vmerge 回傳原因
             if merged is None:
                 self.note("手動", f"{origin}:{name}：{c}", "manual")
                 return None
