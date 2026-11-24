@@ -43,8 +43,12 @@ jobs:
         shell: pwsh
         run: |
           $nsis = "${env:ProgramFiles(x86)}\NSIS"
-          if (-not (Test-Path "$nsis\makensis.exe")) { choco install nsis -y --no-progress }
-          if (-not (Test-Path "$nsis\makensis.exe")) { throw "找不到 makensis.exe" }
+          # Chocolatey 套件站偶爾回 504：最多試 3 次，間隔 30、60 秒
+          for ($i = 1; $i -le 3 -and -not (Test-Path "$nsis\makensis.exe"); $i++) {
+            if ($i -gt 1) { Write-Host "NSIS 安裝失敗，$(30 * ($i - 1)) 秒後重試（第 $i 次）"; Start-Sleep (30 * ($i - 1)) }
+            choco install nsis -y --no-progress
+          }
+          if (-not (Test-Path "$nsis\makensis.exe")) { throw "找不到 makensis.exe（choco install nsis 試了 3 次）" }
           Add-Content $env:GITHUB_PATH $nsis
           & "$nsis\makensis.exe" -VERSION
       - name: 建安裝檔
