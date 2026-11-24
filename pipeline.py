@@ -4089,7 +4089,9 @@ class Jobs:
         except Exception as e:
             traceback.print_exc()
             if ("out of memory" in str(e).lower() and not self.state[jid].get("oom_retry")
-                    and (len(self.running) > 1 or getattr(e, "overlap_oom", False))):   # fork（36）：判定時是重疊處理
+                    and (self._overlapping(jid) or getattr(e, "overlap_oom", False))):
+                # fork（36）：判定時是重疊處理；複審 P3-8：別首剛做完（OVERLAP_GRACE 內）也算，旋律分析這類
+                # 沒經過 _overlap_oom 的 OOM 才不會因為另一首剛好先做完就直接變成錯誤
                 # 兩首同時處理時顯示卡記憶體不夠：接下來十分鐘只處理一首，這首排回最前面重做
                 self.oom_until = time.time() + 600
                 free_gpu()
