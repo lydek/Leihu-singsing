@@ -591,3 +591,122 @@ def test_shared_part_loaded_before_import_point(tmp_path):
     r, _ = merge(tmp_path, {"pipeline.py": old}, {"pipeline.py": new},
                  {"pipeline.py": fork, "leihu/core/early.py": PART_HEAD + "PAT = None\n"})
     assert any("之前就用到 re" in x for x in r["report"] if x.startswith("手動"))
+
+
+# ---------------------------------------------------------------- 逐個上游 commit 同步：--next（2026-11-28）
+
+
+def _repo(root: Path, monkeypatch) -> callable:
+    """暫存 git repo：舊上游 → 上游 3 個 commit；fork 從舊上游分出去。cwd 換到 repo。"""
+    import subprocess
+
+    def g(*args: str) -> str:
+        return subprocess.run(["git", "-c", "user.name=t", "-c", "user.email=t@t", *args], cwd=root,
+                              capture_output=True, check=True).stdout.decode("utf-8").strip()
+
+    root.mkdir()
+    g("init", "-q", "-b", "up")
+    g("config", "core.autocrlf", "false")
+    monkeypatch.chdir(root)
+    return g
+
+
+def _commit(g, root: Path, text: str, msg: str) -> str:
+    (root / "pipeline.py").write_text(text, "utf-8", newline="\n")
+    g("add", "pipeline.py")
+    g("commit", "-q", "-m", msg)
+    return g("rev-parse", "HEAD")
+
+
+def test_next_commit_skips_synced_trailers(tmp_path, monkeypatch):
+    """trailer 用完整 sha 或至少 7 碼的縮寫都算同步過；都同步過時回傳 None。"""
+    root = tmp_path / "r"
+    g = _repo(root, monkeypatch)
+    old = _commit(g, root, OLD, "old")
+    u = [_commit(g, root, OLD.replace("return 2", f"return {i}"), f"u{i}") for i in (1, 2, 3)]
+    assert D.next_commit(old, u[2], []) == (1, 3, u[0])
+    assert D.next_commit(old, u[2], [u[0][:7]]) == (2, 3, u[1])
+    assert D.next_commit(old, u[2], [u[0][:6]]) == (1, 3, u[0])   # 太短的縮寫不算
+    assert D.next_commit(old, u[2], u) == (3, 3, None)
+
+
+def test_next_merges_one_commit_into_worktree(tmp_path, monkeypatch, capsys):
+    """--next：fork 改 a()、上游第 1 個 commit 改 b()，寫回工作目錄；commit 帶 trailer 之後換第 2 個；
+    工作目錄有沒 commit 的修改時不跑。"""
+    root = tmp_path / "r"
+    g = _repo(root, monkeypatch)
+    old = _commit(g, root, OLD, "old")
+    u1 = _commit(g, root, OLD.replace("return 2", "return 22"), "u1")
+    u2 = _commit(g, root, OLD.replace("return 2", "return 222"), "u2")
+    g("switch", "-q", "-c", "fork", old)
+    fork = OLD.replace("    x = 1\n", "    x = 10   # fork\n")
+    _commit(g, root, fork, "fork")
+
+    assert D.step(old, u2, None) == 0
+    got = (root / "pipeline.py").read_text("utf-8")
+    assert "x = 10   # fork" in got and "return 22\n" in got
+    assert f'git commit -c {u1} --trailer "Upstream-commit: {u1}"' in capsys.readouterr().out
+    with pytest.raises(SystemExit, match="還沒 commit"):
+        D.step(old, u2, None)
+
+    g("commit", "-q", "-a", "-C", u1, "--trailer", f"Upstream-commit: {u1}")
+    assert g("log", "-1", "--format=%s") == "u1"   # -C 沿用上游的說明
+    assert D.step(old, u2, None) == 0
+    assert "return 222\n" in (root / "pipeline.py").read_text("utf-8")
+    g("commit", "-q", "-a", "-m", f"u2\n\nUpstream-commit: {u2[:7]}")
+    assert D.step(old, u2, None) == 0
+    assert "都同步過了" in capsys.readouterr().out
+
+
+@pytest.mark.parametrize("argv", [["a", "b", "--next", "--out=o"], ["a", "b", "--next", "--tree=t"],
+                                  ["a", "b", "--next", "--all"], ["a", "b", "c", "--next"]])
+def test_cli_next_rejects_other_modes(argv):
+    with pytest.raises(SystemExit) as e:
+        D.parse_args(argv)
+    assert e.value.code == 2
+
+
+def test_cli_next():
+    a = D.parse_args(["a", "b", "--next", "--expect=e"])
+    assert (a.next, a.refs, a.expect, a.out) == (True, ["a", "b"], "e", None)
+
+
+def test_next_leaves_untracked_files_and_records_empty_sync(tmp_path, monkeypatch, capsys):
+    """Codex 審查 P1：沒追蹤的檔案不能動（git checkout 救不回來）：舊的 b() 留在沒追蹤的 leihu/scratch.py，
+    上游刪掉 b() 時不能刪到它；上游新增的檔案和沒追蹤的檔案同名時不寫出。
+    P2：上游刪掉的 b() fork 早就刪了，合併沒有改動，要印 --allow-empty，commit 之後才會換下一個。"""
+    root = tmp_path / "r"
+    g = _repo(root, monkeypatch)
+    old = _commit(g, root, OLD, "old")
+    u1 = _commit(g, root, OLD.replace("\n\ndef b():\n    return 2\n", "\n"), "u1")
+    (root / "static").mkdir()
+    (root / "static" / "new.js").write_text("// 上游\n", "utf-8")
+    g("add", "static/new.js")
+    g("commit", "-q", "-m", "u2")
+    u2 = g("rev-parse", "HEAD")
+    g("switch", "-q", "-c", "fork", old)
+    _commit(g, root, OLD.replace("\n\ndef b():\n    return 2\n", "\n"), "fork 刪掉 b")
+    scratch = root / "leihu" / "scratch.py"
+    scratch.parent.mkdir()
+    scratch.write_bytes(b"def b():\n    return 2\n")
+    (root / "static").mkdir()
+    (root / "static" / "new.js").write_bytes(b"// fork \xe8\x87\xaa\xe5\xb7\xb1\xe7\x9a\x84\n")
+
+    assert D.step(old, u2, None) == 0
+    assert scratch.read_bytes() == b"def b():\n    return 2\n"
+    assert f'git commit --allow-empty -c {u1} --trailer "Upstream-commit: {u1}"' in capsys.readouterr().out
+    g("commit", "-q", "--allow-empty", "-C", u1, "--trailer", f"Upstream-commit: {u1}")
+
+    assert D.step(old, u2, None) == 1
+    assert any(x.startswith("手動") and "static/new.js" in x for x in capsys.readouterr().out.splitlines())
+    assert (root / "static" / "new.js").read_bytes() == b"// fork \xe8\x87\xaa\xe5\xb7\xb1\xe7\x9a\x84\n"
+
+
+def test_untracked_file_is_not_written_back(tmp_path):
+    """Codex 審查 P1：寫回工作目錄時，git 沒追蹤的檔案（例如 fork 從 git 拿掉、只留在本機的副本）不能被三方合併改掉。"""
+    old, new = tree(tmp_path / "old", {"static/x.js": "a\n"}), tree(tmp_path / "new", {"static/x.js": "b\n"})
+    fork_dir = tmp_path / "fork"
+    tree(fork_dir, {"static/x.js": "a\n"})
+    r = D.run(old, new, D.Source(tree=fork_dir, tracked=set()), fork_dir, extra_files=["static/x.js"])
+    assert (fork_dir / "static" / "x.js").read_text("utf-8") == "a\n"
+    assert r["files"] == [] and any("git 沒追蹤" in x for x in r["report"])

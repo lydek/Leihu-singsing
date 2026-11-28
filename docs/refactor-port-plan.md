@@ -524,7 +524,19 @@ Codex 第 7 次審查後補的（同類問題和繞過路徑）：
 - 沒有逐行看 diff 的：36 的「建議與可選」各小項、70 的 `cancel_song`、`on_cancel` 細節，只依 commit 說明判成「會改變行為」。
 
 ### 3.21 同步上游的流程（2026-11-22）
-**2026-11-24 起改用 `tests/tools/defmerge.py`**（`upstream-sync-research.md`、`pipeline-split-plan.md` 第 6 節）。下面的步驟 2、3 是 `upstream_map.py` 的做法：下一次同步時兩種都跑一次、比較結果，之後只用 `defmerge.py`。`defmerge.py` 還沒演練過的：逐個上游 commit 跑（`<commit>^ <commit>`，每次的 fork 用上一次的結果 `--tree`），才能照步驟 3 一個上游 commit 一個同步 commit、沿用上游的作者和日期；結果寫到 `--out`，要自己複製回工作目錄。拆檔的步驟 0 讓它支援共用命名空間之前，不搬程式。步驟 4 的檢查照舊；拆檔之後另外跑 `symtable` 的名稱檢查。
+**2026-11-24 起改用 `tests/tools/defmerge.py`**（`upstream-sync-research.md`、`pipeline-split-plan.md` 第 6 節）。下面的步驟 2、3 是 `upstream_map.py` 的做法：下一次同步時兩種都跑一次、比較結果，之後只用 `defmerge.py`。步驟 4 的檢查照舊；拆檔之後另外跑 `symtable` 的名稱檢查。
+
+**`defmerge.py --next`（2026-11-28）**：一個上游 commit 一個同步 commit，取代步驟 2、3 的 patch。從同步分支（工作目錄不能有還沒 commit 的修改）重複：
+1. `python tests/tools/defmerge.py <上次同步的版本> <新版本> --next`：從 HEAD 的 `Upstream-commit:` trailer 找出第一個還沒同步的上游 commit，合併它和它的前一個 commit 之間的改動（app.py、pipeline.py 以定義為單位，其他檔案整個檔案三方合併），直接寫回工作目錄。只動 git 追蹤的檔案：沒追蹤的檔案寫壞了沒辦法 `git checkout` 還原，碰到時列為「手動」。
+2. 照報告解決衝突和「手動」，改版號測試，跑步驟 4 的檢查。
+3. 照它印出的指令 `git add`，再 `git commit -c <sha> --trailer "Upstream-commit: <sha>"`：沿用上游的作者、日期和說明，在編輯器裡補兩段（放進現在的結構、fork 的調整）。上游 commit 對 fork 沒有改動時（例如上游刪掉的定義 fork 早就刪了），它印的是 `--allow-empty` 的指令：還是要留一個帶 trailer 的 commit，下一次才會換下一個。
+4. 再跑一次第 1 步，直到印出「都同步過了」。要把幾個上游 commit 合成一個時，commit 完再 squash，每個來源各留一行 trailer。
+
+演練（`v2.3.4..v2.3.5`，從 `263833a` 開始，每一步用 `--expect` 和當時手動同步的 commit 比）：5 個上游 commit 依序合併，「不同的定義」每一步都是無；照手動同步的結果解決之後，最後的檔案和 `43ddbb0` 完全相同，5 個 commit 的作者、日期是上游的。要手動處理的和一次合併時一樣：
+- 第 1 個（換版號）：`leihu.nsi`、`help.html`、`index.html` 整個檔案合併，版號那幾行衝突（7 處，都只有版號；這幾個檔案不套版號記號，`help.html` 的更新紀錄標題 `<h3>2.3.5</h3>` 套了會被換成 2.3.5.1）。版號測試（`test_fork_update.py`、`test_installer_identity.py`、`compare_upstream.py`）照 3.15 自己改。
+- 第 4 個：`submit_unfinished` 放進 `leihu/web/common.py`，3 個檔案要加 import（報告列出來）；手動同步放在 `queue_fine` 後面，工具放在檔案裡前一個鄰居 `_key_speed` 後面。
+- 第 5 個：連續新增的 5 個定義之間的空行和上游不同（工具每個定義前面固定空兩行）。
+- 沒有演練：拆檔後的結構（方式一的 7 個檔案）。`--next` 和一次合併用同一套合併程式，拆檔後一次合併 2.3.5 的模擬見 `pipeline-split-plan.md` 第 5 節「步驟 4 的結果」。
 
 `refactor` 要求線性歷史，不能 merge 上游，只能把上游的 commit 逐一套進來。步驟 1、4 之後，上游改 `app.py` 的 commit 直接 cherry-pick 一定會衝突；程式是原封搬的、函式名稱沒變，所以用 `tests/tools/upstream_map.py` 依「hunk 落在上游哪個最上層定義裡 → 那個名稱現在在哪個檔案」改寫路徑。
 

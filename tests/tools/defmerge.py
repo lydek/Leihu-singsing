@@ -25,6 +25,12 @@ upstream_map.py 是「hunk 落在哪個定義 → 那個名稱現在在哪個檔
     --all：app.py、pipeline.py 以外上游改過的檔案也整個檔案三方合併。
   python tests/tools/defmerge.py <舊上游> <新上游> --tree=<資料夾> --out=<資料夾>
     fork 用一個資料夾（例如模擬拆檔後的副本），不用 git 參照；寫出時保留原本的換行（CRLF／LF）。
+  python tests/tools/defmerge.py <舊上游> <新上游> --next [--expect=<參照>]
+    一個上游 commit 一個同步 commit（refactor-port-plan.md 3.21 步驟 3）：從 HEAD 的 `Upstream-commit:` trailer
+    找出 <舊上游>..<新上游>（第一條父線）裡第一個還沒同步的 commit C，合併 C^ → C（其他檔案也合併），直接寫回
+    工作目錄（換行照原樣），印出要 git add 的檔案和沿用上游作者、日期、說明的 commit 指令。工作目錄有還沒 commit
+    的修改時不跑（寫壞了可以 git checkout 還原）；只合併、寫回 git 追蹤的檔案。這個上游 commit 對 fork 沒有改動時
+    印 --allow-empty 的指令。解決衝突、檢查完、commit 之後再跑一次就是下一個。
 結束代碼：有衝突或要手動處理的是 1，否則 0；參數錯誤（含拼錯的選項）是 2；參照不存在等 git 錯誤直接中止。
 
 限制：類別整個當成一個定義合併（不拆到方法）；名稱改了的定義要登記在 RENAMES；
@@ -90,13 +96,15 @@ def show(ref: str, path: str) -> str | None:
 class Source:
     """一份程式：git 參照或資料夾。讀出來一律是 LF；資料夾記下原本的換行，寫出時照原樣。"""
 
-    def __init__(self, ref: str | None = None, tree: Path | None = None):
+    def __init__(self, ref: str | None = None, tree: Path | None = None, tracked: set[str] | None = None):
         self.ref, self.tree = ref, tree
+        self.tracked = tracked   # --next：只合併 git 追蹤的檔案，沒追蹤的檔案寫壞了沒辦法 git checkout 還原
         self.eols: dict[str, str] = {}
 
     def files(self, pattern: str) -> list[str]:
         if self.tree:
-            return sorted(p.relative_to(self.tree).as_posix() for p in self.tree.glob(pattern) if p.is_file())
+            got = sorted(p.relative_to(self.tree).as_posix() for p in self.tree.glob(pattern) if p.is_file())
+            return [f for f in got if self.tracked is None or f in self.tracked]
         out = git("ls-tree", "-r", "--name-only", self.ref).splitlines()
         rx = re.compile("^" + re.escape(pattern).replace(r"\*", "[^/]*") + "$")
         return [f for f in out if rx.match(f)]
@@ -117,6 +125,10 @@ class Source:
 
     def eol(self, path: str) -> str:
         return self.eols.get(path, "\n")
+
+    def untracked(self, path: str) -> bool:
+        """資料夾裡有這個檔案、但 git 沒追蹤（--next 不能蓋掉它）。"""
+        return self.tracked is not None and path not in self.tracked and (self.tree / path).exists()
 
 
 # ---------------------------------------------------------------- 定義與模組層級
@@ -625,6 +637,9 @@ class Merge:
                 continue
             self.whole[f] = text
         self.check_uses()
+        for f in [f for f in self.whole if self.fork.untracked(f)]:
+            del self.whole[f]
+            self.note("手動", f"{f}：工作目錄裡有這個檔案但 git 沒追蹤，沒有寫出", "manual")
         out_dir.mkdir(parents=True, exist_ok=True)
         for f, text in self.whole.items():
             p = out_dir / f
@@ -734,22 +749,77 @@ def parse_args(argv: list[str]):
     p = argparse.ArgumentParser(prog="defmerge.py", description=__doc__, allow_abbrev=False,
                                 formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("refs", nargs="+", metavar="參照", help="<舊上游> <新上游> [<fork 的參照>]（用 --tree 時不給 fork）")
-    p.add_argument("--out", required=True, help="寫出合併結果的資料夾")
+    p.add_argument("--out", help="寫出合併結果的資料夾")
     p.add_argument("--tree", help="fork 用資料夾，不用 git 參照")
     p.add_argument("--expect", help="和這個參照比較合併結果（驗證用）")
     p.add_argument("--all", action="store_true", help="app.py、pipeline.py 以外上游改過的檔案也整個檔案三方合併")
+    p.add_argument("--next", action="store_true", help="合併下一個還沒同步的上游 commit，寫回工作目錄")
     a = p.parse_args(argv)
-    if len(a.refs) != (2 if a.tree else 3):
+    if a.next:
+        if a.tree or a.out or a.all or len(a.refs) != 2:
+            p.error("--next 只給 <舊上游> <新上游>，不能和 --tree、--out、--all 一起用（固定寫回工作目錄、其他檔案也合併）")
+    elif len(a.refs) != (2 if a.tree else 3):
         p.error("要給 <舊上游> <新上游> <fork 的參照>；用 --tree 時只給前兩個")
+    elif not a.out:
+        p.error("要給 --out")
     return a
+
+
+def synced(rev: str = "HEAD") -> list[str]:
+    """rev 的歷史裡同步過的上游 commit（`Upstream-commit:` trailer 的值）。"""
+    out = git("log", "--format=%(trailers:key=Upstream-commit,valueonly,separator=%x0a)", rev)
+    return [v.strip() for v in out.splitlines() if v.strip()]
+
+
+def next_commit(old: str, new: str, done: list[str]) -> tuple[int, int, str | None]:
+    """old..new（上游的第一條父線，舊的在前）裡第一個還沒同步的：(第幾個, 總數, sha)，都同步過時 sha 是 None。
+    trailer 可以是縮寫（至少 7 碼）；合成一個同步 commit 的幾個上游 commit 各寫一行，都算同步過。"""
+    shas = git("rev-list", "--reverse", "--first-parent", f"{old}..{new}").split()
+    for i, s in enumerate(shas, 1):
+        if not any(len(d) >= 7 and s.startswith(d) for d in done):
+            return i, len(shas), s
+    return len(shas), len(shas), None
+
+
+def step(old: str, new: str, expect: Source | None) -> int:
+    """--next：合併下一個上游 commit，寫回工作目錄。"""
+    root = Path(git("rev-parse", "--show-toplevel").strip())
+    if git("status", "--porcelain", "--untracked-files=no").strip():
+        raise SystemExit("工作目錄有還沒 commit 的修改：先 commit 或還原再跑 --next（寫回之後要能用 git checkout 還原）")
+    i, n, sha = next_commit(old, new, synced())
+    if sha is None:
+        print(f"{old}..{new} 的 {n} 個上游 commit 都同步過了")
+        return 0
+    print(f"第 {i}／{n} 個上游 commit：{git('log', '-1', '--format=%h %an %ad %s', '--date=iso', sha).strip()}")
+    tracked = set(git("-C", str(root), "ls-files", "-z").split("\0")) - {""}
+    fork = Source(tree=root, tracked=tracked)
+    r = run(Source(ref=f"{sha}^"), Source(ref=sha), fork, root, expect, changed_files(f"{sha}^", sha))
+    print("\n".join(r["report"]))
+    print("統計：", r["stats"])
+    if expect:
+        print("和", expect.ref, "不同的定義：", r["diffs"] or "無")
+    print("寫回：", r["files"])
+    todo = r["stats"]["conflict"] or r["stats"]["manual"]
+    same = not todo and (not r["files"] or not git("-C", str(root), "status", "--porcelain", "--", *r["files"]).strip())
+    print("解決衝突、照 3.21 步驟 4 檢查完之後，在 repo 根目錄執行（新增的檔案也要 add）：")
+    if same:   # 例如上游刪掉的定義 fork 早就刪了：還是要有帶 trailer 的 commit，下次才會換下一個
+        print("  這個上游 commit 對 fork 沒有改動，記一個空的同步 commit：")
+        print(f'  git commit --allow-empty -c {sha} --trailer "Upstream-commit: {sha}"')
+    else:
+        print("  git add -- " + " ".join(r["files"]))
+        print(f'  git commit -c {sha} --trailer "Upstream-commit: {sha}"')
+    print("  （-c 沿用上游的作者、日期和說明，編輯器裡補「放進現在的結構」「fork 的調整」兩段）")
+    return 1 if todo else 0
 
 
 def main() -> int:
     a = parse_args(sys.argv[1:])
     for ref in [*a.refs, *([a.expect] if a.expect else [])]:
         check_ref(ref)
-    fork = Source(tree=Path(a.tree)) if a.tree else Source(ref=a.refs[2])
     expect = Source(ref=a.expect) if a.expect else None
+    if a.next:
+        return step(a.refs[0], a.refs[1], expect)
+    fork = Source(tree=Path(a.tree)) if a.tree else Source(ref=a.refs[2])
     extra = changed_files(a.refs[0], a.refs[1]) if a.all else None
     r = run(Source(ref=a.refs[0]), Source(ref=a.refs[1]), fork, Path(a.out), expect, extra)
     print("\n".join(r["report"]))
